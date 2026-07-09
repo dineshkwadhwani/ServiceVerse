@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
-import { ChevronRight, Package, Truck, CheckCircle, DollarSign, Star, Loader2 } from 'lucide-react';
+import { Package, Truck, CheckCircle, DollarSign, Star, Loader2 } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 import type { Order } from '@/types';
-import { formatDate, formatDateTime, formatCurrency } from '@/utils/formatters';
+import { formatDateTime } from '@/utils/formatters';
 
 interface OrderTrackingProps {
   orderId: string;
   onStatusChange?: () => void;
 }
 
-export function OrderTracking({ orderId, onStatusChange }: OrderTrackingProps) {
+export function OrderTracking({ orderId }: OrderTrackingProps) {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [feedbackRating, setFeedbackRating] = useState(0);
@@ -119,7 +119,6 @@ export function OrderTracking({ orderId, onStatusChange }: OrderTrackingProps) {
 
         <div className="space-y-4">
           {statusSteps.map((step, index) => {
-            const Icon = step.icon;
             const isCompleted = index <= currentStepIndex;
             const isCurrent = index === currentStepIndex;
 

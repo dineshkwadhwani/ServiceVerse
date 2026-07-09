@@ -30,27 +30,29 @@ try {
   console.warn('Messaging not available:', error);
 }
 
-// Connect to emulators in development
-if (import.meta.env.DEV && typeof window !== 'undefined') {
-  // Auth emulator
+// Connect to emulators only when explicitly enabled
+const useEmulators =
+  import.meta.env.DEV &&
+  import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true' &&
+  typeof window !== 'undefined';
+
+if (useEmulators) {
   try {
     connectAuthEmulator(auth, 'http://localhost:9099');
-  } catch (error) {
-    // Already connected or not available
+  } catch {
+    // Already connected
   }
 
-  // Firestore emulator
   try {
-    connectFirestoreEmulator(db, 'localhost', 8080);
-  } catch (error) {
-    // Already connected or not available
+    connectFirestoreEmulator(db, 'localhost', 8081);
+  } catch {
+    // Already connected
   }
 
-  // Storage emulator
   try {
     connectStorageEmulator(storage, 'localhost', 9199);
-  } catch (error) {
-    // Already connected or not available
+  } catch {
+    // Already connected
   }
 }
 

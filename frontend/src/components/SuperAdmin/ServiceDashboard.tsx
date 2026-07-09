@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, Edit2, Eye } from 'lucide-react';
-import { apiClient } from '@/services/apiClient';
+import { Plus } from 'lucide-react';
+import { getServices } from '@/services/serviceService';
 import { useToast } from '@/store/notificationStore';
 import { CreateServiceModal } from './CreateServiceModal';
 import { ServiceCard } from './ServiceCard';
@@ -25,9 +25,9 @@ export function ServiceDashboard() {
   const fetchServices = async () => {
     setIsLoading(true);
     try {
-      const response = await apiClient.getServices(currentPage, ITEMS_PER_PAGE);
-      setServices(response.data.services || []);
-      setTotalServices(response.data.total || 0);
+      const response = await getServices(currentPage, ITEMS_PER_PAGE);
+      setServices(response.services || []);
+      setTotalServices(response.total || 0);
     } catch (error: any) {
       toast.error('Failed to fetch services', error.message);
     } finally {

@@ -13,7 +13,6 @@ export function DocumentUploadForm({
   register,
   errors,
   setValue,
-  bankDetails,
 }: DocumentUploadFormProps) {
   const handleGSTUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

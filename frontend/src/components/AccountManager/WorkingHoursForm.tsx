@@ -1,4 +1,4 @@
-import { UseFormRegister, UseFormSetValue, UseFormWatch } from 'react-hook-form';
+import { UseFormRegister, UseFormSetValue } from 'react-hook-form';
 import type { OnboardSPFormData } from '@/types';
 
 interface WorkingHoursFormProps {

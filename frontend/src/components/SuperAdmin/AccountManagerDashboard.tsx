@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, Eye } from 'lucide-react';
+import { Plus, Edit2, Eye } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 import { CreateAccountManagerModal } from './CreateAccountManagerModal';

@@ -28,7 +28,6 @@ export function CreateOrderForm({
     register,
     handleSubmit,
     formState: { errors },
-    watch,
   } = useForm({
     resolver: zodResolver(createOrderSchema),
     defaultValues: {
@@ -37,9 +36,6 @@ export function CreateOrderForm({
       pickupTime: '09:00',
     },
   });
-
-  const pickupDate = watch('pickupDate');
-  const pickupTime = watch('pickupTime');
 
   useEffect(() => {
     fetchMenuItems();

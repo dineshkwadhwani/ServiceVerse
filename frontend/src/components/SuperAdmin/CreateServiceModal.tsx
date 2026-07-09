@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Upload, Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createServiceSchema } from '@/utils/validators';
-import { apiClient } from '@/services/apiClient';
+import { createService as createServiceInFirestore } from '@/services/serviceService';
 import { useToast } from '@/store/notificationStore';
-import { DEFAULT_COLORS, WORKING_HOURS_DEFAULT } from '@/utils/constants';
+import { DEFAULT_COLORS } from '@/utils/constants';
 import type { Service, CreateServiceFormData } from '@/types';
 
 interface CreateServiceModalProps {
@@ -95,42 +95,20 @@ export function CreateServiceModal({
     setValue('colorTheme', newColors);
   };
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: CreateServiceFormData) => {
     setIsSubmitting(true);
     try {
-      // Create FormData for file upload
-      const formData = new FormData();
-      formData.append('name', data.name);
-      formData.append('description', data.description);
-      formData.append('fromEmail', data.fromEmail);
-      formData.append('fromName', data.fromName);
-      formData.append('gstPercentage', data.gstPercentage);
-      formData.append('colorTheme', JSON.stringify(data.colorTheme));
-      formData.append('defaultCommission', JSON.stringify(data.defaultCommission));
-
-      if (data.logo instanceof File) {
-        formData.append('logo', data.logo);
-      }
-      if (data.heroImage instanceof File) {
-        formData.append('heroImage', data.heroImage);
-      }
-
       if (service) {
-        // Update existing service
-        // TODO: Update API to handle FormData
-        // await apiClient.updateService(service.serviceId, formData);
-        toast.success('Service updated successfully');
-      } else {
-        // Create new service
-        // TODO: Update API to handle FormData
-        // await apiClient.createService(formData);
-        toast.success('Service created successfully');
+        toast.error('Update not implemented yet');
+        return;
       }
 
+      await createServiceInFirestore(data);
       onSave();
       onClose();
-    } catch (error: any) {
-      toast.error('Failed to save service', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to save service';
+      toast.error('Failed to save service', message);
     } finally {
       setIsSubmitting(false);
     }

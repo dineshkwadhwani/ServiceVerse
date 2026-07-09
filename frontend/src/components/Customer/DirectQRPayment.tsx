@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { QrCode, Check, Clock, Loader2 } from 'lucide-react';
+import { QrCode, Check, Loader2 } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 
@@ -36,8 +36,8 @@ export function DirectQRPayment({
     }
   };
 
-  // Generate QR code data (this is a placeholder - in production, generate actual QR)
-  const qrCodeData = `upi://pay?pa=${spUPIId}&pn=${encodeURIComponent(spName)}&am=${amount}&tn=ServiceVerse%20Order%20${orderId.slice(-6)}`;
+  // Reserved for future QR rendering integration.
+  void `upi://pay?pa=${spUPIId}&pn=${encodeURIComponent(spName)}&am=${amount}&tn=ServiceVerse%20Order%20${orderId.slice(-6)}`;
 
   if (isPaymentConfirmed) {
     return (

@@ -1,0 +1,22 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'SUPERADMIN';
+    }
+
+    // SuperAdmin: full read/write on all storage paths
+    match /{allPaths=**} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // Service images are publicly readable (logos, hero banners)
+    match /services/{serviceId}/{fileName} {
+      allow read: if true;
+    }
+  }
+}
