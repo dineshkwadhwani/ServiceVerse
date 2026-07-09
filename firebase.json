@@ -1,0 +1,18 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": [
+    {
+      "bucket": "serviceverse-dev-a6b72.appspot.com",
+      "rules": "storage.rules"
+    }
+  ],
+  "functions": [
+    {
+      "source": "backend/functions",
+      "codebase": "default",
+      "runtime": "nodejs20"
+    }
+  ]
+}

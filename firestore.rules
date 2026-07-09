@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SUPERADMIN';
+    }
+
+    function isAccountManager() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ACCOUNT_MANAGER';
+    }
+
+    function isServiceProvider() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SERVICE_PROVIDER';
+    }
+
+    function isCustomer() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'CUSTOMER';
+    }
+
+    // Services collection - publicly readable, write restricted to SuperAdmin
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create, update, delete: if isSuperAdmin();
+
+      // Menu items subcollection
+      match /menuItems/{menuItemId} {
+        allow read: if true;
+        allow write: if isSuperAdmin();
+      }
+    }
+
+    // Users collection - read own document, SuperAdmin can read/write all
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow create: if isAuthenticated();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Orders collection - owner can read/write, SuperAdmin can manage all
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.serviceProviderId == request.auth.uid ||
+        isSuperAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.serviceProviderId == request.auth.uid ||
+        isSuperAdmin()
+      );
+
+      // Order feedback subcollection
+      match /feedback/{feedbackId} {
+        allow read: if isAuthenticated() && (
+          get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid ||
+          get(/databases/$(database)/documents/orders/$(orderId)).data.serviceProviderId == request.auth.uid ||
+          isSuperAdmin()
+        );
+        allow write: if isAuthenticated();
+      }
+    }
+
+    // Account Managers collection - SuperAdmin only
+    match /accountManagers/{amId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // Service Providers collection - read own, SuperAdmin can manage all
+    match /serviceProviders/{spId} {
+      allow read: if isAuthenticated() && (request.auth.uid == spId || isSuperAdmin());
+      allow write: if isSuperAdmin();
+    }
+
+    // Analytics collection - SuperAdmin only
+    match /analytics/{analyticsId} {
+      allow read, write: if isSuperAdmin();
+    }
+  }
+}
