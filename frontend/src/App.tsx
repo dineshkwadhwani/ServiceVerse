@@ -6,6 +6,8 @@ import { useNotificationStore } from '@/store/notificationStore';
 import { USER_ROLES } from '@/utils/constants';
 
 import { LoginPage } from '@/pages/LoginPage';
+import { LandingPage } from '@/pages/LandingPage';
+import { ServiceLandingPage } from '@/pages/ServiceLandingPage';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { NotFound } from '@/pages/NotFound';
 import { ToastContainer } from '@/components/Shared/Toast';
@@ -65,18 +67,40 @@ export function App() {
     <Router>
       <div className="min-h-screen bg-gray-50">
         <Routes>
+          {/* ============================================================================ */}
+          {/* PUBLIC ROUTES - NO AUTH REQUIRED */}
+          {/* ============================================================================ */}
+
+          {/* Main Landing Page - Shows all services */}
+          <Route path="/" element={<LandingPage />} />
+
+          {/* Service-Specific Landing Page */}
+          <Route path="/:serviceName" element={<ServiceLandingPage />} />
+
+          {/* Login Page */}
           <Route path="/login" element={<LoginPage />} />
 
+          {/* ============================================================================ */}
+          {/* PROTECTED ROUTES - AUTH REQUIRED */}
+          {/* ============================================================================ */}
+
           <Route element={<ProtectedRoute />}>
+            {/* Admin Redirect */}
             <Route path="/admin" element={<Navigate to="/superadmin/services" replace />} />
-            <Route path="/" element={<DashboardLayout />}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<DashboardRedirect />} />
-              <Route path="superadmin/services" element={<ServiceDashboard />} />
-              <Route path="superadmin/account-managers" element={<AccountManagerDashboard />} />
+
+            {/* Dashboard Routes */}
+            <Route path="/dashboard" element={<DashboardLayout />}>
+              <Route index element={<DashboardRedirect />} />
+            </Route>
+
+            {/* SuperAdmin Routes */}
+            <Route path="/superadmin" element={<DashboardLayout />}>
+              <Route path="services" element={<ServiceDashboard />} />
+              <Route path="account-managers" element={<AccountManagerDashboard />} />
             </Route>
           </Route>
 
+          {/* 404 - Not Found */}
           <Route path="*" element={<NotFound />} />
         </Routes>
 
