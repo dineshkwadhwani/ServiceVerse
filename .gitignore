@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 
+serviceverse-dev*
 # Environment variables
 .env
 .env.local
