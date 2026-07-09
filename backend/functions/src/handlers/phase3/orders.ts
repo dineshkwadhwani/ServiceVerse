@@ -115,7 +115,7 @@ export async function getOrders(req: AuthRequest, res: Response) {
 
     const snapshot = await query.orderBy('createdAt', 'desc').limit(50).get();
 
-    const orders = snapshot.docs.map((doc) => ({
+    const orders = snapshot.docs.map((doc: any) => ({
       ...doc.data(),
       createdAt: doc.data().createdAt?.toDate?.(),
       pickupDate: doc.data().pickupDate?.toDate?.(),

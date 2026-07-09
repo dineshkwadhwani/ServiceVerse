@@ -1,6 +1,6 @@
 import * as functions from 'firebase-functions';
-import * as express from 'express';
-import * as cors from 'cors';
+import express from 'express';
+import cors from 'cors';
 import { verifyToken, requireRole } from '@/middleware/auth';
 import { sendError, sendSuccess } from '@/middleware/errorHandler';
 import { Logger } from '@/utils/logger';

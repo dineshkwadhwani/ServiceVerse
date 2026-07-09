@@ -247,7 +247,7 @@ export async function onboardServiceProvider(req: AuthRequest, res: Response) {
             serviceProviderId: spId,
           });
         } catch (coworkerError) {
-          logger.warn('Failed to create coworker', coworkerError);
+          logger.warn('Failed to create coworker', { error: String(coworkerError) });
         }
       }
     }
@@ -291,15 +291,15 @@ export async function getServiceProviders(req: AuthRequest, res: Response) {
       ...doc.data(),
       createdAt: doc.data().createdAt?.toDate?.(),
       onboardedAt: doc.data().onboardedAt?.toDate?.(),
-    }));
+    } as any));
 
     return sendSuccess(res, {
       serviceProviders,
       total: serviceProviders.length,
       byStatus: {
-        active: serviceProviders.filter((sp) => sp.status === 'ACTIVE').length,
-        pending: serviceProviders.filter((sp) => sp.status === 'ONBOARDING').length,
-        inactive: serviceProviders.filter((sp) => sp.status === 'INACTIVE').length,
+        active: serviceProviders.filter((sp: any) => sp.status === 'ACTIVE').length,
+        pending: serviceProviders.filter((sp: any) => sp.status === 'ONBOARDING').length,
+        inactive: serviceProviders.filter((sp: any) => sp.status === 'INACTIVE').length,
       },
     });
   } catch (error: any) {
