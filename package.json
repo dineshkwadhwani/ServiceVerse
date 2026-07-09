@@ -1,0 +1,20 @@
+{
+  "name": "serviceverse",
+  "version": "1.0.0",
+  "description": "ServiceVerse - Multi-utility SaaS platform",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend/functions"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run serve --workspace=backend/functions",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:backend": "npm run build --workspace=backend/functions",
+    "install:all": "npm install"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
