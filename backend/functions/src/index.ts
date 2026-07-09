@@ -23,6 +23,17 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+// Public endpoints (no authentication required)
+// Get all services (public listing)
+app.get('/services', async (req, res) => {
+  serviceHandlers.getServices(req as any, res);
+});
+
+// Get Service by ID (public)
+app.get('/services/:serviceId', async (req, res) => {
+  serviceHandlers.getService(req as any, res);
+});
+
 // Auth middleware for all other routes
 app.use(verifyToken);
 
@@ -33,16 +44,6 @@ app.use(verifyToken);
 // Create Service
 app.post('/services', requireRole('SUPERADMIN'), (req, res) => {
   serviceHandlers.createService(req as any, res);
-});
-
-// Get Services
-app.get('/services', async (req, res) => {
-  serviceHandlers.getServices(req as any, res);
-});
-
-// Get Service by ID
-app.get('/services/:serviceId', async (req, res) => {
-  serviceHandlers.getService(req as any, res);
 });
 
 // Update Service
