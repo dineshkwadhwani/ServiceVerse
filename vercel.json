@@ -1,8 +1,10 @@
 {
   "version": 2,
+  "root": ".",
   "buildCommand": "npm run build:frontend",
   "installCommand": "npm ci",
   "outputDirectory": "frontend/dist",
+  "framework": "vite",
   "routes": [
     {
       "src": "/assets/(.*)",
