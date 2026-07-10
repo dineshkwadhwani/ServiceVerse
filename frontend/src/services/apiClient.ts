@@ -105,6 +105,18 @@ class ApiClient {
   }
 
   // ============================================================================
+  // SERVICE PROVIDER DASHBOARD
+  // ============================================================================
+
+  async createCustomerBySP(data: any) {
+    return this.axiosInstance.post('/service-providers/create-customer', data);
+  }
+
+  async getSPCustomers() {
+    return this.axiosInstance.get('/service-providers/customers');
+  }
+
+  // ============================================================================
   // SERVICES
   // ============================================================================
 

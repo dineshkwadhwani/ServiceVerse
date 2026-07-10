@@ -10,6 +10,7 @@ import * as phase3Handlers from '@/handlers/phase3/orders';
 
 import * as authHandlers from '@/handlers/auth/registration';
 import * as customerHandlers from '@/handlers/customers/dashboard';
+import * as spDashboardHandlers from '@/handlers/serviceProviders/dashboard';
 
 import { getSeedAdminConfig, seedSuperAdminUser } from '@/handlers/admin/seedAdmin';
 
@@ -88,6 +89,18 @@ app.post('/customers/add-provider', async (req, res) => {
 
 app.post('/customers/request-unorphan', async (req, res) => {
   customerHandlers.requestUnorphan(req as any, res);
+});
+
+// ============================================================================
+// SERVICE PROVIDER DASHBOARD
+// ============================================================================
+
+app.post('/service-providers/create-customer', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  spDashboardHandlers.createCustomerBySP(req as any, res);
+});
+
+app.get('/service-providers/customers', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  spDashboardHandlers.getSPCustomers(req as any, res);
 });
 
 // ============================================================================
