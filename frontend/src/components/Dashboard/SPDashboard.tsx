@@ -314,7 +314,7 @@ export function SPDashboard() {
                       value={formData.phone}
                       onChange={handleInputChange}
                       placeholder="10-digit number"
-                      maxLength="10"
+                      maxLength={10}
                       className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
                     />
                   </div>

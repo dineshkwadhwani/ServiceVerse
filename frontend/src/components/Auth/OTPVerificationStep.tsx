@@ -134,7 +134,7 @@ export function OTPVerificationStep({
             value={otp}
             onChange={(e) => setOtp(e.target.value.toUpperCase())}
             placeholder="Enter 6-digit code"
-            maxLength="6"
+            maxLength={6}
             className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 text-center text-lg tracking-widest font-mono"
             disabled={isVerifying || isLoading}
           />

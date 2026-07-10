@@ -44,9 +44,6 @@ export function SuperAdminDashboard() {
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<
-    'ACCOUNT_MANAGER' | 'SERVICE_PROVIDER' | 'CUSTOMER'
-  >('ACCOUNT_MANAGER');
   const [newUserForm, setNewUserForm] = useState({
     name: '',
     email: '',
@@ -361,7 +358,6 @@ export function SuperAdminDashboard() {
                   <button
                     key={role}
                     onClick={() => {
-                      setSelectedRole(role as any);
                       setNewUserForm({ ...newUserForm, role: role as any });
                     }}
                     className={`px-3 py-2 rounded-lg text-sm font-semibold transition ${

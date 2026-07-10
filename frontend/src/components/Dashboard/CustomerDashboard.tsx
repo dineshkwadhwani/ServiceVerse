@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/store/notificationStore';
 import { apiClient } from '@/services/apiClient';
-import { Search, Plus, LogOut, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
-import type { Service, UserServiceAssociation } from '@/types';
+import { Search, Plus, LogOut, AlertCircle, Loader2 } from 'lucide-react';
+import type { Service } from '@/types';
 
 export function CustomerDashboard() {
   const { user, signOut } = useAuthStore();

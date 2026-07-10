@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Phone, Briefcase, User, Loader2 } from 'lucide-react';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { auth } from '@/utils/firebase-config';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 import { OTPVerificationStep } from './OTPVerificationStep';
@@ -26,7 +24,6 @@ export function RegisterSPForm({ serviceId }: { serviceId: string }) {
     phone: '',
   });
   const [verificationMethod, setVerificationMethod] = useState<'email' | 'phone' | null>(null);
-  const [confirmationResult, setConfirmationResult] = useState<any>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -58,32 +55,6 @@ export function RegisterSPForm({ serviceId }: { serviceId: string }) {
       return false;
     }
     return true;
-  };
-
-  const handleSendPhoneOTP = async () => {
-    if (!validateForm()) return;
-
-    setIsLoading(true);
-    try {
-      const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible',
-      });
-
-      const confirmation = await signInWithPhoneNumber(
-        auth,
-        `+91${formData.phone}`,
-        recaptchaVerifier
-      );
-
-      setConfirmationResult(confirmation);
-      setVerificationMethod('phone');
-      setStep('verification');
-      toast.success('OTP sent to your phone');
-    } catch (error: any) {
-      toast.error('Failed to send phone OTP: ' + error.message);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleSendEmailOTP = async () => {
@@ -209,7 +180,7 @@ export function RegisterSPForm({ serviceId }: { serviceId: string }) {
               value={formData.phone}
               onChange={handleInputChange}
               placeholder="10-digit phone number"
-              maxLength="10"
+              maxLength={10}
               className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
               required
             />
@@ -219,29 +190,17 @@ export function RegisterSPForm({ serviceId }: { serviceId: string }) {
 
         {/* Verification Methods */}
         <div className="pt-4 border-t border-white/10">
-          <p className="text-white font-semibold mb-4">Verify your account with at least one method:</p>
+          <p className="text-white font-semibold mb-4">Verify your account:</p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button
-              type="button"
-              onClick={handleSendEmailOTP}
-              disabled={isLoading || !formData.email}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
-            >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-              Email OTP
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSendPhoneOTP}
-              disabled={isLoading || !formData.phone}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
-            >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
-              Phone OTP
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleSendEmailOTP}
+            disabled={isLoading || !formData.email}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
+          >
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+            Send OTP via Email
+          </button>
         </div>
 
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-300">

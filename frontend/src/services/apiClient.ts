@@ -52,7 +52,7 @@ class ApiClient {
 
   async verifyEmailOTP(email: string, otp: string) {
     const response = await this.axiosInstance.post('/auth/verify-email-otp', { email, otp });
-    return response.success === true;
+    return (response as any)?.success === true;
   }
 
   async sendPhoneOTP(phone: string) {
@@ -61,7 +61,7 @@ class ApiClient {
 
   async verifyPhoneOTP(phone: string, otp: string) {
     const response = await this.axiosInstance.post('/auth/verify-phone-otp', { phone, otp });
-    return response.success === true;
+    return (response as any)?.success === true;
   }
 
   async registerCustomer(data: any) {
@@ -209,8 +209,8 @@ class ApiClient {
   // SERVICE PROVIDERS
   // ============================================================================
 
-  async registerServiceProvider(data: any) {
-    return this.axiosInstance.post('/service-providers/register', data);
+  async getServiceProviders() {
+    return this.axiosInstance.get('/service-providers');
   }
 
   async assignAccountManager(spId: string, accountManagerId: string) {
@@ -222,10 +222,6 @@ class ApiClient {
 
   async onboardServiceProvider(spId: string, data: any) {
     return this.axiosInstance.post(`/service-providers/${spId}/onboard`, data);
-  }
-
-  async getServiceProviders() {
-    return this.axiosInstance.get('/service-providers');
   }
 
   // ============================================================================

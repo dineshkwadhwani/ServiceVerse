@@ -8,7 +8,6 @@ import {
   Loader2,
   LogOut,
   Clock,
-  User,
   AlertCircle,
 } from 'lucide-react';
 

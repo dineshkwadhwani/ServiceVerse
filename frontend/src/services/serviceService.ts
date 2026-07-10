@@ -38,6 +38,7 @@ function mapServiceDoc(id: string, data: Record<string, unknown>): Service {
     gstPercentage: data.gstPercentage as number,
     defaultCommission: data.defaultCommission as Service['defaultCommission'],
     status: (data.status as Service['status']) || 'INACTIVE',
+    unorphanReasons: (data.unorphanReasons as string[]) || [],
     createdBy: data.createdBy as string,
     createdAt:
       (data.createdAt as { toDate?: () => Date })?.toDate?.() || new Date(),

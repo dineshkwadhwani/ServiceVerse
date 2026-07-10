@@ -9,6 +9,9 @@ export interface BaseUser {
   role: UserRole;
   createdAt: Date;
   updatedAt: Date;
+  businessName?: string;
+  isOrphaned?: boolean;
+  verified?: boolean;
 }
 
 export interface SuperAdmin extends BaseUser {
