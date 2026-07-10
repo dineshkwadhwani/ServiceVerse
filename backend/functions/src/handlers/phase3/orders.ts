@@ -9,11 +9,25 @@ import Razorpay from 'razorpay';
 
 const logger = new Logger('Phase3Handlers');
 
-// Initialize Razorpay
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+let razorpayClient: Razorpay | null = null;
+
+function getRazorpayClient(): Razorpay {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (!keyId || !keySecret) {
+    throw new ValidationError('Razorpay credentials are not configured');
+  }
+
+  if (!razorpayClient) {
+    razorpayClient = new Razorpay({
+      key_id: keyId,
+      key_secret: keySecret,
+    });
+  }
+
+  return razorpayClient;
+}
 
 /**
  * Create Order
@@ -286,7 +300,7 @@ export async function initializeRazorpayPayment(req: AuthRequest, res: Response)
     const amount = Math.round(orderData.totalAmount * 100); // Convert to paise
 
     // Create Razorpay order
-    const razorpayOrder = await razorpay.orders.create({
+    const razorpayOrder = await getRazorpayClient().orders.create({
       amount,
       currency: 'INR',
       receipt: orderId,

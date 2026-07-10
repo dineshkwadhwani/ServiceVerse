@@ -17,6 +17,8 @@
     "deploy:rules:cli": "bash scripts/deploy-rules.sh",
     "deploy:rules:firestore": "unset GOOGLE_APPLICATION_CREDENTIALS; npx --yes --package=firebase-tools@15.22.4 firebase deploy --only firestore:rules --project serviceverse-dev-fa38e",
     "test:firestore": "node scripts/test-firestore-connection.js",
+    "seed:superadmin": "npm run seed:superadmin --workspace=backend/functions",
+    "deploy:seedAdmin": "npm run build --workspace=backend/functions && npx --yes --package=firebase-tools@15.22.4 firebase deploy --only functions:seedAdmin --project serviceverse-dev-fa38e",
     "build:frontend": "npm run build --workspace=frontend",
     "build:backend": "npm run build --workspace=backend/functions",
     "build": "npm run build:frontend",

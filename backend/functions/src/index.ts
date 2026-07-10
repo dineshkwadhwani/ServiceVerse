@@ -7,8 +7,12 @@ import { Logger } from '@/utils/logger';
 import * as serviceHandlers from '@/handlers/services/createService';
 import * as phase2Handlers from '@/handlers/phase2/onboarding';
 import * as phase3Handlers from '@/handlers/phase3/orders';
+
 import * as authHandlers from '@/handlers/auth/registration';
 import * as customerHandlers from '@/handlers/customers/dashboard';
+
+import { getSeedAdminConfig, seedSuperAdminUser } from '@/handlers/admin/seedAdmin';
+
 
 const logger = new Logger('CloudFunctions');
 
@@ -242,6 +246,64 @@ export const health = functions
       timestamp: new Date().toISOString(),
       version: '1.0.0',
     });
+  });
+
+/**
+ * One-time / bootstrap endpoint to create the SuperAdmin user.
+ * Protected by SEED_ADMIN_SECRET (header: x-seed-secret).
+ */
+export const seedAdmin = functions
+  .region('us-central1')
+  .https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+
+    if (req.method === 'OPTIONS') {
+      res.set('Access-Control-Allow-Methods', 'POST');
+      res.set('Access-Control-Allow-Headers', 'Content-Type, x-seed-secret');
+      res.status(204).send('');
+      return;
+    }
+
+    if (req.method !== 'POST') {
+      res.status(405).json({ success: false, error: 'Method not allowed. Use POST.' });
+      return;
+    }
+
+    try {
+      const config = getSeedAdminConfig();
+      const providedSecret =
+        req.get('x-seed-secret') || (req.body?.secret as string | undefined);
+
+      if (!providedSecret || providedSecret !== config.secret) {
+        res.status(401).json({ success: false, error: 'Unauthorized' });
+        return;
+      }
+
+      const result = await seedSuperAdminUser({
+        email: (req.body?.email as string | undefined) || config.email,
+        password: (req.body?.password as string | undefined) || config.password,
+        firstName: (req.body?.firstName as string | undefined) || config.firstName,
+        lastName: (req.body?.lastName as string | undefined) || config.lastName,
+        phone: (req.body?.phone as string | undefined) || config.phone,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          uid: result.uid,
+          email: result.email,
+          role: result.role,
+          created: result.created,
+          updated: result.updated,
+        },
+      });
+    } catch (error: any) {
+      logger.error('seedAdmin failed', error);
+      res.status(500).json({
+        success: false,
+        error: error?.message || 'Failed to seed SuperAdmin',
+      });
+    }
   });
 
 logger.info('Cloud Functions initialized successfully');
