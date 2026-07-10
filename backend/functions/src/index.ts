@@ -12,6 +12,7 @@ import * as authHandlers from '@/handlers/auth/registration';
 import * as customerHandlers from '@/handlers/customers/dashboard';
 import * as spDashboardHandlers from '@/handlers/serviceProviders/dashboard';
 import * as amDashboardHandlers from '@/handlers/accountManagers/dashboard';
+import * as superAdminHandlers from '@/handlers/superAdmin/dashboard';
 
 import { getSeedAdminConfig, seedSuperAdminUser } from '@/handlers/admin/seedAdmin';
 
@@ -114,6 +115,22 @@ app.get('/account-managers/unorphan-requests', requireRole('ACCOUNT_MANAGER'), a
 
 app.patch('/account-managers/unorphan-requests/:requestId', requireRole('ACCOUNT_MANAGER'), async (req, res) => {
   amDashboardHandlers.reviewUnorphanRequest(req as any, res);
+});
+
+// ============================================================================
+// SUPERADMIN DASHBOARD
+// ============================================================================
+
+app.get('/superadmin/stats', requireRole('SUPERADMIN'), async (req, res) => {
+  superAdminHandlers.getSystemStats(req as any, res);
+});
+
+app.get('/superadmin/users', requireRole('SUPERADMIN'), async (req, res) => {
+  superAdminHandlers.getAllUsers(req as any, res);
+});
+
+app.post('/superadmin/users', requireRole('SUPERADMIN'), async (req, res) => {
+  superAdminHandlers.createUser(req as any, res);
 });
 
 // ============================================================================

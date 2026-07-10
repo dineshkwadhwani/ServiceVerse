@@ -129,6 +129,22 @@ class ApiClient {
   }
 
   // ============================================================================
+  // SUPERADMIN DASHBOARD
+  // ============================================================================
+
+  async getSuperAdminStats() {
+    return this.axiosInstance.get('/superadmin/stats');
+  }
+
+  async getAllUsers() {
+    return this.axiosInstance.get('/superadmin/users');
+  }
+
+  async createUserByAdmin(data: any) {
+    return this.axiosInstance.post('/superadmin/users', data);
+  }
+
+  // ============================================================================
   // SERVICES
   // ============================================================================
 

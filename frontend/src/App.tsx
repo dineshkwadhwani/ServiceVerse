@@ -17,6 +17,7 @@ import { AccountManagerDashboard } from '@/components/SuperAdmin/AccountManagerD
 import { CustomerDashboard } from '@/components/Dashboard/CustomerDashboard';
 import { SPDashboard } from '@/components/Dashboard/SPDashboard';
 import { AMDashboard } from '@/components/Dashboard/AMDashboard';
+import { SuperAdminDashboard } from '@/components/Dashboard/SuperAdminDashboard';
 
 function AuthLoadingScreen() {
   return (
@@ -100,6 +101,9 @@ export function App() {
 
             {/* Account Manager Dashboard */}
             <Route path="/account-manager" element={<AMDashboard />} />
+
+            {/* SuperAdmin Dashboard */}
+            <Route path="/superadmin-dashboard" element={<SuperAdminDashboard />} />
 
             {/* Admin Redirect */}
             <Route path="/admin" element={<Navigate to="/superadmin/services" replace />} />
