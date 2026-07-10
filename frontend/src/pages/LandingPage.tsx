@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Loader2, LogIn, UserPlus, ArrowRight } from 'lucide-react';
-import { apiClient } from '@/services/apiClient';
+import { getActiveServices } from '@/services/serviceService';
 import { useToast } from '@/store/notificationStore';
 import type { Service } from '@/types';
 
@@ -16,13 +16,11 @@ export function LandingPage() {
   const fetchServices = async () => {
     setIsLoading(true);
     try {
-      const response = await apiClient.getServices();
-      const activeServices = (response.data?.services || []).filter(
-        (s: Service) => s.status === 'ACTIVE'
-      );
+      const activeServices = await getActiveServices();
       setServices(activeServices);
-    } catch (error: any) {
-      toast.error('Failed to load services', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to load services';
+      toast.error('Failed to load services', message);
     } finally {
       setIsLoading(false);
     }

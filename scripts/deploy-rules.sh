@@ -2,22 +2,54 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT_ID="${FIREBASE_PROJECT_ID:-serviceverse-dev-a6b72}"
+PROJECT_ID="${FIREBASE_PROJECT_ID:-serviceverse-dev-fa38e}"
+FIREBASE_CLI="npx --yes --package=firebase-tools@15.22.4 firebase"
 
 cd "$ROOT_DIR"
 
-# Prefer interactive Firebase login over service account credentials.
-# To force service account auth, set GOOGLE_APPLICATION_CREDENTIALS before running.
-if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
-  echo "Using Firebase CLI user login (run 'npx firebase-tools login' if deploy fails)."
-else
-  echo "Using service account: $GOOGLE_APPLICATION_CREDENTIALS"
-fi
+# Service account tokens often fail for rules deploy — use interactive login instead.
+unset GOOGLE_APPLICATION_CREDENTIALS
 
-echo "Deploying Firestore + Storage rules to project: $PROJECT_ID"
+echo "Deploying rules to project: $PROJECT_ID"
+echo "Logged in as:"
+$FIREBASE_CLI login:list || true
 echo ""
 
-# Use an isolated npx install to avoid monorepo dependency conflicts on Node 22.
-npx --yes --package=firebase-tools@15.22.4 firebase deploy \
-  --only firestore:rules,storage \
-  --project "$PROJECT_ID"
+deploy_firestore() {
+  echo "→ Deploying Firestore rules..."
+  $FIREBASE_CLI deploy --only firestore:rules --project "$PROJECT_ID"
+}
+
+deploy_storage() {
+  echo "→ Deploying Storage rules..."
+  $FIREBASE_CLI deploy --only storage --project "$PROJECT_ID"
+}
+
+if deploy_firestore; then
+  echo "✔ Firestore rules deployed"
+else
+  echo ""
+  echo "Firestore deploy failed. Re-authenticate, then retry:"
+  echo "  npx firebase-tools@15.22.4 logout"
+  echo "  npx firebase-tools@15.22.4 login --reauth"
+  echo "  npm run deploy:rules"
+  exit 1
+fi
+
+if deploy_storage; then
+  echo "✔ Storage rules deployed"
+else
+  echo ""
+  echo "Storage deploy failed (401 usually means expired login or Storage not enabled)."
+  echo ""
+  echo "Try:"
+  echo "  1. npx firebase-tools@15.22.4 login --reauth"
+  echo "  2. Enable Storage in Firebase Console → Storage → Get started"
+  echo "  3. npm run deploy:rules"
+  echo ""
+  echo "Or paste storage.rules manually in Firebase Console → Storage → Rules"
+  exit 1
+fi
+
+echo ""
+echo "✔ All rules deployed successfully!"

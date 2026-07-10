@@ -74,11 +74,11 @@ export function App() {
           {/* Main Landing Page - Shows all services */}
           <Route path="/" element={<LandingPage />} />
 
-          {/* Service-Specific Landing Page */}
-          <Route path="/:serviceName" element={<ServiceLandingPage />} />
-
           {/* Login Page */}
           <Route path="/login" element={<LoginPage />} />
+
+          {/* Service-Specific Landing Page */}
+          <Route path="/:serviceName" element={<ServiceLandingPage />} />
 
           {/* ============================================================================ */}
           {/* PROTECTED ROUTES - AUTH REQUIRED */}

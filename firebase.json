@@ -4,7 +4,7 @@
   },
   "storage": [
     {
-      "bucket": "serviceverse-dev-a6b72.appspot.com",
+      "bucket": "serviceverse-dev-fa38e.firebasestorage.app",
       "rules": "storage.rules"
     }
   ],

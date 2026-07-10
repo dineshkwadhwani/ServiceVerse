@@ -1,6 +1,6 @@
 import { Edit2, Eye, ToggleRight, ToggleLeft } from 'lucide-react';
 import type { Service } from '@/types';
-import { apiClient } from '@/services/apiClient';
+import { toggleServiceStatus } from '@/services/serviceService';
 import { useToast } from '@/store/notificationStore';
 import { useState } from 'react';
 
@@ -20,7 +20,7 @@ export function ServiceCard({ service, onEdit, onView }: ServiceCardProps) {
     setIsToggling(true);
     try {
       const newStatus = status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-      await apiClient.toggleServiceStatus(service.serviceId, newStatus);
+      await toggleServiceStatus(service.serviceId, newStatus);
       setStatus(newStatus);
       toast.success(`Service ${newStatus.toLowerCase()}`);
     } catch (error: any) {
