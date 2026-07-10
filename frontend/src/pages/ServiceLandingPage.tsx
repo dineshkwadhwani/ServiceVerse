@@ -143,7 +143,7 @@ export function ServiceLandingPage() {
               Sign In to Order
             </a>
             <a
-              href="/register"
+              href={`/register?serviceId=${service.serviceId}`}
               className="inline-flex items-center gap-2 px-8 py-3 rounded-lg font-semibold text-white bg-white/20 hover:bg-white/30 transition border border-white/30"
             >
               Create Account

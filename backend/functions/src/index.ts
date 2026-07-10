@@ -7,6 +7,7 @@ import { Logger } from '@/utils/logger';
 import * as serviceHandlers from '@/handlers/services/createService';
 import * as phase2Handlers from '@/handlers/phase2/onboarding';
 import * as phase3Handlers from '@/handlers/phase3/orders';
+import * as authHandlers from '@/handlers/auth/registration';
 
 const logger = new Logger('CloudFunctions');
 
@@ -23,15 +24,42 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Public endpoints (no authentication required)
-// Get all services (public listing)
+// ============================================================================
+// PUBLIC ENDPOINTS (no authentication required)
+// ============================================================================
+
+// Services endpoints
 app.get('/services', async (req, res) => {
   serviceHandlers.getServices(req as any, res);
 });
 
-// Get Service by ID (public)
 app.get('/services/:serviceId', async (req, res) => {
   serviceHandlers.getService(req as any, res);
+});
+
+// Auth endpoints
+app.post('/auth/send-email-otp', async (req, res) => {
+  authHandlers.sendEmailOTP(req, res);
+});
+
+app.post('/auth/verify-email-otp', async (req, res) => {
+  authHandlers.verifyEmailOTP(req, res);
+});
+
+app.post('/auth/send-phone-otp', async (req, res) => {
+  authHandlers.sendPhoneOTP(req, res);
+});
+
+app.post('/auth/verify-phone-otp', async (req, res) => {
+  authHandlers.verifyPhoneOTP(req, res);
+});
+
+app.post('/auth/register-customer', async (req, res) => {
+  authHandlers.registerCustomer(req, res);
+});
+
+app.post('/auth/register-sp', async (req, res) => {
+  authHandlers.registerServiceProvider(req, res);
 });
 
 // Auth middleware for all other routes

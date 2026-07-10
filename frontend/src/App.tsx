@@ -8,6 +8,7 @@ import { USER_ROLES } from '@/utils/constants';
 import { LoginPage } from '@/pages/LoginPage';
 import { LandingPage } from '@/pages/LandingPage';
 import { ServiceLandingPage } from '@/pages/ServiceLandingPage';
+import { RegisterPage } from '@/pages/RegisterPage';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { NotFound } from '@/pages/NotFound';
 import { ToastContainer } from '@/components/Shared/Toast';
@@ -76,6 +77,9 @@ export function App() {
 
           {/* Login Page */}
           <Route path="/login" element={<LoginPage />} />
+
+          {/* Register Page */}
+          <Route path="/register" element={<RegisterPage />} />
 
           {/* Service-Specific Landing Page */}
           <Route path="/:serviceName" element={<ServiceLandingPage />} />

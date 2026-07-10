@@ -43,6 +43,36 @@ class ApiClient {
   }
 
   // ============================================================================
+  // AUTH & REGISTRATION
+  // ============================================================================
+
+  async sendEmailOTP(email: string) {
+    return this.axiosInstance.post('/auth/send-email-otp', { email });
+  }
+
+  async verifyEmailOTP(email: string, otp: string) {
+    const response = await this.axiosInstance.post('/auth/verify-email-otp', { email, otp });
+    return response.success === true;
+  }
+
+  async sendPhoneOTP(phone: string) {
+    return this.axiosInstance.post('/auth/send-phone-otp', { phone });
+  }
+
+  async verifyPhoneOTP(phone: string, otp: string) {
+    const response = await this.axiosInstance.post('/auth/verify-phone-otp', { phone, otp });
+    return response.success === true;
+  }
+
+  async registerCustomer(data: any) {
+    return this.axiosInstance.post('/auth/register-customer', data);
+  }
+
+  async registerServiceProvider(data: any) {
+    return this.axiosInstance.post('/auth/register-sp', data);
+  }
+
+  // ============================================================================
   // SERVICES
   // ============================================================================
 
