@@ -73,6 +73,38 @@ class ApiClient {
   }
 
   // ============================================================================
+  // CUSTOMER DASHBOARD
+  // ============================================================================
+
+  async getCustomerServices() {
+    return this.axiosInstance.get('/customers/services');
+  }
+
+  async searchServiceProviders(serviceId: string, query: string) {
+    return this.axiosInstance.get('/customers/search-providers', {
+      params: { serviceId, query },
+    });
+  }
+
+  async addServiceProviderToCustomer(serviceId: string, spId: string) {
+    return this.axiosInstance.post('/customers/add-provider', {
+      serviceId,
+      spId,
+    });
+  }
+
+  async requestUnorphan(serviceId: string, reason: string) {
+    return this.axiosInstance.post('/customers/request-unorphan', {
+      serviceId,
+      reason,
+    });
+  }
+
+  async getServiceDetails(serviceId: string) {
+    return this.axiosInstance.get(`/services/${serviceId}`);
+  }
+
+  // ============================================================================
   // SERVICES
   // ============================================================================
 

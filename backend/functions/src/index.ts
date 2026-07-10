@@ -8,6 +8,7 @@ import * as serviceHandlers from '@/handlers/services/createService';
 import * as phase2Handlers from '@/handlers/phase2/onboarding';
 import * as phase3Handlers from '@/handlers/phase3/orders';
 import * as authHandlers from '@/handlers/auth/registration';
+import * as customerHandlers from '@/handlers/customers/dashboard';
 
 const logger = new Logger('CloudFunctions');
 
@@ -64,6 +65,26 @@ app.post('/auth/register-sp', async (req, res) => {
 
 // Auth middleware for all other routes
 app.use(verifyToken);
+
+// ============================================================================
+// CUSTOMER DASHBOARD
+// ============================================================================
+
+app.get('/customers/services', async (req, res) => {
+  customerHandlers.getCustomerServices(req as any, res);
+});
+
+app.get('/customers/search-providers', async (req, res) => {
+  customerHandlers.searchServiceProviders(req as any, res);
+});
+
+app.post('/customers/add-provider', async (req, res) => {
+  customerHandlers.addServiceProviderToCustomer(req as any, res);
+});
+
+app.post('/customers/request-unorphan', async (req, res) => {
+  customerHandlers.requestUnorphan(req as any, res);
+});
 
 // ============================================================================
 // PHASE 1: SuperAdmin - Services & Menu Management

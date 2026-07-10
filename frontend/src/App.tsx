@@ -14,6 +14,7 @@ import { NotFound } from '@/pages/NotFound';
 import { ToastContainer } from '@/components/Shared/Toast';
 import { ServiceDashboard } from '@/components/SuperAdmin/ServiceDashboard';
 import { AccountManagerDashboard } from '@/components/SuperAdmin/AccountManagerDashboard';
+import { CustomerDashboard } from '@/components/Dashboard/CustomerDashboard';
 
 function AuthLoadingScreen() {
   return (
@@ -89,6 +90,9 @@ export function App() {
           {/* ============================================================================ */}
 
           <Route element={<ProtectedRoute />}>
+            {/* Customer Dashboard */}
+            <Route path="/customer" element={<CustomerDashboard />} />
+
             {/* Admin Redirect */}
             <Route path="/admin" element={<Navigate to="/superadmin/services" replace />} />
 

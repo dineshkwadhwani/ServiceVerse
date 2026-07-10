@@ -57,16 +57,16 @@ export interface Coworker extends BaseUser {
 
 export interface Customer extends BaseUser {
   role: 'CUSTOMER';
-  address: string;
+  address?: string;
+  city?: string;
+  pin?: string;
   status: 'ACTIVE' | 'INACTIVE';
-  source: 'SELF_REGISTERED' | 'ADDED_BY_SP' | 'REFERRAL';
-  referralCode: string;
-  linkedServiceProviders: Array<{
-    serviceProviderId: string;
-    spName: string;
-    linkedAt: Date;
-    linkedBy: 'SP' | 'CUSTOMER' | 'REFERRAL';
-  }>;
+  verified: boolean;
+  verifiedMethod?: 'email' | 'phone';
+  isOrphaned: boolean; // true = can add multiple SPs, false = locked to one SP
+  createdBySP?: string; // UID of SP who created this customer (if non-orphaned)
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Service Types
@@ -90,6 +90,7 @@ export interface Service {
   gstPercentage: number;
   defaultCommission: CommissionConfig;
   status: 'ACTIVE' | 'INACTIVE';
+  unorphanReasons: string[]; // Predefined reasons for customers to unorphan
   createdAt: Date;
   updatedAt: Date;
   createdBy: string;
@@ -339,6 +340,36 @@ export interface OnboardSPFormData {
     phone: string;
     email: string;
   }>;
+}
+
+// User-Service Association
+export interface UserServiceAssociation {
+  associationId: string;
+  userId: string;
+  serviceId: string;
+  role: 'SERVICE_PROVIDER' | 'CUSTOMER';
+  status: 'ACTIVE' | 'INACTIVE';
+  joinedDate: Date;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+// Unorphan Request
+export type UnorphanStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface UnorphanRequest {
+  requestId: string;
+  customerId: string;
+  serviceId: string;
+  currentSPId?: string; // If non-orphaned, the SP they want to unorphan from
+  reason: string;
+  status: UnorphanStatus;
+  requestedAt: Date;
+  reviewedAt?: Date;
+  reviewedBy?: string; // UID of AM/SA who reviewed
+  approvalNotes?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // API Response Types
