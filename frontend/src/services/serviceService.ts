@@ -6,6 +6,8 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
+  where,
 } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { auth, db, storage } from '@/utils/firebase-config';
@@ -80,6 +82,35 @@ export async function createService(data: CreateServiceFormData): Promise<string
   });
 
   return serviceId;
+}
+
+export async function toggleServiceStatus(
+  serviceId: string,
+  status: 'ACTIVE' | 'INACTIVE'
+): Promise<void> {
+  await updateDoc(doc(db, COLLECTIONS.SERVICES, serviceId), {
+    status,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function getActiveServices(): Promise<Service[]> {
+  const snapshot = await getDocs(
+    query(collection(db, COLLECTIONS.SERVICES), where('status', '==', 'ACTIVE'))
+  );
+
+  return snapshot.docs
+    .map((docSnap) => mapServiceDoc(docSnap.id, docSnap.data()))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export async function getServiceBySlug(slug: string): Promise<Service | null> {
+  const services = await getActiveServices();
+  return (
+    services.find(
+      (service) => service.name.toLowerCase().replace(/\s+/g, '-') === slug.toLowerCase()
+    ) ?? null
+  );
 }
 
 export async function getServices(

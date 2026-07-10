@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, LogIn, ArrowLeft, Clock, DollarSign } from 'lucide-react';
-import { apiClient } from '@/services/apiClient';
+import { getServiceBySlug } from '@/services/serviceService';
 import { useToast } from '@/store/notificationStore';
 import type { Service } from '@/types';
 
@@ -17,16 +17,14 @@ export function ServiceLandingPage() {
   }, [serviceName]);
 
   const fetchService = async () => {
+    if (!serviceName) {
+      navigate('/');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // Fetch all services and find the matching one
-      const response = await apiClient.getServices();
-      const services = response.data?.services || [];
-      
-      const foundService = services.find(
-        (s: Service) =>
-          s.name.toLowerCase().replace(/\s+/g, '-') === serviceName?.toLowerCase()
-      );
+      const foundService = await getServiceBySlug(serviceName);
 
       if (!foundService) {
         toast.error('Service not found');
@@ -35,8 +33,9 @@ export function ServiceLandingPage() {
       }
 
       setService(foundService);
-    } catch (error: any) {
-      toast.error('Failed to load service', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to load service';
+      toast.error('Failed to load service', message);
       navigate('/');
     } finally {
       setIsLoading(false);
