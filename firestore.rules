@@ -6,7 +6,10 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SUPERADMIN';
+      return isAuthenticated() && (
+        request.auth.token.role == 'SUPERADMIN' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SUPERADMIN'
+      );
     }
 
     function isAccountManager() {
@@ -21,7 +24,16 @@ service cloud.firestore {
       return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'CUSTOMER';
     }
 
+    // ============================================================================
+    // SUPERADMIN: Full access to everything
+    // ============================================================================
+    match /{document=**} {
+      allow read, write, delete: if isSuperAdmin();
+    }
+
+    // ============================================================================
     // Services collection - publicly readable, write restricted to SuperAdmin
+    // ============================================================================
     match /services/{serviceId} {
       allow read: if true;
       allow create, update, delete: if isSuperAdmin();
@@ -33,14 +45,18 @@ service cloud.firestore {
       }
     }
 
+    // ============================================================================
     // Users collection - read own document, SuperAdmin can read/write all
+    // ============================================================================
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
       allow create: if isAuthenticated();
       allow update, delete: if isSuperAdmin();
     }
 
+    // ============================================================================
     // Orders collection - owner can read/write, SuperAdmin can manage all
+    // ============================================================================
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (
         resource.data.customerId == request.auth.uid ||
@@ -65,18 +81,24 @@ service cloud.firestore {
       }
     }
 
+    // ============================================================================
     // Account Managers collection - SuperAdmin only
+    // ============================================================================
     match /accountManagers/{amId} {
       allow read, write: if isSuperAdmin();
     }
 
+    // ============================================================================
     // Service Providers collection - read own, SuperAdmin can manage all
+    // ============================================================================
     match /serviceProviders/{spId} {
       allow read: if isAuthenticated() && (request.auth.uid == spId || isSuperAdmin());
       allow write: if isSuperAdmin();
     }
 
+    // ============================================================================
     // Analytics collection - SuperAdmin only
+    // ============================================================================
     match /analytics/{analyticsId} {
       allow read, write: if isSuperAdmin();
     }
