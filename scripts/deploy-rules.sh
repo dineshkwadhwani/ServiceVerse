@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT_ID="${FIREBASE_PROJECT_ID:-serviceverse-dev-a6b72}"
+PROJECT_ID="${FIREBASE_PROJECT_ID:-serviceverse-dev-fa38e}"
 
 cd "$ROOT_DIR"
 
