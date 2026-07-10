@@ -11,6 +11,7 @@ import * as phase3Handlers from '@/handlers/phase3/orders';
 import * as authHandlers from '@/handlers/auth/registration';
 import * as customerHandlers from '@/handlers/customers/dashboard';
 import * as spDashboardHandlers from '@/handlers/serviceProviders/dashboard';
+import * as amDashboardHandlers from '@/handlers/accountManagers/dashboard';
 
 import { getSeedAdminConfig, seedSuperAdminUser } from '@/handlers/admin/seedAdmin';
 
@@ -101,6 +102,18 @@ app.post('/service-providers/create-customer', requireRole('SERVICE_PROVIDER'), 
 
 app.get('/service-providers/customers', requireRole('SERVICE_PROVIDER'), async (req, res) => {
   spDashboardHandlers.getSPCustomers(req as any, res);
+});
+
+// ============================================================================
+// ACCOUNT MANAGER DASHBOARD
+// ============================================================================
+
+app.get('/account-managers/unorphan-requests', requireRole('ACCOUNT_MANAGER'), async (req, res) => {
+  amDashboardHandlers.getUnorphanRequests(req as any, res);
+});
+
+app.patch('/account-managers/unorphan-requests/:requestId', requireRole('ACCOUNT_MANAGER'), async (req, res) => {
+  amDashboardHandlers.reviewUnorphanRequest(req as any, res);
 });
 
 // ============================================================================

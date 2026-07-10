@@ -117,6 +117,18 @@ class ApiClient {
   }
 
   // ============================================================================
+  // ACCOUNT MANAGER DASHBOARD
+  // ============================================================================
+
+  async getAMUnorphanRequests() {
+    return this.axiosInstance.get('/account-managers/unorphan-requests');
+  }
+
+  async reviewUnorphanRequest(requestId: string, data: any) {
+    return this.axiosInstance.patch(`/account-managers/unorphan-requests/${requestId}`, data);
+  }
+
+  // ============================================================================
   // SERVICES
   // ============================================================================
 
