@@ -1,7 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd frontend && npm run build",
-  "installCommand": "npm ci",
+  "buildCommand": "npm ci && npm run build:frontend",
   "outputDirectory": "frontend/dist",
   "framework": "vite",
   "routes": [
