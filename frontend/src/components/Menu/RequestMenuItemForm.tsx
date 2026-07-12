@@ -7,7 +7,6 @@ import { FormInput } from '@/components/Form/FormInput';
 import type { MenuItemRequest } from '@/types';
 
 interface RequestMenuItemFormProps {
-  serviceId: string;
   serviceName: string;
   onSubmit: (data: {
     name: string;
@@ -24,7 +23,6 @@ interface FormData {
 }
 
 export function RequestMenuItemForm({
-  serviceId,
   serviceName,
   onSubmit,
   pendingRequests = [],
