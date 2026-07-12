@@ -74,7 +74,7 @@ export function ServiceCard({ service, onEdit, onView, onStatusChange }: Service
           <div className="flex items-center justify-between">
             <span className="text-gray-600">Menu Items:</span>
             <span className="font-semibold text-gray-900">
-              {service.defaultCommission ? 12 : 0}
+              {service.menuItems?.length || 0}
             </span>
           </div>
           <div className="flex items-center justify-between">
