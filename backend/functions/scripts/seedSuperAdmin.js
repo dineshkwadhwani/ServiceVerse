@@ -3,23 +3,20 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const admin = require('firebase-admin');
 const { FieldValue } = require('firebase-admin/firestore');
+const { v4: uuidv4 } = require('uuid');
 
 function getSeedAdminConfig() {
-  const email = process.env.SEED_ADMIN_EMAIL?.trim();
-  const password = process.env.SEED_ADMIN_PASSWORD;
+  const phone = process.env.SEED_ADMIN_PHONE?.trim();
   const secret = process.env.SEED_ADMIN_SECRET;
 
-  if (!email) throw new Error('SEED_ADMIN_EMAIL is not configured');
-  if (!password) throw new Error('SEED_ADMIN_PASSWORD is not configured');
+  if (!phone) throw new Error('SEED_ADMIN_PHONE is not configured');
   if (!secret) throw new Error('SEED_ADMIN_SECRET is not configured');
 
   return {
-    email,
-    password,
-    secret,
-    firstName: process.env.SEED_ADMIN_FIRST_NAME?.trim(),
-    lastName: process.env.SEED_ADMIN_LAST_NAME?.trim(),
-    phone: process.env.SEED_ADMIN_PHONE?.trim(),
+    phone,
+    firstName: process.env.SEED_ADMIN_FIRST_NAME?.trim() || 'Admin',
+    lastName: process.env.SEED_ADMIN_LAST_NAME?.trim() || 'User',
+    email: process.env.SEED_ADMIN_EMAIL?.trim() || `admin+${uuidv4()}@serviceverse.app`,
   };
 }
 
@@ -35,58 +32,43 @@ function getServiceAccount() {
 }
 
 async function seedSuperAdminUser(input) {
-  const email = input.email.trim().toLowerCase();
+  const phone = input.phone.trim();
   const firstName = input.firstName?.trim() || 'Admin';
   const lastName = input.lastName?.trim() || 'User';
   const name = `${firstName} ${lastName}`.trim();
+  const email = input.email.trim().toLowerCase();
+
+  const db = admin.firestore();
+
+  // Generate a unique UID for this user in Firestore
+  // This will be used temporarily; the actual Firebase Auth UID will be assigned on first phone sign-in
+  const uid = uuidv4();
 
   const userData = {
+    uid,
+    phone,
     email,
     firstName,
     lastName,
     name,
-    phone: input.phone?.trim() || '',
     role: 'SUPERADMIN',
     status: 'ACTIVE',
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   };
 
-  let authUser;
-  let created = false;
-  let updated = false;
+  // Create user document in Firestore
+  // We'll store it under the temp UID; it will be migrated after first phone sign-in
+  await db.collection('users').doc(uid).set(userData, { merge: true });
 
-  try {
-    authUser = await admin.auth().getUserByEmail(email);
-    await admin.auth().updateUser(authUser.uid, {
-      password: input.password,
-      emailVerified: true,
-      displayName: name,
-    });
-    updated = true;
-  } catch (error) {
-    if (error.code !== 'auth/user-not-found') throw error;
+  // Also create a lookup by phone for easy migration after sign-in
+  await db.collection('phoneToUser').doc(phone).set({
+    uid,
+    email,
+    role: 'SUPERADMIN',
+  });
 
-    authUser = await admin.auth().createUser({
-      email,
-      password: input.password,
-      emailVerified: true,
-      displayName: name,
-    });
-    created = true;
-  }
-
-  const profile = { uid: authUser.uid, ...userData };
-  const db = admin.firestore();
-
-  await Promise.all([
-    db.collection('users').doc(authUser.uid).set(profile, { merge: true }),
-    db.collection('superadmins').doc(authUser.uid).set(profile, { merge: true }),
-  ]);
-
-  await admin.auth().setCustomUserClaims(authUser.uid, { role: 'SUPERADMIN' });
-
-  return { uid: authUser.uid, email, role: 'SUPERADMIN', created, updated };
+  return { uid, phone, name, role: 'SUPERADMIN' };
 }
 
 async function main() {
@@ -100,18 +82,20 @@ async function main() {
     console.log('Seeding SuperAdmin...\n');
     const config = getSeedAdminConfig();
     const result = await seedSuperAdminUser({
-      email: config.email,
-      password: config.password,
+      phone: config.phone,
       firstName: config.firstName,
       lastName: config.lastName,
-      phone: config.phone,
+      email: config.email,
     });
 
-    console.log('SuperAdmin seeded successfully');
-    console.log(`Email: ${result.email}`);
-    console.log(`UID: ${result.uid}`);
-    console.log(`Created: ${result.created}`);
-    console.log(`Updated: ${result.updated}`);
+    console.log('✓ SuperAdmin seeded successfully');
+    console.log(`  Name: ${result.name}`);
+    console.log(`  Phone: ${result.phone}`);
+    console.log(`  UID: ${result.uid}`);
+    console.log(`  Role: ${result.role}`);
+    console.log('\nTo sign in as SuperAdmin:');
+    console.log(`  1. Register/Sign in with phone: ${result.phone}`);
+    console.log(`  2. This account has SuperAdmin role assigned`);
     process.exit(0);
   } catch (error) {
     console.error('Failed to seed SuperAdmin:', error.message);

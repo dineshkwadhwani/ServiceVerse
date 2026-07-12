@@ -1,17 +1,30 @@
 import { useEffect, useState } from 'react';
-import { Loader2, LogIn, UserPlus, ArrowRight } from 'lucide-react';
+import { Loader2, LogIn, UserPlus, ArrowRight, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { getActiveServices } from '@/services/serviceService';
 import { useToast } from '@/store/notificationStore';
+import { useAuthStore } from '@/store/authStore';
 import type { Service } from '@/types';
 
 export function LandingPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDesktop, setIsDesktop] = useState(true);
+  const [showRoleSelection, setShowRoleSelection] = useState(false);
   const toast = useToast();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, signOut } = useAuthStore();
 
   useEffect(() => {
     fetchServices();
+    checkDeviceSize();
+    window.addEventListener('resize', checkDeviceSize);
+    return () => window.removeEventListener('resize', checkDeviceSize);
   }, []);
+
+  const checkDeviceSize = () => {
+    setIsDesktop(window.innerWidth >= 768);
+  };
 
   const fetchServices = async () => {
     setIsLoading(true);
@@ -26,9 +39,129 @@ export function LandingPage() {
     }
   };
 
-  const handleServiceClick = (serviceName: string) => {
-    // Navigate to service-specific landing page
-    window.location.href = `/${serviceName.toLowerCase().replace(/\s+/g, '-')}`;
+  const handleServiceClick = (serviceId: string) => {
+    if (!isAuthenticated) {
+      // Not logged in: go to registration with service pre-selected
+      navigate(`/register?serviceId=${serviceId}`);
+    } else if (user?.role === 'CUSTOMER') {
+      // Logged in as customer: go to customer dashboard
+      navigate('/dashboard/customer');
+    } else if (user?.role === 'SERVICE_PROVIDER') {
+      // Logged in as service provider: go to SP dashboard
+      navigate('/dashboard/service-provider');
+    } else if (user?.role === 'ACCOUNT_MANAGER') {
+      // Logged in as account manager: go to AM dashboard
+      navigate('/dashboard/account-manager');
+    } else if (user?.role === 'SUPERADMIN') {
+      // Logged in as superadmin: go to SuperAdmin dashboard
+      navigate('/dashboard/superadmin');
+    } else {
+      // Default: go to registration
+      navigate(`/register?serviceId=${serviceId}`);
+    }
+  };
+
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      toast.error('Failed to sign out');
+    }
+  };
+
+  const handleRoleSelection = (role: 'SERVICE_PROVIDER' | 'CUSTOMER') => {
+    setShowRoleSelection(false);
+    navigate(`/register?role=${role}`);
+  };
+
+  const renderServiceTile = (service: Service) => {
+    // Mobile: icon and name only
+    if (!isDesktop) {
+      return (
+        <button
+          key={service.serviceId}
+          onClick={() => handleServiceClick(service.serviceId)}
+          className="flex flex-col items-center gap-3 p-4 rounded-lg hover:bg-white/10 transition group"
+        >
+          {service.logo && (
+            <img
+              src={service.logo}
+              alt={service.name}
+              className="w-20 h-20 rounded-lg bg-white/10 border border-white/20 object-cover group-hover:scale-110 transition"
+            />
+          )}
+          <p className="text-sm font-semibold text-white text-center line-clamp-2">
+            {service.name}
+          </p>
+        </button>
+      );
+    }
+
+    // Desktop: full tile with hero image, description, and join button
+    return (
+      <div
+        key={service.serviceId}
+        className="group bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-white/30 transition hover:shadow-2xl hover:shadow-blue-500/20 cursor-pointer"
+      >
+        {/* Hero Image */}
+        <div
+          className="h-40 relative overflow-hidden"
+          style={{
+            backgroundColor: service.colorTheme?.primary || '#3B82F6',
+          }}
+        >
+          {service.heroImage && (
+            <img
+              src={service.heroImage}
+              alt={service.name}
+              className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
+            />
+          )}
+        </div>
+
+        {/* Service Logo & Details */}
+        <div className="p-6">
+          <div className="flex items-center gap-4 mb-4">
+            {service.logo && (
+              <img
+                src={service.logo}
+                alt={service.name}
+                className="w-16 h-16 rounded-lg bg-white/10 border border-white/20 object-cover"
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xl font-bold text-white truncate">{service.name}</h3>
+              {service.gstPercentage && (
+                <p className="text-xs text-gray-400">GST: {service.gstPercentage}%</p>
+              )}
+            </div>
+          </div>
+
+          <p className="text-gray-300 text-sm mb-6 line-clamp-2">{service.description}</p>
+          <div className="flex gap-3 mb-4">
+            <button
+              onClick={() => handleServiceClick(service.serviceId)}
+              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+            >
+              Join Now
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <span
+            className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+              service.status === 'ACTIVE'
+                ? 'bg-green-500/20 text-green-300'
+                : 'bg-gray-500/20 text-gray-300'
+            }`}
+          >
+            {service.status === 'ACTIVE' ? '✓ Active' : 'Inactive'}
+          </span>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -40,32 +173,77 @@ export function LandingPage() {
             <h1 className="text-2xl font-bold text-white">ServiceVerse</h1>
             <p className="text-sm text-gray-400">Multi-service Platform</p>
           </div>
-          <div className="flex gap-4">
-            <a
-              href="/admin"
-              className="flex items-center gap-2 px-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition"
-            >
-              <LogIn className="w-4 h-4" />
-              Admin
-            </a>
+
+          {/* Right side navigation */}
+          <div className="flex gap-3 items-center">
+            {isAuthenticated && user ? (
+              <>
+                <span className="text-sm text-gray-300 hidden sm:inline">Welcome back, {user.name}</span>
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition text-sm"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <a
+                  href="/login"
+                  className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition text-sm"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign In
+                </a>
+              </>
+            )}
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-6 py-20 text-center">
-        <h2 className="text-5xl font-bold text-white mb-6">
-          Welcome to ServiceVerse
-        </h2>
-        <p className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
-          Discover and book amazing services from our trusted providers. 
-          One account, unlimited services.
-        </p>
+      <section className="max-w-7xl mx-auto px-6 py-12 sm:py-20 text-center">
+        {isAuthenticated && user ? (
+          <div className="mb-8">
+            <h2 className="text-3xl sm:text-5xl font-bold text-white mb-4">
+              Welcome back, {user.name}! 👋
+            </h2>
+            <p className="text-lg text-gray-300">
+              Explore our services and manage your account
+            </p>
+          </div>
+        ) : (
+          <>
+            <h2 className="text-3xl sm:text-5xl font-bold text-white mb-6">
+              Welcome to ServiceVerse
+            </h2>
+            <p className="text-lg sm:text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+              Discover and book amazing services from our trusted providers.
+              One account, unlimited services.
+            </p>
 
-        {/* Search/Filter could go here */}
-        <div className="mb-16">
-          <p className="text-gray-400">Explore our services below</p>
-        </div>
+            {/* Mobile: Auth buttons below hero on mobile */}
+            {!isDesktop && (
+              <div className="flex gap-3 justify-center flex-wrap mb-8">
+                <a
+                  href="/login"
+                  className="flex items-center gap-2 px-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold transition text-sm"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign In
+                </a>
+                <button
+                  onClick={() => setShowRoleSelection(true)}
+                  className="flex items-center gap-2 px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition text-sm"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Join
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </section>
 
       {/* Services Grid */}
@@ -83,129 +261,75 @@ export function LandingPage() {
             <p className="text-gray-500 text-sm mt-2">Check back soon for new services!</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {services.map((service) => (
+          <>
+            {/* All Services Grid */}
+            <div>
+              {isAuthenticated && (
+                <h3 className="text-2xl font-bold text-white mb-6">Available Services</h3>
+              )}
               <div
-                key={service.serviceId}
-                className="group bg-white/5 border border-white/10 rounded-xl overflow-hidden hover:border-white/30 transition hover:shadow-2xl hover:shadow-blue-500/20 cursor-pointer"
-                onClick={() => handleServiceClick(service.name)}
+                className={`grid gap-6 sm:gap-8 ${
+                  isDesktop
+                    ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                    : 'grid-cols-3 sm:grid-cols-4'
+                }`}
               >
-                {/* Service Header with Color Theme */}
-                <div
-                  className="h-32 relative overflow-hidden"
-                  style={{
-                    backgroundColor: service.colorTheme?.primary || '#3B82F6',
-                  }}
-                >
-                  {service.heroImage && (
-                    <img
-                      src={service.heroImage}
-                      alt={service.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition duration-300"
-                    />
-                  )}
-                </div>
-
-                {/* Service Logo */}
-                <div className="relative px-6 pt-0">
-                  <div className="flex items-center gap-4 -mt-8 mb-4">
-                    {service.logo && (
-                      <img
-                        src={service.logo}
-                        alt={service.name}
-                        className="w-16 h-16 rounded-lg bg-white/10 border border-white/20 object-cover"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-white">{service.name}</h3>
-                      {service.gstPercentage && (
-                        <p className="text-xs text-gray-400">GST: {service.gstPercentage}%</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Service Description */}
-                <div className="px-6">
-                  <p className="text-gray-300 text-sm mb-6 line-clamp-2">
-                    {service.description}
-                  </p>
-
-                  {/* Service Stats */}
-                  <div className="grid grid-cols-2 gap-4 mb-6 pb-6 border-b border-white/10">
-                    <div className="bg-white/5 rounded-lg p-3">
-                      <p className="text-xs text-gray-400">Menu Items</p>
-                      <p className="text-lg font-bold text-white">
-                        {/* This would need to be fetched from API */}
-                        0
-                      </p>
-                    </div>
-                    <div className="bg-white/5 rounded-lg p-3">
-                      <p className="text-xs text-gray-400">Providers</p>
-                      <p className="text-lg font-bold text-white">
-                        {/* This would need to be fetched from API */}
-                        0
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-3 mb-6">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleServiceClick(service.name);
-                      }}
-                      className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
-                    >
-                      Explore
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Bottom Status */}
-                <div className="px-6 pb-6">
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                      service.status === 'ACTIVE'
-                        ? 'bg-green-500/20 text-green-300'
-                        : 'bg-gray-500/20 text-gray-300'
-                    }`}
-                  >
-                    {service.status === 'ACTIVE' ? '✓ Active' : 'Inactive'}
-                  </span>
-                </div>
+                {services.map((service) => renderServiceTile(service))}
               </div>
-            ))}
-          </div>
+            </div>
+          </>
         )}
       </section>
 
-      {/* CTA Section */}
-      <section className="max-w-7xl mx-auto px-6 py-20 text-center border-t border-white/10">
-        <h3 className="text-3xl font-bold text-white mb-6">Ready to get started?</h3>
-        <div className="flex gap-4 justify-center">
-          <a
-            href="/login"
-            className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition"
-          >
-            <LogIn className="w-5 h-5" />
-            Sign In
-          </a>
-          <a
-            href="/register"
-            className="flex items-center gap-2 px-8 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg font-semibold transition border border-white/20"
-          >
-            <UserPlus className="w-5 h-5" />
-            Create Account
-          </a>
+
+      {/* Role Selection Modal */}
+      {showRoleSelection && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-white/10 rounded-2xl p-8 max-w-md w-full">
+            <h3 className="text-2xl font-bold text-white mb-2">Join ServiceVerse</h3>
+            <p className="text-gray-400 mb-8">Choose how you want to get started</p>
+
+            <div className="space-y-4">
+              <button
+                onClick={() => handleRoleSelection('CUSTOMER')}
+                className="w-full p-6 bg-white/5 border border-white/10 rounded-xl hover:border-blue-500/50 hover:bg-white/10 transition text-left group"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="text-lg font-bold text-white mb-1">I'm a Customer</h4>
+                    <p className="text-sm text-gray-400">Book and manage services</p>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-blue-400 group-hover:translate-x-1 transition" />
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleRoleSelection('SERVICE_PROVIDER')}
+                className="w-full p-6 bg-white/5 border border-white/10 rounded-xl hover:border-purple-500/50 hover:bg-white/10 transition text-left group"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="text-lg font-bold text-white mb-1">I'm a Service Provider</h4>
+                    <p className="text-sm text-gray-400">Provide services and grow</p>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-purple-400 group-hover:translate-x-1 transition" />
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowRoleSelection(false)}
+              className="w-full mt-6 px-4 py-2 text-gray-400 hover:text-white transition"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
-      </section>
+      )}
 
       {/* Footer */}
-      <footer className="bg-black/40 border-t border-white/10 mt-20">
-        <div className="max-w-7xl mx-auto px-6 py-8 text-center text-gray-400">
+      <footer className="bg-black/40 border-t border-white/10 mt-12 sm:mt-20">
+        <div className="max-w-7xl mx-auto px-6 py-8 text-center text-gray-400 text-sm">
           <p>&copy; 2025 ServiceVerse. All rights reserved.</p>
         </div>
       </footer>

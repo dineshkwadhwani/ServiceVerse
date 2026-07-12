@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { auth } from '@/utils/firebase-config';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/us-central1/serviceverse';
+const API_URL = import.meta.env.VITE_API_URL;
 const TIMEOUT = 30000;
 
 class ApiClient {

@@ -10,9 +10,7 @@
   "scripts": {
     "dev": "npm run dev --workspace=frontend",
     "dev:frontend": "npm run dev --workspace=frontend",
-    "dev:backend": "npm run serve --workspace=backend/functions",
-    "emulators": "npm run build --workspace=backend/functions && npx firebase emulators:start",
-    "emulators:functions": "npm run build --workspace=backend/functions && npx firebase emulators:start --only functions",
+    "deploy:functions": "npm run build --workspace=backend/functions && npx --yes --package=firebase-tools@15.22.4 firebase deploy --only functions --project serviceverse-dev-fa38e",
     "deploy:rules": "node scripts/deploy-rules-api.js",
     "deploy:rules:cli": "bash scripts/deploy-rules.sh",
     "deploy:rules:firestore": "unset GOOGLE_APPLICATION_CREDENTIALS; npx --yes --package=firebase-tools@15.22.4 firebase deploy --only firestore:rules --project serviceverse-dev-fa38e",

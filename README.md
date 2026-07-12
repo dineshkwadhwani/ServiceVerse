@@ -98,15 +98,17 @@ cp .env.example .env.local
 
 ### 3. Start Development
 
+This project connects directly to Cloud Firebase — no local emulators are used.
+
 ```bash
-# Terminal 1: Start frontend (from frontend/)
+# Deploy backend functions to Firebase Cloud (from backend/functions/)
+npm run deploy
+
+# Start frontend (from frontend/)
 npm run dev
 
-# Terminal 2: Start backend emulators (from backend/functions/)
-npm run serve
-
 # Frontend: http://localhost:5173
-# Backend: http://localhost:5001
+# Backend: https://us-central1-<project-id>.cloudfunctions.net/api
 ```
 
 ## 📚 Documentation

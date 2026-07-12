@@ -71,7 +71,7 @@ export async function createService(data: CreateServiceFormData): Promise<string
     fromName: data.fromName,
     gstPercentage: data.gstPercentage,
     defaultCommission: data.defaultCommission,
-    status: 'INACTIVE' as const,
+    status: 'ACTIVE' as const,
     createdBy: user.uid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

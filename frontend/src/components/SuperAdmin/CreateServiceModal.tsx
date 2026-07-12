@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { X, Upload, Loader2 } from 'lucide-react';
+import { X, Upload, Loader2, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createServiceSchema } from '@/utils/validators';
 import { createService as createServiceInFirestore } from '@/services/serviceService';
 import { useToast } from '@/store/notificationStore';
 import { DEFAULT_COLORS } from '@/utils/constants';
+import { FormInput } from '@/components/Form/FormInput';
+import { FormTextarea } from '@/components/Form/FormTextarea';
+import { useFormErrors } from '@/hooks/useFormErrors';
 import type { Service, CreateServiceFormData } from '@/types';
 
 interface CreateServiceModalProps {
@@ -43,6 +46,7 @@ export function CreateServiceModal({
     formState: { errors },
     setValue,
     watch,
+    setFocus,
   } = useForm<CreateServiceFormData>({
     resolver: zodResolver(createServiceSchema),
     defaultValues: {
@@ -58,8 +62,10 @@ export function CreateServiceModal({
       },
       colorTheme: colors,
     },
+    mode: 'onBlur',
   });
 
+  const { hasErrors, errorCount } = useFormErrors({ errors, setFocus });
   const commissionType = watch('defaultCommission.type');
   const gstPercentage = watch('gstPercentage');
 
@@ -132,44 +138,52 @@ export function CreateServiceModal({
 
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
+          {/* Error Summary */}
+          {hasErrors && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-red-900">Validation Error</h3>
+                <p className="text-red-700 text-sm">
+                  Please fix the {errorCount} error{errorCount !== 1 ? 's' : ''} below before saving.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Service Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Service Name *
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., Laundry Service"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              {...register('name')}
-            />
-            {errors.name && (
-              <p className="text-red-600 text-sm mt-1">{errors.name.message}</p>
-            )}
-          </div>
+          <FormInput
+            label="Service Name"
+            placeholder="e.g., Laundry Service"
+            error={errors.name?.message}
+            required
+            {...register('name')}
+          />
 
           {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description *
-            </label>
-            <textarea
-              placeholder="Describe the service"
-              rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              {...register('description')}
-            />
-            {errors.description && (
-              <p className="text-red-600 text-sm mt-1">{errors.description.message}</p>
-            )}
-          </div>
+          <FormTextarea
+            label="Description"
+            placeholder="Describe the service"
+            rows={3}
+            error={errors.description?.message}
+            required
+            {...register('description')}
+          />
 
           {/* Logo Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Service Logo *
+              Service Logo <span className="text-red-500">*</span>
             </label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+            <div
+              className={`
+                border-2 border-dashed rounded-lg p-4 transition
+                ${errors.logo
+                  ? 'border-red-500 bg-red-50'
+                  : 'border-gray-300 hover:border-gray-400'
+                }
+              `}
+            >
               <input
                 type="file"
                 accept="image/*"
@@ -188,19 +202,35 @@ export function CreateServiceModal({
                     className="w-20 h-20 object-contain mb-2"
                   />
                 ) : (
-                  <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                  <Upload className={`w-8 h-8 mb-2 ${errors.logo ? 'text-red-400' : 'text-gray-400'}`} />
                 )}
-                <span className="text-sm text-gray-600">Click to upload logo</span>
+                <span className={`text-sm ${errors.logo ? 'text-red-600' : 'text-gray-600'}`}>
+                  Click to upload logo
+                </span>
               </label>
             </div>
+            {errors.logo && (
+              <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
+                <AlertCircle className="w-4 h-4" />
+                {errors.logo.message}
+              </p>
+            )}
           </div>
 
           {/* Hero Image Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Hero Image *
+              Hero Image <span className="text-red-500">*</span>
             </label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+            <div
+              className={`
+                border-2 border-dashed rounded-lg p-4 transition
+                ${errors.heroImage
+                  ? 'border-red-500 bg-red-50'
+                  : 'border-gray-300 hover:border-gray-400'
+                }
+              `}
+            >
               <input
                 type="file"
                 accept="image/*"
@@ -219,17 +249,25 @@ export function CreateServiceModal({
                     className="w-full h-32 object-cover rounded mb-2"
                   />
                 ) : (
-                  <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                  <Upload className={`w-8 h-8 mb-2 ${errors.heroImage ? 'text-red-400' : 'text-gray-400'}`} />
                 )}
-                <span className="text-sm text-gray-600">Click to upload hero image</span>
+                <span className={`text-sm ${errors.heroImage ? 'text-red-600' : 'text-gray-600'}`}>
+                  Click to upload hero image
+                </span>
               </label>
             </div>
+            {errors.heroImage && (
+              <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
+                <AlertCircle className="w-4 h-4" />
+                {errors.heroImage.message}
+              </p>
+            )}
           </div>
 
           {/* Color Theme */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
-              Color Theme *
+              Color Theme <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-2 gap-4">
               {[
@@ -237,107 +275,114 @@ export function CreateServiceModal({
                 { key: 'secondary', label: 'Secondary Color' },
                 { key: 'accent', label: 'Accent Color' },
                 { key: 'primaryFontColor', label: 'Primary Font Color' },
-              ].map((color) => (
-                <div key={color.key}>
-                  <label className="text-sm text-gray-600 mb-1 block">
-                    {color.label}
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={colors[color.key as keyof typeof colors]}
-                      onChange={(e) => handleColorChange(color.key, e.target.value)}
-                      className="w-12 h-10 rounded cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={colors[color.key as keyof typeof colors]}
-                      onChange={(e) => handleColorChange(color.key, e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm"
-                      placeholder="#000000"
-                    />
+              ].map((color) => {
+                const colorError = (errors.colorTheme as any)?.[color.key];
+                return (
+                  <div key={color.key}>
+                    <label className={`text-sm mb-1 block ${colorError ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                      {color.label}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={colors[color.key as keyof typeof colors]}
+                        onChange={(e) => handleColorChange(color.key, e.target.value)}
+                        className={`w-12 h-10 rounded cursor-pointer border-2 ${colorError ? 'border-red-500' : 'border-gray-300'}`}
+                      />
+                      <input
+                        type="text"
+                        value={colors[color.key as keyof typeof colors]}
+                        onChange={(e) => handleColorChange(color.key, e.target.value)}
+                        className={`
+                          flex-1 px-3 py-2 border rounded text-sm
+                          ${colorError
+                            ? 'border-red-500 bg-red-50 focus:ring-red-400'
+                            : 'border-gray-300 focus:ring-blue-500'
+                          }
+                          focus:outline-none focus:ring-2 transition
+                        `}
+                        placeholder="#000000"
+                      />
+                    </div>
+                    {colorError && (
+                      <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {colorError.message}
+                      </p>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           {/* Email Details */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                From Email *
-              </label>
-              <input
-                type="email"
-                placeholder="noreply@serviceverse.com"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                {...register('fromEmail')}
-              />
-              {errors.fromEmail && (
-                <p className="text-red-600 text-sm mt-1">{errors.fromEmail.message}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                From Name *
-              </label>
-              <input
-                type="text"
-                placeholder="ServiceVerse"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                {...register('fromName')}
-              />
-              {errors.fromName && (
-                <p className="text-red-600 text-sm mt-1">{errors.fromName.message}</p>
-              )}
-            </div>
+            <FormInput
+              label="From Email"
+              type="email"
+              placeholder="noreply@serviceverse.com"
+              error={errors.fromEmail?.message}
+              required
+              {...register('fromEmail')}
+            />
+            <FormInput
+              label="From Name"
+              type="text"
+              placeholder="ServiceVerse"
+              error={errors.fromName?.message}
+              required
+              {...register('fromName')}
+            />
           </div>
 
           {/* GST & Commission */}
           <div className="grid grid-cols-2 gap-4">
+            <FormInput
+              label="GST Percentage"
+              type="number"
+              step="0.1"
+              min="0"
+              max="100"
+              helperText={`Currently: ${gstPercentage}%`}
+              error={errors.gstPercentage?.message}
+              required
+              {...register('gstPercentage', { valueAsNumber: true })}
+            />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                GST Percentage *
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                max="100"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                {...register('gstPercentage', { valueAsNumber: true })}
-              />
-              <p className="text-xs text-gray-500 mt-1">Currently: {gstPercentage}%</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Commission Type *
+                Commission Type <span className="text-red-500">*</span>
               </label>
               <select
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`
+                  w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 transition
+                  ${errors.defaultCommission?.type
+                    ? 'border-red-500 focus:ring-red-400 bg-red-50'
+                    : 'border-gray-300 focus:ring-blue-500'
+                  }
+                `}
                 {...register('defaultCommission.type')}
               >
                 <option value="PERCENTAGE">Percentage (%)</option>
                 <option value="PER_ITEM">Per Item (₹)</option>
               </select>
+              {errors.defaultCommission?.type && (
+                <p className="text-red-600 text-sm mt-1">{errors.defaultCommission.type.message}</p>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Commission Value *
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder={commissionType === 'PERCENTAGE' ? '10' : '100'}
-                {...register('defaultCommission.value', { valueAsNumber: true })}
-              />
-            </div>
+            <FormInput
+              label="Commission Value"
+              type="number"
+              step="0.1"
+              min="0"
+              placeholder={commissionType === 'PERCENTAGE' ? '10' : '100'}
+              error={errors.defaultCommission?.value?.message}
+              required
+              {...register('defaultCommission.value', { valueAsNumber: true })}
+            />
             <div>
               <label className="flex items-center gap-2 mt-8 cursor-pointer">
                 <input

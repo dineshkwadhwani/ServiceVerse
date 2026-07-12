@@ -6,13 +6,6 @@ import { signInWithEmailAndPassword, signOut as firebaseSignOut, User } from 'fi
 import type { BaseUser, UserRole } from '@/types';
 import { COLLECTIONS } from '@/utils/constants';
 
-const ROLE_COLLECTION_MAP: Partial<Record<UserRole, string>> = {
-  SUPERADMIN: COLLECTIONS.SUPERADMINS,
-  ACCOUNT_MANAGER: COLLECTIONS.ACCOUNT_MANAGERS,
-  SERVICE_PROVIDER: COLLECTIONS.SERVICE_PROVIDERS,
-  CUSTOMER: COLLECTIONS.CUSTOMERS,
-};
-
 interface AuthState {
   user: BaseUser | null;
   firebaseUser: User | null;
@@ -60,14 +53,11 @@ export const useAuthStore = create<AuthState>()(
             return;
           }
 
-          const collectionName = ROLE_COLLECTION_MAP[role];
+          // Load user profile from the unified 'users' collection
           let profileData: Record<string, unknown> | null = null;
-
-          if (collectionName) {
-            const profileDoc = await getDoc(doc(db, collectionName, firebaseUser.uid));
-            if (profileDoc.exists()) {
-              profileData = profileDoc.data();
-            }
+          const profileDoc = await getDoc(doc(db, COLLECTIONS.USERS, firebaseUser.uid));
+          if (profileDoc.exists()) {
+            profileData = profileDoc.data();
           }
 
           const user: BaseUser = {

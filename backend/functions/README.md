@@ -26,12 +26,9 @@ cp .env.example .env
 ```bash
 # Build TypeScript
 npm run build
-
-# Run local emulator
-npm run serve
-
-# Functions will be available at: http://localhost:5001/project-id/us-central1/api
 ```
+
+This project connects directly to Cloud Firebase — there is no local emulator. Deploy to test changes:
 
 ### Deployment
 

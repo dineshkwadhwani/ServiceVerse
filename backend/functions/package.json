@@ -5,11 +5,8 @@
   "type": "commonjs",
   "main": "lib/index.js",
   "scripts": {
-    "build": "tsc && tsc-alias",
+    "build": "tsc && npx tsc-alias",
     "seed:superadmin": "node scripts/seedSuperAdmin.js",
-    "serve": "npm run build && firebase emulators:start --only functions",
-    "shell": "npm run build && firebase functions:shell",
-    "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log"
   },

@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
-import { getStorage, connectStorageEmulator } from 'firebase/storage';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const firebaseConfig = {
@@ -30,31 +30,8 @@ try {
   console.warn('Messaging not available:', error);
 }
 
-// Connect to emulators only when explicitly enabled
-const useEmulators =
-  import.meta.env.DEV &&
-  import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true' &&
-  typeof window !== 'undefined';
-
-if (useEmulators) {
-  try {
-    connectAuthEmulator(auth, 'http://localhost:9099');
-  } catch {
-    // Already connected
-  }
-
-  try {
-    connectFirestoreEmulator(db, 'localhost', 8081);
-  } catch {
-    // Already connected
-  }
-
-  try {
-    connectStorageEmulator(storage, 'localhost', 9199);
-  } catch {
-    // Already connected
-  }
-}
+// Using cloud Firebase directly for local development
+// No emulator needed
 
 // Firebase Messaging Service
 export async function initFCM() {

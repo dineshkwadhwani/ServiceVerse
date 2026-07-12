@@ -161,11 +161,11 @@ cd backend/functions && npm install
 
 ### 3. **Start Development**
 ```bash
-# Terminal 1: Frontend
-cd frontend && npm run dev
+# Deploy backend to Firebase Cloud
+cd backend/functions && npm run deploy
 
-# Terminal 2: Backend emulators
-cd backend/functions && npm run serve
+# Start frontend
+cd frontend && npm run dev
 ```
 
 ### 4. **Build Phase 1: SuperAdmin Services**

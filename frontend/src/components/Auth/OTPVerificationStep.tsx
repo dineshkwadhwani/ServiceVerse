@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { ArrowLeft, Loader2, Mail, Phone, CheckCircle2 } from 'lucide-react';
-import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 
 interface OTPVerificationStepProps {
@@ -10,6 +9,7 @@ interface OTPVerificationStepProps {
   onVerified: () => Promise<void>;
   onBack: () => void;
   isLoading: boolean;
+  confirmationResult?: any; // Firebase phone confirmation result
 }
 
 export function OTPVerificationStep({
@@ -19,12 +19,12 @@ export function OTPVerificationStep({
   onVerified,
   onBack,
   isLoading,
+  confirmationResult,
 }: OTPVerificationStepProps) {
   const toast = useToast();
   const [otp, setOtp] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
-  const [resendCountdown, setResendCountdown] = useState(0);
 
   const displayValue = method === 'email' ? email : `+91 ${phone}`;
 
@@ -36,23 +36,18 @@ export function OTPVerificationStep({
 
     setIsVerifying(true);
     try {
-      let isValid = false;
-
-      if (method === 'email') {
-        isValid = await apiClient.verifyEmailOTP(email, otp);
-      } else {
-        isValid = await apiClient.verifyPhoneOTP(phone, otp);
-      }
-
-      if (isValid) {
+      if (method === 'phone' && confirmationResult) {
+        // Verify phone OTP using Firebase confirmationResult
+        await confirmationResult.confirm(otp);
         setIsVerified(true);
-        toast.success('OTP verified successfully!');
+        toast.success('Phone verified successfully!');
 
         setTimeout(async () => {
           await onVerified();
         }, 1000);
-      } else {
-        toast.error('Invalid OTP. Please try again.');
+      } else if (method === 'email') {
+        // Email verification is handled via link - this shouldn't be called
+        toast.error('Email verification is link-based. Please check your email.');
       }
     } catch (error: any) {
       toast.error('Verification failed: ' + error.message);
@@ -61,32 +56,47 @@ export function OTPVerificationStep({
     }
   };
 
-  const handleResendOTP = async () => {
-    setIsVerifying(true);
-    try {
-      if (method === 'email') {
-        await apiClient.sendEmailOTP(email);
-      } else {
-        await apiClient.sendPhoneOTP(phone);
-      }
-      toast.success('OTP resent successfully');
-      setResendCountdown(60);
-      const interval = setInterval(() => {
-        setResendCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } catch (error: any) {
-      toast.error('Failed to resend OTP: ' + error.message);
-    } finally {
-      setIsVerifying(false);
-    }
-  };
+  // For email, show a different UI
+  if (method === 'email') {
+    return (
+      <div>
+        <button
+          onClick={onBack}
+          disabled={isLoading}
+          className="flex items-center gap-2 text-gray-400 hover:text-white mb-8 disabled:opacity-50"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
 
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2">Verify Your Email</h1>
+          <p className="text-gray-400">We've sent a verification link to</p>
+          <p className="text-white font-semibold mt-2">{email}</p>
+        </div>
+
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
+          <div className="text-center">
+            <Mail className="w-12 h-12 text-blue-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-white mb-3">Check Your Email</h3>
+            <p className="text-gray-400 mb-6">
+              Click the verification link in your email to complete your registration. The link will open automatically when you click it.
+            </p>
+            <p className="text-sm text-gray-500">
+              If you don't see the email, check your spam folder or wait a moment and refresh.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-300">
+          <p className="font-semibold mb-1">✓ Link expires in 24 hours</p>
+          <p className="text-xs">The verification link is secure and will only work for your account.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // For phone, show OTP input
   if (isVerified) {
     return (
       <div className="text-center py-12">
@@ -113,35 +123,29 @@ export function OTPVerificationStep({
       </button>
 
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Verify Your {method === 'email' ? 'Email' : 'Phone'}</h1>
+        <h1 className="text-3xl font-bold text-white mb-2">Verify Your Phone</h1>
         <p className="text-gray-400">We've sent a verification code to</p>
         <p className="text-white font-semibold mt-2">{displayValue}</p>
       </div>
 
       <div className="bg-white/5 border border-white/10 rounded-2xl p-8">
-        {/* OTP Input */}
         <div className="mb-6">
-          <label className={`flex items-center gap-2 text-white font-semibold mb-3`}>
-            {method === 'email' ? (
-              <Mail className="w-4 h-4" />
-            ) : (
-              <Phone className="w-4 h-4" />
-            )}
+          <label className="flex items-center gap-2 text-white font-semibold mb-3">
+            <Phone className="w-4 h-4" />
             Verification Code
           </label>
           <input
             type="text"
             value={otp}
-            onChange={(e) => setOtp(e.target.value.toUpperCase())}
+            onChange={(e) => setOtp(e.target.value)}
             placeholder="Enter 6-digit code"
             maxLength={6}
             className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 text-center text-lg tracking-widest font-mono"
             disabled={isVerifying || isLoading}
           />
-          <p className="text-xs text-gray-400 mt-2">Check your {method} for the code</p>
+          <p className="text-xs text-gray-400 mt-2">Check your SMS for the code</p>
         </div>
 
-        {/* Verify Button */}
         <button
           onClick={handleVerifyOTP}
           disabled={isVerifying || isLoading || otp.length < 6}
@@ -156,18 +160,6 @@ export function OTPVerificationStep({
             'Verify Code'
           )}
         </button>
-
-        {/* Resend OTP */}
-        <div className="mt-6 text-center">
-          <p className="text-gray-400 text-sm mb-3">Didn't receive the code?</p>
-          <button
-            onClick={handleResendOTP}
-            disabled={isVerifying || isLoading || resendCountdown > 0}
-            className="text-blue-400 hover:text-blue-300 font-semibold disabled:text-gray-400 disabled:cursor-not-allowed"
-          >
-            {resendCountdown > 0 ? `Resend in ${resendCountdown}s` : 'Resend Code'}
-          </button>
-        </div>
       </div>
 
       <div className="mt-6 bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-sm text-amber-300">

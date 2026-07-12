@@ -9,6 +9,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { LandingPage } from '@/pages/LandingPage';
 import { ServiceLandingPage } from '@/pages/ServiceLandingPage';
 import { RegisterPage } from '@/pages/RegisterPage';
+import { VerifyEmailPage } from '@/pages/VerifyEmailPage';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { NotFound } from '@/pages/NotFound';
 import { ToastContainer } from '@/components/Shared/Toast';
@@ -85,8 +86,11 @@ export function App() {
           {/* Register Page */}
           <Route path="/register" element={<RegisterPage />} />
 
+          {/* Email Verification Page */}
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+
           {/* Service-Specific Landing Page */}
-          <Route path="/:serviceName" element={<ServiceLandingPage />} />
+          <Route path="/service/:serviceId" element={<ServiceLandingPage />} />
 
           {/* ============================================================================ */}
           {/* PROTECTED ROUTES - AUTH REQUIRED */}

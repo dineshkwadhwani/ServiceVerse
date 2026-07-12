@@ -2,12 +2,6 @@
   "firestore": {
     "rules": "firestore.rules"
   },
-  "storage": [
-    {
-      "bucket": "serviceverse-dev-fa38e.appspot.com",
-      "rules": "storage.rules"
-    }
-  ],
   "functions": [
     {
       "source": "backend/functions",

@@ -9,6 +9,7 @@ import * as phase2Handlers from '@/handlers/phase2/onboarding';
 import * as phase3Handlers from '@/handlers/phase3/orders';
 
 import * as authHandlers from '@/handlers/auth/registration';
+import * as phoneSignInHandlers from '@/handlers/auth/phoneSignIn';
 import * as customerHandlers from '@/handlers/customers/dashboard';
 import * as spDashboardHandlers from '@/handlers/serviceProviders/dashboard';
 import * as amDashboardHandlers from '@/handlers/accountManagers/dashboard';
@@ -60,6 +61,10 @@ app.post('/auth/send-phone-otp', async (req, res) => {
 
 app.post('/auth/verify-phone-otp', async (req, res) => {
   authHandlers.verifyPhoneOTP(req, res);
+});
+
+app.post('/auth/complete-phone-signin', async (req, res) => {
+  phoneSignInHandlers.completePhoneSignIn(req, res);
 });
 
 app.post('/auth/register-customer', async (req, res) => {

@@ -67,6 +67,7 @@ export const NOTIFICATION_TYPES = {
 
 // Firebase Firestore Collections
 export const COLLECTIONS = {
+  USERS: 'users',
   SUPERADMINS: 'superadmins',
   ACCOUNT_MANAGERS: 'accountManagers',
   SERVICES: 'services',

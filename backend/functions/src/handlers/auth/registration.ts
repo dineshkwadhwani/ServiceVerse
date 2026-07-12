@@ -4,8 +4,19 @@ import { Logger } from '@/utils/logger';
 import { ValidationError, sendError, sendSuccess } from '@/middleware/errorHandler';
 import type { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+const Resend = require('resend').Resend;
 
 const logger = new Logger('AuthHandlers');
+
+// Lazy initialize Resend - will be created only when needed
+let resend: any = null;
+
+function getResend() {
+  if (!resend && process.env.RESEND_API_KEY) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resend;
+}
 
 /**
  * Register a new customer user
@@ -249,9 +260,34 @@ export async function sendEmailOTP(req: any, res: Response) {
       { merge: true }
     );
 
-    // TODO: Send email OTP using Resend service
-    // For now, log it (in production, use Resend or similar service)
-    logger.info('OTP generated and stored', { email, otp });
+    // Send email OTP using Resend
+    const emailService = getResend();
+    if (emailService) {
+      try {
+        await emailService.emails.send({
+          from: 'noreply@serviceverse.app',
+          to: email,
+          subject: 'Your ServiceVerse Verification Code',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #333;">Verify Your Email</h2>
+              <p style="color: #666; font-size: 16px;">Your verification code is:</p>
+              <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+                <p style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #3B82F6; margin: 0;">${otp}</p>
+              </div>
+              <p style="color: #999; font-size: 14px;">This code expires in 10 minutes.</p>
+              <p style="color: #999; font-size: 12px;">If you didn't request this code, you can safely ignore this email.</p>
+            </div>
+          `,
+        });
+        logger.info('OTP email sent successfully', { email });
+      } catch (emailError: any) {
+        logger.error('Failed to send OTP email', emailError, { email });
+        // Still return success - OTP is stored, user can request resend
+      }
+    } else {
+      logger.warn('RESEND_API_KEY not configured, OTP not sent via email', { email, otp });
+    }
 
     return sendSuccess(res, {
       message: 'OTP sent to email',
