@@ -5,13 +5,13 @@ import type { MenuItem, SPMenuItem } from '@/types';
 interface SPMenuManagerProps {
   masterMenu: MenuItem[];
   spMenu: SPMenuItem[];
-  onUpdateItem: (menuItemId: string, spPrice: number, isActive: boolean) => Promise<void>;
+  onUpdateItem: (menuItemId: string, customPrice: number, isEnabled: boolean) => Promise<void>;
   isLoading?: boolean;
 }
 
 interface EditingItem {
   menuItemId: string;
-  spPrice: number;
+  customPrice: number;
 }
 
 export function SPMenuManager({
@@ -29,15 +29,15 @@ export function SPMenuManager({
 
   const handleToggleItem = async (item: MenuItem) => {
     const spItem = spMenuMap.get(item.menuItemId);
-    const isActive = spItem?.isActive ?? false;
-    const spPrice = spItem?.spPrice ?? item.basePrice;
+    const isEnabled = spItem?.isEnabled ?? false;
+    const customPrice = spItem?.customPrice ?? item.basePrice;
 
     setIsSaving(true);
     try {
-      await onUpdateItem(item.menuItemId, spPrice, !isActive);
+      await onUpdateItem(item.menuItemId, customPrice, !isEnabled);
       // Update map
       if (spItem) {
-        spItem.isActive = !isActive;
+        spItem.isEnabled = !isEnabled;
       }
     } catch (error) {
       console.error('Error toggling item:', error);
@@ -48,7 +48,7 @@ export function SPMenuManager({
 
   const handleSavePrice = async (menuItemId: string, newPrice: number) => {
     const spItem = spMenuMap.get(menuItemId);
-    const isActive = spItem?.isActive ?? false;
+    const isEnabled = spItem?.isEnabled ?? false;
 
     if (newPrice < 0) {
       alert('Price cannot be negative');
@@ -57,11 +57,11 @@ export function SPMenuManager({
 
     setIsSaving(true);
     try {
-      await onUpdateItem(menuItemId, newPrice, isActive);
+      await onUpdateItem(menuItemId, newPrice, isEnabled);
       setEditingItem(null);
       // Update map
       if (spItem) {
-        spItem.spPrice = newPrice;
+        spItem.customPrice = newPrice;
       }
     } catch (error) {
       console.error('Error saving price:', error);
@@ -80,7 +80,7 @@ export function SPMenuManager({
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-gray-900">Menu Management</h3>
         <span className="text-sm text-gray-600">
-          {spMenu.filter((m) => m.isActive).length} of {masterMenu.length} items enabled
+          {spMenu.filter((m) => m.isEnabled).length} of {masterMenu.length} items enabled
         </span>
       </div>
 
@@ -92,15 +92,15 @@ export function SPMenuManager({
         <div className="space-y-2">
           {masterMenu.map((item) => {
             const spItem = getItemStatus(item);
-            const isActive = spItem?.isActive ?? false;
-            const spPrice = spItem?.spPrice ?? item.basePrice;
+            const isEnabled = spItem?.isEnabled ?? false;
+            const customPrice = spItem?.customPrice ?? item.basePrice;
             const isEditing = editingItem?.menuItemId === item.menuItemId;
 
             return (
               <div
                 key={item.menuItemId}
                 className={`border rounded-lg transition-all ${
-                  isActive
+                  isEnabled
                     ? 'border-blue-300 bg-blue-50'
                     : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
@@ -113,20 +113,20 @@ export function SPMenuManager({
                       onClick={() => handleToggleItem(item)}
                       disabled={isLoading || isSaving}
                       className={`flex-shrink-0 w-10 h-6 rounded-full transition-colors ${
-                        isActive ? 'bg-blue-600' : 'bg-gray-300'
+                        isEnabled ? 'bg-blue-600' : 'bg-gray-300'
                       } flex items-center justify-between px-1 cursor-pointer disabled:opacity-50`}
-                      title={isActive ? 'Click to disable' : 'Click to enable'}
+                      title={isEnabled ? 'Click to disable' : 'Click to enable'}
                     >
                       <div
                         className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                          isActive ? 'translate-x-4' : ''
+                          isEnabled ? 'translate-x-4' : ''
                         }`}
                       />
                     </button>
 
                     {/* Item Info */}
                     <div className="flex-1 min-w-0">
-                      <p className={`font-medium ${isActive ? 'text-gray-900' : 'text-gray-600'}`}>
+                      <p className={`font-medium ${isEnabled ? 'text-gray-900' : 'text-gray-600'}`}>
                         {item.name}
                       </p>
                       {item.image ? (
@@ -143,10 +143,10 @@ export function SPMenuManager({
                       <p className="text-xs text-gray-500">Master: ₹{item.basePrice.toFixed(2)}</p>
                       <p
                         className={`font-semibold ${
-                          isActive ? 'text-blue-600' : 'text-gray-400'
+                          isEnabled ? 'text-blue-600' : 'text-gray-400'
                         }`}
                       >
-                        Your: ₹{spPrice.toFixed(2)}
+                        Your: ₹{customPrice.toFixed(2)}
                       </p>
                     </div>
 
@@ -190,7 +190,7 @@ export function SPMenuManager({
                     )}
 
                     {/* Price Edit */}
-                    {isActive && (
+                    {isEnabled && (
                       <div>
                         <p className="text-xs text-gray-600 font-medium mb-2">Set Your Price</p>
                         {isEditing ? (
@@ -200,11 +200,11 @@ export function SPMenuManager({
                               type="number"
                               step="0.01"
                               min="0"
-                              value={editingItem?.spPrice ?? spPrice}
+                              value={editingItem?.customPrice ?? customPrice}
                               onChange={(e) =>
                                 setEditingItem({
                                   menuItemId: item.menuItemId,
-                                  spPrice: parseFloat(e.target.value) || 0,
+                                  customPrice: parseFloat(e.target.value) || 0,
                                 })
                               }
                               className="flex-1 px-2 py-1 border border-blue-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -215,7 +215,7 @@ export function SPMenuManager({
                               onClick={() =>
                                 handleSavePrice(
                                   item.menuItemId,
-                                  editingItem?.spPrice ?? spPrice
+                                  editingItem?.customPrice ?? customPrice
                                 )
                               }
                               disabled={isSaving}
@@ -233,13 +233,13 @@ export function SPMenuManager({
                         ) : (
                           <div className="flex items-center justify-between">
                             <p className="text-sm font-semibold text-gray-900">
-                              ₹{spPrice.toFixed(2)}
+                              ₹{customPrice.toFixed(2)}
                             </p>
                             <button
                               onClick={() =>
                                 setEditingItem({
                                   menuItemId: item.menuItemId,
-                                  spPrice,
+                                  customPrice,
                                 })
                               }
                               disabled={isSaving}

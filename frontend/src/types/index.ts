@@ -50,6 +50,9 @@ export interface ServiceProvider extends BaseUser {
   commission: CommissionConfig;
   upiQRCode?: string;
   onboardedAt?: Date;
+  customMenus?: {
+    [serviceId: string]: SPMenuItem[]; // SP's custom menu prices and enabled status per service
+  };
 }
 
 export interface Coworker extends BaseUser {
@@ -94,6 +97,7 @@ export interface Service {
   defaultCommission: CommissionConfig;
   status: 'ACTIVE' | 'INACTIVE';
   unorphanReasons: string[]; // Predefined reasons for customers to unorphan
+  menuItems: MenuItem[]; // Master menu embedded in service
   createdAt: Date;
   updatedAt: Date;
   createdBy: string;
@@ -109,9 +113,14 @@ export interface MenuItem {
   updatedAt: Date;
 }
 
-export interface SPMenuItem extends MenuItem {
-  spPrice: number;
-  isActive: boolean;
+export interface SPMenuItem {
+  menuItemId: string;
+  name: string;
+  description?: string;
+  basePrice: number; // Original price from service
+  image?: string;
+  customPrice?: number; // SP's custom price override (if different from basePrice)
+  isEnabled: boolean; // SP can enable/disable items
 }
 
 export type MenuItemRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';

@@ -8,6 +8,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  arrayUnion,
 } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { auth, db, storage } from '@/utils/firebase-config';
@@ -26,6 +27,19 @@ async function uploadServiceImage(
 }
 
 function mapServiceDoc(id: string, data: Record<string, unknown>): Service {
+  const menuItemsData = (data.menuItems as any[]) || [];
+  const menuItems = menuItemsData.map((item) => ({
+    menuItemId: item.menuItemId as string,
+    name: item.name as string,
+    description: item.description as string | undefined,
+    basePrice: item.basePrice as number,
+    image: item.image as string | undefined,
+    createdAt:
+      (item.createdAt as { toDate?: () => Date })?.toDate?.() || new Date(),
+    updatedAt:
+      (item.updatedAt as { toDate?: () => Date })?.toDate?.() || new Date(),
+  }));
+
   return {
     serviceId: (data.serviceId as string) || id,
     name: data.name as string,
@@ -39,6 +53,7 @@ function mapServiceDoc(id: string, data: Record<string, unknown>): Service {
     defaultCommission: data.defaultCommission as Service['defaultCommission'],
     status: (data.status as Service['status']) || 'INACTIVE',
     unorphanReasons: (data.unorphanReasons as string[]) || [],
+    menuItems,
     createdBy: data.createdBy as string,
     createdAt:
       (data.createdAt as { toDate?: () => Date })?.toDate?.() || new Date(),
@@ -47,7 +62,10 @@ function mapServiceDoc(id: string, data: Record<string, unknown>): Service {
   };
 }
 
-export async function createService(data: CreateServiceFormData): Promise<string> {
+export async function createService(
+  data: CreateServiceFormData,
+  menuItems: Array<{ name: string; description?: string; basePrice: number; image?: string }>
+): Promise<string> {
   const user = auth.currentUser;
   if (!user) {
     throw new Error('You must be logged in to create a service');
@@ -59,6 +77,14 @@ export async function createService(data: CreateServiceFormData): Promise<string
     uploadServiceImage(serviceId, data.logo, 'logo'),
     uploadServiceImage(serviceId, data.heroImage, 'hero'),
   ]);
+
+  // Transform menu items to include menuItemId
+  const embeddedMenuItems = menuItems.map((item) => ({
+    menuItemId: crypto.randomUUID(),
+    ...item,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }));
 
   const serviceData = {
     serviceId,
@@ -72,15 +98,13 @@ export async function createService(data: CreateServiceFormData): Promise<string
     gstPercentage: data.gstPercentage,
     defaultCommission: data.defaultCommission,
     status: 'ACTIVE' as const,
+    menuItems: embeddedMenuItems,
     createdBy: user.uid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
 
   await setDoc(doc(db, COLLECTIONS.SERVICES, serviceId), serviceData);
-  await setDoc(doc(db, COLLECTIONS.SERVICES, serviceId, 'menuItems', '_init'), {
-    initialized: true,
-  });
 
   return serviceId;
 }
@@ -132,4 +156,30 @@ export async function getServices(
     services: allServices.slice(start, start + pageSize),
     total: allServices.length,
   };
+}
+
+export async function addMenuItemToService(
+  serviceId: string,
+  itemData: {
+    name: string;
+    description?: string;
+    basePrice: number;
+    image?: string;
+  }
+): Promise<string> {
+  const menuItemId = crypto.randomUUID();
+  const newMenuItem = {
+    menuItemId,
+    ...itemData,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  // Append to the menuItems array in the service document
+  await updateDoc(doc(db, COLLECTIONS.SERVICES, serviceId), {
+    menuItems: arrayUnion(newMenuItem),
+    updatedAt: serverTimestamp(),
+  });
+
+  return menuItemId;
 }

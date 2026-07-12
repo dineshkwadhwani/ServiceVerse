@@ -8,9 +8,10 @@ interface ServiceCardProps {
   service: Service;
   onEdit: (service: Service) => void;
   onView: (service: Service) => void;
+  onStatusChange?: () => void;
 }
 
-export function ServiceCard({ service, onEdit, onView }: ServiceCardProps) {
+export function ServiceCard({ service, onEdit, onView, onStatusChange }: ServiceCardProps) {
   const [isToggling, setIsToggling] = useState(false);
   const [status, setStatus] = useState(service.status);
   const toast = useToast();
@@ -23,6 +24,8 @@ export function ServiceCard({ service, onEdit, onView }: ServiceCardProps) {
       await toggleServiceStatus(service.serviceId, newStatus);
       setStatus(newStatus);
       toast.success(`Service ${newStatus.toLowerCase()}`);
+      // Notify parent to refresh services list
+      onStatusChange?.();
     } catch (error: any) {
       toast.error('Failed to update service status', error.message);
     } finally {

@@ -8,8 +8,9 @@ import { useToast } from '@/store/notificationStore';
 import { DEFAULT_COLORS } from '@/utils/constants';
 import { FormInput } from '@/components/Form/FormInput';
 import { FormTextarea } from '@/components/Form/FormTextarea';
+import { MenuItemForm } from '@/components/Menu/MenuItemForm';
 import { useFormErrors } from '@/hooks/useFormErrors';
-import type { Service, CreateServiceFormData } from '@/types';
+import type { Service, CreateServiceFormData, MenuItem } from '@/types';
 
 interface CreateServiceModalProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ export function CreateServiceModal({
       secondaryFontColor: DEFAULT_COLORS.secondaryFont,
     }
   );
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const toast = useToast();
 
   const {
@@ -102,6 +104,12 @@ export function CreateServiceModal({
   };
 
   const onSubmit = async (data: CreateServiceFormData) => {
+    // Validate at least 1 menu item
+    if (menuItems.length === 0) {
+      toast.error('At least 1 menu item is required');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       if (service) {
@@ -109,7 +117,8 @@ export function CreateServiceModal({
         return;
       }
 
-      await createServiceInFirestore(data);
+      // Create service with embedded menu items
+      await createServiceInFirestore(data, menuItems);
       onSave();
       onClose();
     } catch (error: unknown) {
@@ -118,6 +127,20 @@ export function CreateServiceModal({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleAddMenuItem = (item: Omit<MenuItem, 'menuItemId' | 'createdAt' | 'updatedAt'>) => {
+    const newItem: MenuItem = {
+      ...item,
+      menuItemId: `temp-${Date.now()}`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    setMenuItems([...menuItems, newItem]);
+  };
+
+  const handleRemoveMenuItem = (index: number) => {
+    setMenuItems(menuItems.filter((_, i) => i !== index));
   };
 
   return (
@@ -394,6 +417,16 @@ export function CreateServiceModal({
                 <span className="text-sm text-gray-700">Commission Active</span>
               </label>
             </div>
+          </div>
+
+          {/* Menu Items */}
+          <div className="border-t border-gray-200 pt-6">
+            <MenuItemForm
+              items={menuItems}
+              onAdd={handleAddMenuItem}
+              onRemove={handleRemoveMenuItem}
+              isLoading={isSubmitting}
+            />
           </div>
 
           {/* Buttons */}

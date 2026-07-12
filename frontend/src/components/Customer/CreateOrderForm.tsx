@@ -52,30 +52,21 @@ export function CreateOrderForm({
           name: 'Shirt',
           description: 'Regular shirt',
           basePrice: 50,
-          spPrice: 50,
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          isEnabled: true,
         },
         {
           menuItemId: '2',
           name: 'Pant',
           description: 'Regular pant',
           basePrice: 60,
-          spPrice: 60,
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          isEnabled: true,
         },
         {
           menuItemId: '3',
           name: 'Saree',
           description: 'Silk saree',
           basePrice: 100,
-          spPrice: 100,
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          isEnabled: true,
         },
       ];
       setMenuItems(mockMenuItems);
@@ -103,7 +94,8 @@ export function CreateOrderForm({
   const getTotalAmount = () => {
     return Object.entries(selectedItems).reduce((sum, [itemId, qty]) => {
       const item = menuItems.find((m) => m.menuItemId === itemId);
-      return sum + (item?.spPrice || 0) * qty;
+      const price = item?.customPrice ?? item?.basePrice ?? 0;
+      return sum + price * qty;
     }, 0);
   };
 
@@ -119,11 +111,12 @@ export function CreateOrderForm({
         serviceProviderId,
         items: Object.entries(selectedItems).map(([itemId, quantity]) => {
           const item = menuItems.find((m) => m.menuItemId === itemId);
+          const price = item?.customPrice ?? item?.basePrice ?? 0;
           return {
             menuItemId: itemId,
             menuItemName: item?.name,
             quantity,
-            price: item?.spPrice,
+            price,
           };
         }),
         pickupDate: new Date(data.pickupDate),
@@ -177,7 +170,7 @@ export function CreateOrderForm({
                     <h4 className="font-medium text-gray-900">{item.name}</h4>
                     <p className="text-sm text-gray-500">{item.description}</p>
                     <p className="text-sm font-semibold text-blue-600 mt-1">
-                      ₹{item.spPrice}
+                      ₹{item.customPrice ?? item.basePrice}
                     </p>
                   </div>
 
@@ -212,7 +205,7 @@ export function CreateOrderForm({
 
                   {quantity > 0 && (
                     <div className="ml-6 text-right font-semibold text-gray-900">
-                      ₹{item.spPrice * quantity}
+                      ₹{(item.customPrice ?? item.basePrice) * quantity}
                     </div>
                   )}
                 </div>

@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { getServices } from '@/services/serviceService';
 import { useToast } from '@/store/notificationStore';
 import { CreateServiceModal } from './CreateServiceModal';
+import { ViewServiceModal } from './ViewServiceModal';
 import { ServiceCard } from './ServiceCard';
 import type { Service } from '@/types';
 
@@ -10,7 +11,9 @@ export function ServiceDashboard() {
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [viewingService, setViewingService] = useState<Service | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalServices, setTotalServices] = useState(0);
   const toast = useToast();
@@ -54,9 +57,8 @@ export function ServiceDashboard() {
   };
 
   const handleViewService = (service: Service) => {
-    // Navigate to service detail page
-    // window.location.href = `/superadmin/services/${service.serviceId}`;
-    toast.info('View service detail', `Service: ${service.name}`);
+    setViewingService(service);
+    setIsViewModalOpen(true);
   };
 
   const totalPages = Math.ceil(totalServices / ITEMS_PER_PAGE);
@@ -124,6 +126,7 @@ export function ServiceDashboard() {
               service={service}
               onEdit={handleEditService}
               onView={handleViewService}
+              onStatusChange={fetchServices}
             />
           ))}
         </div>
@@ -168,6 +171,14 @@ export function ServiceDashboard() {
         service={selectedService}
         onClose={() => setIsModalOpen(false)}
         onSave={handleServiceSaved}
+      />
+
+      {/* View Service Modal */}
+      <ViewServiceModal
+        isOpen={isViewModalOpen}
+        service={viewingService}
+        onClose={() => setIsViewModalOpen(false)}
+        onServiceUpdated={handleServiceSaved}
       />
     </div>
   );
