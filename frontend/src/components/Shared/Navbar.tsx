@@ -1,14 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/store/notificationStore';
-import { Menu, LogOut, Bell, User, Settings } from 'lucide-react';
+import { LogOut, Bell, User, Settings } from 'lucide-react';
 import { useState } from 'react';
 
-interface NavbarProps {
-  onMenuClick?: () => void;
-}
-
-export function Navbar({ onMenuClick }: NavbarProps) {
+export function Navbar() {
   const navigate = useNavigate();
   const { user, signOut } = useAuthStore();
   const toast = useToast();
@@ -28,15 +24,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
     <nav className="bg-white border-b border-gray-200 shadow-sm">
       <div className="px-6 py-4 flex items-center justify-between">
         {/* Left */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onMenuClick}
-            className="p-2 hover:bg-gray-100 rounded-lg transition"
-          >
-            <Menu className="w-5 h-5 text-gray-600" />
-          </button>
-          <h1 className="text-lg font-semibold text-gray-900">ServiceVerse</h1>
-        </div>
+        <h1 className="text-lg font-semibold text-gray-900">ServiceVerse</h1>
 
         {/* Right */}
         <div className="flex items-center gap-4">
