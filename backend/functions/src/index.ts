@@ -15,6 +15,7 @@ import * as customerHandlers from '@/handlers/customers/dashboard';
 import * as spDashboardHandlers from '@/handlers/serviceProviders/dashboard';
 import * as amDashboardHandlers from '@/handlers/accountManagers/dashboard';
 import * as superAdminHandlers from '@/handlers/superAdmin/dashboard';
+import * as diagnosticsHandlers from '@/handlers/debug/diagnostics';
 
 import { getSeedAdminConfig, seedSuperAdminUser } from '@/handlers/admin/seedAdmin';
 
@@ -74,6 +75,11 @@ app.post('/auth/register-customer', async (req, res) => {
 
 app.post('/auth/register-sp', async (req, res) => {
   authHandlers.registerServiceProvider(req, res);
+});
+
+// Complete registration after phone verification (unified login/register endpoint)
+app.post('/auth/complete-registration', verifyToken, async (req, res) => {
+  authHandlers.completeRegistration(req, res);
 });
 
 // Auth middleware for all other routes
@@ -145,6 +151,14 @@ app.get('/admin/menu-item-requests', requireRole('SUPERADMIN', 'ACCOUNT_MANAGER'
 // ACCOUNT MANAGER DASHBOARD
 // ============================================================================
 
+app.get('/account-managers/stats', requireRole('ACCOUNT_MANAGER'), async (req, res) => {
+  amDashboardHandlers.getAMStats(req as any, res);
+});
+
+app.get('/account-managers/pending-onboarding', requireRole('ACCOUNT_MANAGER'), async (req, res) => {
+  amDashboardHandlers.getAMPendingOnboarding(req as any, res);
+});
+
 app.get('/account-managers/unorphan-requests', requireRole('ACCOUNT_MANAGER'), async (req, res) => {
   amDashboardHandlers.getUnorphanRequests(req as any, res);
 });
@@ -167,6 +181,10 @@ app.get('/superadmin/users', requireRole('SUPERADMIN'), async (req, res) => {
 
 app.post('/superadmin/users', requireRole('SUPERADMIN'), async (req, res) => {
   superAdminHandlers.createUser(req as any, res);
+});
+
+app.put('/superadmin/users/:userId', requireRole('SUPERADMIN'), async (req, res) => {
+  superAdminHandlers.updateUser(req as any, res);
 });
 
 // ============================================================================
@@ -215,6 +233,11 @@ app.get('/account-managers', requireRole('SUPERADMIN'), (req, res) => {
   phase2Handlers.getAccountManagers(req as any, res);
 });
 
+// Update AccountManager
+app.put('/account-managers/:amId', requireRole('SUPERADMIN'), (req, res) => {
+  phase2Handlers.updateAccountManager(req as any, res);
+});
+
 // Assign AccountManager to ServiceProvider
 app.post('/service-providers/:spId/assign-account-manager', requireRole('SUPERADMIN'), (req, res) => {
   phase2Handlers.assignAccountManager(req as any, res);
@@ -228,6 +251,27 @@ app.post('/service-providers/:spId/onboard', requireRole('ACCOUNT_MANAGER'), (re
 // Get ServiceProviders (for AccountManager)
 app.get('/service-providers', requireRole('ACCOUNT_MANAGER'), (req, res) => {
   phase2Handlers.getServiceProviders(req as any, res);
+});
+
+// SP Onboarding Workflow
+// Get pending SP onboarding requests (SuperAdmin)
+app.get('/sp-onboarding/pending', requireRole('SUPERADMIN'), (req, res) => {
+  phase2Handlers.getPendingOnboardingRequests(req as any, res);
+});
+
+// Assign AM to SP (SuperAdmin)
+app.post('/sp-onboarding/:requestId/assign-am', requireRole('SUPERADMIN'), (req, res) => {
+  phase2Handlers.assignAccountManagerToSP(req as any, res);
+});
+
+// Get pending SPs for AM (AccountManager)
+app.get('/sp-onboarding/my-pending', requireRole('ACCOUNT_MANAGER'), (req, res) => {
+  phase2Handlers.getPendingSPsForAccountManager(req as any, res);
+});
+
+// Mark onboarding as complete (AccountManager)
+app.post('/sp-onboarding/:requestId/complete', requireRole('ACCOUNT_MANAGER'), (req, res) => {
+  phase2Handlers.markOnboardingComplete(req as any, res);
 });
 
 // ============================================================================
@@ -303,6 +347,16 @@ app.get('/analytics', async (req, res) => {
 // Error handling for 404
 // ============================================================================
 
+// ============================================================================
+// DEBUG ENDPOINTS (for troubleshooting)
+// ============================================================================
+
+// Check SP assignment for an AM (no auth required for debugging)
+app.get('/debug/check-sp-assignment', (req, res) => {
+  diagnosticsHandlers.checkSPAssignment(req as any, res);
+});
+
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,

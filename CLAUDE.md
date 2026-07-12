@@ -1,7 +1,7 @@
 # ServiceVerse Project Documentation
 
-**Last Updated**: July 12, 2026  
-**Status**: 🚀 Active Development - Phase 4 Complete
+**Last Updated**: July 13, 2026  
+**Status**: 🚀 Active Development - Milestone 1 Complete: All Logins Working ✅
 
 ---
 
@@ -161,6 +161,50 @@ ServiceVerse is a comprehensive multi-utility SaaS platform for service provider
 - `vercel.json` - Vercel deployment configuration
 - `firebase.json` - Firebase configuration
 - `.env.example` files for both frontend and backend
+
+#### Phase 11: Dashboard Architecture Refactoring & Code Cleanup ✅
+
+- Unified dashboard UI patterns across 4 role-based dashboards
+- Extracted 3 reusable shared components to eliminate code duplication
+- Deleted 19 dead/orphaned files with zero references
+- Removed "New" suffix nomenclature (dashboards are no longer versioned)
+- Cleaned up debug console logging from API interceptors and modals
+
+**Architecture Changes**:
+
+- Created `DashboardTabs.tsx` — Consistent sticky pill-style tab navigation (used by all 4 dashboards)
+- Created `StatsGrid.tsx` — Icon+number+label stat cards component (replaces hand-rolled copies)
+- Created `EmptyState.tsx` — Reusable "No X yet" placeholder box (replaces ~10 copy-pasted versions)
+- All dashboards now share styling source-of-truth; style changes propagate uniformly
+
+**Files Deleted** (confirmed zero references):
+
+- Old duplicate dashboards: `components/Dashboard/AMDashboard.tsx` (pre-refactor version), `CustomerDashboard.tsx`, `SPDashboard.tsx`
+- Orphaned folders: `components/Customer/` (4 files), `components/AccountManager/` (4 files), `components/Menu/` (3 files)
+- Dead pages: `pages/LoginPage.tsx`, `pages/ServiceLandingPage.tsx`, `pages/LandingPage.tsx` (old version)
+- Dead modal: `Auth/LoginModalNew.tsx`, `Auth/RegisterModal.tsx`
+
+**Files Renamed** (dropped "New" suffix):
+
+- `AMDashboardNew` → `AMDashboard` + renamed function export
+- `SPDashboardNew` → `SPDashboard` + renamed function export  
+- `CustomerDashboardNew` → `CustomerDashboard` + renamed function export
+- `ServiceCustomerDashboardNew` → `ServiceCustomerDashboard` + renamed function export
+- `ApprovalsTabNew` → `ApprovalsTab` + renamed function export + removed 15+ console.log debug statements
+- `LandingPageNew` → `LandingPage` + renamed function export
+
+**Cleanup Work**:
+
+- Stripped emoji-tagged debug console.log calls from `apiClient.ts` request/response interceptors
+- Removed verbose logging from `ApprovalsTab.tsx`, `EditUserModal.tsx`, `CreateAccountManagerModal.tsx`
+- Updated all 21 import sites in `App.tsx` and component tree to reference new names
+- Verified: `tsc --noEmit` clean, `vite build` succeeds, CSS bundle size decreased (37.7KB → 28.1KB due to dead Tailwind class purging)
+
+**Files Modified**:
+
+- `App.tsx` — Updated all dashboard imports and router wiring
+- `frontend/src/services/apiClient.ts` — Cleaned up request/response interceptor logging
+- All 4 dashboard components + `ApprovalsTab.tsx` — Applied shared components, removed duplicate styling
 
 ---
 

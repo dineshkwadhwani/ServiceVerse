@@ -19,13 +19,9 @@ class ApiClient {
     // Add request interceptor to attach auth token
     this.axiosInstance.interceptors.request.use(
       async (config) => {
-        try {
-          const token = await auth.currentUser?.getIdToken();
-          if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-          }
-        } catch (error) {
-          console.error('Failed to get auth token:', error);
+        const token = await auth.currentUser?.getIdToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
       },
@@ -70,6 +66,10 @@ class ApiClient {
 
   async registerServiceProvider(data: any) {
     return this.axiosInstance.post('/auth/register-sp', data);
+  }
+
+  async completeRegistration(data: any) {
+    return this.axiosInstance.post('/auth/complete-registration', data);
   }
 
   // ============================================================================
@@ -120,6 +120,14 @@ class ApiClient {
   // ACCOUNT MANAGER DASHBOARD
   // ============================================================================
 
+  async getAMStats() {
+    return this.axiosInstance.get('/account-managers/stats');
+  }
+
+  async getAMPendingOnboarding() {
+    return this.axiosInstance.get('/account-managers/pending-onboarding');
+  }
+
   async getAMUnorphanRequests() {
     return this.axiosInstance.get('/account-managers/unorphan-requests');
   }
@@ -142,6 +150,10 @@ class ApiClient {
 
   async createUserByAdmin(data: any) {
     return this.axiosInstance.post('/superadmin/users', data);
+  }
+
+  async updateUserByAdmin(userId: string, data: any) {
+    return this.axiosInstance.put(`/superadmin/users/${userId}`, data);
   }
 
   // ============================================================================
@@ -318,6 +330,28 @@ class ApiClient {
 
   async confirmDirectPayment(orderId: string) {
     return this.axiosInstance.patch(`/orders/${orderId}/confirm-direct-payment`);
+  }
+
+  // ============================================================================
+  // SP ONBOARDING WORKFLOW
+  // ============================================================================
+
+  async getPendingOnboardingRequests() {
+    return this.axiosInstance.get('/sp-onboarding/pending');
+  }
+
+  async assignAccountManagerToSP(requestId: string, accountManagerId: string) {
+    return this.axiosInstance.post(`/sp-onboarding/${requestId}/assign-am`, {
+      accountManagerId,
+    });
+  }
+
+  async getPendingSPsForAccountManager() {
+    return this.axiosInstance.get('/sp-onboarding/my-pending');
+  }
+
+  async markOnboardingComplete(requestId: string) {
+    return this.axiosInstance.post(`/sp-onboarding/${requestId}/complete`);
   }
 
   // ============================================================================

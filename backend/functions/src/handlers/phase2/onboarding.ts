@@ -17,63 +17,65 @@ export async function createAccountManager(req: AuthRequest, res: Response) {
       return sendError(res, new ValidationError('User not authenticated'));
     }
 
-    const { email, phone, name, serviceId } = req.body;
+    const { email, phone, name } = req.body;
 
-    if (!email || !phone || !name || !serviceId) {
-      return sendError(res, new ValidationError('Missing required fields'));
+    if (!email || !phone || !name) {
+      return sendError(res, new ValidationError('Missing required fields: name, email, phone'));
     }
 
-    logger.info('Creating account manager', { email, serviceId });
+    logger.info('Creating account manager', { phone, name, email });
 
-    // Check if service exists
-    const serviceDoc = await db.collection('services').doc(serviceId).get();
-    if (!serviceDoc.exists) {
-      return sendError(res, new ValidationError('Service not found'));
+    // Check if phone already exists in users collection
+    const phoneCheck = await db
+      .collection('users')
+      .where('phone', '==', phone)
+      .limit(1)
+      .get();
+
+    if (!phoneCheck.empty) {
+      return sendError(res, new ValidationError('Phone number already registered'));
     }
 
-    // Create auth user
-    const userRecord = await auth.createUser({
-      email,
-      password: Math.random().toString(36).slice(-12), // Temporary password
-      displayName: name,
+    // Create Firebase Auth user with phone (no email auth - phone-only)
+    const authUser = await auth.createUser({
       phoneNumber: `+91${phone}`,
+      displayName: name,
     });
 
-    // Create Firestore document
-    const amData = {
-      uid: userRecord.uid,
+    logger.info('Created auth user for AM', { uid: authUser.uid, phone });
+
+    // Create user document in users collection (verified and active immediately)
+    const userData = {
+      uid: authUser.uid,
       email,
       phone,
       name,
       role: 'ACCOUNT_MANAGER',
-      service: {
-        serviceId,
-        serviceName: serviceDoc.data()?.name,
-      },
-      managerId: null, // For future hierarchy
       status: 'ACTIVE',
+      verified: true,
+      verifiedMethod: 'admin',
       createdAt: new Date(),
+      updatedAt: new Date(),
       createdBy: req.user.uid,
     };
 
-    await db.collection('accountManagers').doc(userRecord.uid).set(amData);
+    await db.collection('users').doc(authUser.uid).set(userData);
+    logger.info('Created user document for AM', { uid: authUser.uid });
 
     // Set custom claims
-    await auth.setCustomUserClaims(userRecord.uid, {
-      role: 'ACCOUNT_MANAGER',
-      serviceId,
-    });
-
-    logger.info('Account Manager created successfully', { uid: userRecord.uid });
+    await auth.setCustomUserClaims(authUser.uid, { role: 'ACCOUNT_MANAGER' });
+    logger.info('Set custom claims for AM', { uid: authUser.uid });
 
     return sendSuccess(
       res,
       {
-        uid: userRecord.uid,
-        email,
+        uid: authUser.uid,
+        phone,
         name,
+        email,
+        role: 'ACCOUNT_MANAGER',
         status: 'ACTIVE',
-        temporaryPassword: 'Email sent to user',
+        message: 'Account Manager created successfully. Ready to use.',
       },
       201
     );
@@ -90,13 +92,28 @@ export async function getAccountManagers(req: AuthRequest, res: Response) {
   try {
     logger.info('Fetching account managers');
 
-    const snapshot = await db.collection('accountManagers').orderBy('createdAt', 'desc').get();
+    // Query users collection for all ACCOUNT_MANAGER role users
+    const snapshot = await db
+      .collection('users')
+      .where('role', '==', 'ACCOUNT_MANAGER')
+      .get();
 
-    const accountManagers = snapshot.docs.map((doc) => ({
-      uid: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate?.(),
-    }));
+    const accountManagers = snapshot.docs
+      .map((doc) => {
+        const data = doc.data();
+        return {
+          uid: doc.id,
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          role: data.role,
+          status: data.status,
+          createdAt: data.createdAt?.toDate?.() || new Date(),
+        };
+      })
+      .sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
+
+    logger.info(`Found ${accountManagers.length} account managers`);
 
     return sendSuccess(res, {
       accountManagers,
@@ -118,18 +135,23 @@ export async function assignAccountManager(req: AuthRequest, res: Response) {
 
     logger.info('Assigning account manager', { spId, accountManagerId });
 
-    // Verify AM exists
-    const amDoc = await db.collection('accountManagers').doc(accountManagerId).get();
+    // Verify AM exists in users collection
+    const amDoc = await db.collection('users').doc(accountManagerId).get();
     if (!amDoc.exists) {
       return sendError(res, new ValidationError('Account Manager not found'));
     }
 
-    // Update SP document
+    const amData = amDoc.data() as any;
+    if (amData.role !== 'ACCOUNT_MANAGER') {
+      return sendError(res, new ValidationError('User is not an Account Manager'));
+    }
+
+    // Update SP document with AM reference
     await db.collection('serviceProviders').doc(spId).update({
       accountManager: {
         userId: accountManagerId,
-        name: amDoc.data()?.name,
-        email: amDoc.data()?.email,
+        name: amData.name,
+        email: amData.email,
       },
       status: 'ASSIGNED',
       updatedAt: new Date(),
@@ -283,15 +305,16 @@ export async function getServiceProviders(req: AuthRequest, res: Response) {
     const snapshot = await db
       .collection('serviceProviders')
       .where('accountManager.userId', '==', accountManagerId)
-      .orderBy('createdAt', 'desc')
       .get();
 
-    const serviceProviders = snapshot.docs.map((doc) => ({
-      uid: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate?.(),
-      onboardedAt: doc.data().onboardedAt?.toDate?.(),
-    } as any));
+    const serviceProviders = snapshot.docs
+      .map((doc) => ({
+        uid: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate?.(),
+        onboardedAt: doc.data().onboardedAt?.toDate?.(),
+      } as any))
+      .sort((a: any, b: any) => (b.createdAt || new Date()) - (a.createdAt || new Date()));
 
     return sendSuccess(res, {
       serviceProviders,
@@ -304,6 +327,319 @@ export async function getServiceProviders(req: AuthRequest, res: Response) {
     });
   } catch (error: any) {
     logger.error('Failed to fetch service providers', error);
+    return sendError(res, error);
+  }
+}
+
+/**
+ * Update Account Manager
+ */
+export async function updateAccountManager(req: AuthRequest, res: Response) {
+  try {
+    const { amId } = req.params;
+    const { name, email, phone, status } = req.body;
+
+    if (!amId) {
+      return sendError(res, new ValidationError('Account Manager ID is required'));
+    }
+
+    logger.info('Updating account manager', { amId, name, email, phone, status });
+
+    const amRef = db.collection('users').doc(amId);
+    const amSnap = await amRef.get();
+
+    if (!amSnap.exists) {
+      return sendError(res, new ValidationError('Account Manager not found'));
+    }
+
+    const currentAM = amSnap.data() as any;
+
+    // Update Firestore document
+    const updateData: any = { updatedAt: new Date() };
+    if (name !== undefined) updateData.name = name;
+    if (phone !== undefined) updateData.phone = phone;
+    if (status !== undefined) updateData.status = status;
+    if (email !== undefined && currentAM && email !== currentAM.email) {
+      // Update Firebase Auth email
+      await auth.updateUser(amId, { email });
+      updateData.email = email;
+    }
+
+    await amRef.update(updateData);
+
+    logger.info('Account Manager updated successfully', { amId });
+
+    return sendSuccess(res, {
+      amId,
+      message: 'Account Manager updated successfully',
+    });
+  } catch (error: any) {
+    logger.error('Failed to update account manager', error);
+    return sendError(res, error);
+  }
+}
+
+/**
+ * Get pending SP onboarding requests (SuperAdmin only)
+ * SPs awaiting account manager assignment
+ */
+export async function getPendingOnboardingRequests(req: AuthRequest, res: Response) {
+  try {
+    const userId = req.user?.uid;
+    console.log('[getPendingOnboardingRequests] Starting, userId:', userId);
+    logger.info('Fetching pending SP onboarding requests', { userId });
+
+    console.log('[getPendingOnboardingRequests] Querying approvals collection...');
+    // Get all SP registration approvals
+    const snapshot = await db
+      .collection('approvals')
+      .where('requestType', '==', 'SP_REGISTRATION')
+      .get();
+
+    console.log('[getPendingOnboardingRequests] Query successful, total docs:', snapshot.size);
+
+    // Filter for PENDING_AM_ASSIGNMENT status
+    const pendingRequests = snapshot.docs
+      .filter((doc) => doc.data().status === 'PENDING_AM_ASSIGNMENT')
+      .map((doc) => ({
+        requestId: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate?.(),
+        updatedAt: doc.data().updatedAt?.toDate?.(),
+      }))
+      .sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
+
+    console.log('[getPendingOnboardingRequests] Filtered to', pendingRequests.length, 'pending requests');
+    logger.info('Fetched pending onboarding requests', { count: pendingRequests.length });
+
+    return sendSuccess(res, {
+      requests: pendingRequests,
+      total: pendingRequests.length,
+    });
+  } catch (error: any) {
+    console.error('[getPendingOnboardingRequests] ERROR:', error.message, error.code);
+    console.error('[getPendingOnboardingRequests] Full error:', error);
+    logger.error('Failed to fetch pending onboarding requests', error);
+    return sendError(res, error);
+  }
+}
+
+/**
+ * Assign Account Manager to SP (SuperAdmin only)
+ */
+export async function assignAccountManagerToSP(req: AuthRequest, res: Response) {
+  try {
+    const { requestId } = req.params;
+    const { accountManagerId } = req.body;
+
+    if (!requestId || !accountManagerId) {
+      return sendError(res, new ValidationError('Missing requestId or accountManagerId'));
+    }
+
+    logger.info('Assigning AM to SP', { requestId, accountManagerId });
+
+    // Verify request exists
+    const requestDoc = await db.collection('approvals').doc(requestId).get();
+    if (!requestDoc.exists) {
+      return sendError(res, new ValidationError('Approval request not found'));
+    }
+
+    const requestData = requestDoc.data() as any;
+    const { userId, serviceId } = requestData;
+
+    // Verify AM exists
+    const amDoc = await db.collection('users').doc(accountManagerId).get();
+    if (!amDoc.exists || amDoc.data()?.role !== 'ACCOUNT_MANAGER') {
+      return sendError(res, new ValidationError('Account Manager not found'));
+    }
+
+    const amData = amDoc.data() as any;
+
+    // Update approval request with approver info
+    await db.collection('approvals').doc(requestId).update({
+      status: 'ASSIGNED',
+      assignedAccountManagerId: accountManagerId,
+      assignedAccountManagerName: amData.name,
+      assignedAccountManagerEmail: amData.email,
+      approverName: amData.name,
+      approverPhone: amData.phone,
+      assignedAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // Add AM info to SP user document (flat fields for backward compatibility)
+    await db.collection('users').doc(userId).update({
+      accountManagerId,
+      accountManagerName: amData.name,
+      accountManagerEmail: amData.email,
+      updatedAt: new Date(),
+    });
+
+    // Also create/update SP entry in serviceProviders collection with nested structure
+    // This ensures getServiceProviders() query works correctly
+    const spServiceProvidersRef = db.collection('serviceProviders').doc(userId);
+    const spServiceProvidersDoc = await spServiceProvidersRef.get();
+
+    if (spServiceProvidersDoc.exists) {
+      // Update existing SP document
+      await spServiceProvidersRef.update({
+        accountManager: {
+          userId: accountManagerId,
+          name: amData.name,
+          email: amData.email,
+        },
+        status: 'ASSIGNED',
+        updatedAt: new Date(),
+      });
+    } else {
+      // Create new SP document if it doesn't exist (shouldn't happen, but safety check)
+      await spServiceProvidersRef.set({
+        userId,
+        accountManager: {
+          userId: accountManagerId,
+          name: amData.name,
+          email: amData.email,
+        },
+        status: 'ASSIGNED',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+
+    logger.info('Account manager assigned to SP', { requestId, accountManagerId, userId });
+
+    return sendSuccess(res, {
+      requestId,
+      userId,
+      status: 'ASSIGNED',
+      assignedAccountManagerId: accountManagerId,
+      assignedAt: new Date(),
+    });
+  } catch (error: any) {
+    logger.error('Failed to assign account manager', error);
+    return sendError(res, error);
+  }
+}
+
+/**
+ * Get pending SPs for Account Manager (AM assigned SPs awaiting onboarding)
+ */
+export async function getPendingSPsForAccountManager(req: AuthRequest, res: Response) {
+  try {
+    const accountManagerId = req.user?.uid;
+
+    if (!accountManagerId) {
+      return sendError(res, new ValidationError('User not authenticated'));
+    }
+
+    logger.info('Fetching pending SPs for AM', { accountManagerId });
+
+    // Get approval requests assigned to this AM
+    const snapshot = await db
+      .collection('approvals')
+      .where('assignedAccountManagerId', '==', accountManagerId)
+      .where('requestType', '==', 'SP_REGISTRATION')
+      .get();
+
+    const requests = snapshot.docs
+      .filter((doc) => doc.data().status !== 'COMPLETED')
+      .map((doc) => ({
+        requestId: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate?.(),
+        updatedAt: doc.data().updatedAt?.toDate?.(),
+      } as any))
+      .sort((a: any, b: any) => {
+        // Sort by status first (ASSIGNED before IN_PROGRESS), then by date
+        const statusOrder = { ASSIGNED: 1, IN_PROGRESS: 2 };
+        const aStatus = (statusOrder as any)[a.status] || 3;
+        const bStatus = (statusOrder as any)[b.status] || 3;
+        if (aStatus !== bStatus) return aStatus - bStatus;
+        return (b.createdAt as any) - (a.createdAt as any);
+      });
+
+    return sendSuccess(res, {
+      requests,
+      total: requests.length,
+      byStatus: {
+        assigned: requests.filter((r: any) => r.status === 'ASSIGNED').length,
+        inProgress: requests.filter((r: any) => r.status === 'IN_PROGRESS').length,
+        completed: requests.filter((r: any) => r.status === 'COMPLETED').length,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Failed to fetch pending SPs for AM', error);
+    return sendError(res, error);
+  }
+}
+
+/**
+ * Mark SP onboarding as complete (AccountManager only)
+ */
+export async function markOnboardingComplete(req: AuthRequest, res: Response) {
+  try {
+    const { requestId } = req.params;
+    const accountManagerId = req.user?.uid;
+
+    if (!requestId) {
+      return sendError(res, new ValidationError('requestId is required'));
+    }
+
+    if (!accountManagerId) {
+      return sendError(res, new ValidationError('User not authenticated'));
+    }
+
+    logger.info('Marking onboarding as complete', { requestId, accountManagerId });
+
+    // Verify request exists and is assigned to this AM
+    const requestDoc = await db.collection('approvals').doc(requestId).get();
+    if (!requestDoc.exists) {
+      return sendError(res, new ValidationError('Approval request not found'));
+    }
+
+    const requestData = requestDoc.data() as any;
+    if (requestData.assignedAccountManagerId !== accountManagerId) {
+      return sendError(res, new ValidationError('You are not assigned to this SP'));
+    }
+
+    const { userId, serviceId } = requestData;
+
+    // Update approval request
+    await db.collection('approvals').doc(requestId).update({
+      status: 'COMPLETED',
+      completedAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // Update SP user document to ACTIVE status
+    await db.collection('users').doc(userId).update({
+      status: 'ACTIVE',
+      onboardingCompletedAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // Update service association to ACTIVE
+    await db
+      .collection('users')
+      .doc(userId)
+      .collection('serviceAssociations')
+      .doc(serviceId)
+      .update({
+        status: 'ACTIVE',
+        isActive: true,
+        activatedAt: new Date(),
+      });
+
+    logger.info('Onboarding marked as complete', { requestId, userId });
+
+    return sendSuccess(res, {
+      requestId,
+      userId,
+      status: 'COMPLETED',
+      completedAt: new Date(),
+    });
+  } catch (error: any) {
+    logger.error('Failed to mark onboarding as complete', error);
     return sendError(res, error);
   }
 }

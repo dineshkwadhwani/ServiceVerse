@@ -76,6 +76,7 @@ export async function getAllUsers(req: AuthRequest, res: Response) {
         email: data.email,
         phone: data.phone || null,
         role: data.role,
+        status: data.status || 'ACTIVE',
         verified: data.verified || false,
         createdAt: data.createdAt?.toDate?.() || data.createdAt,
       };
@@ -161,6 +162,52 @@ export async function createUser(req: AuthRequest, res: Response) {
     });
   } catch (error: any) {
     logger.error('Failed to create user', error);
+    return sendError(res, error);
+  }
+}
+
+export async function updateUser(req: AuthRequest, res: Response) {
+  try {
+    const { userId } = req.params;
+    const { name, email, phone, status } = req.body;
+
+    if (!userId) {
+      return sendError(res, new ValidationError('User ID is required'));
+    }
+
+    logger.info('Updating user', { userId, name, email, phone, status });
+
+    // Get current user
+    const userRef = db.collection('users').doc(userId);
+    const userSnap = await userRef.get();
+
+    if (!userSnap.exists) {
+      return sendError(res, new ValidationError('User not found'));
+    }
+
+    const currentUser = userSnap.data() as any;
+
+    // Update Firestore document
+    const updateData: any = { updatedAt: new Date() };
+    if (name !== undefined) updateData.name = name;
+    if (phone !== undefined) updateData.phone = phone;
+    if (status !== undefined) updateData.status = status;
+    if (email !== undefined && currentUser && email !== currentUser.email) {
+      // Update Firebase Auth email
+      await auth.updateUser(userId, { email });
+      updateData.email = email;
+    }
+
+    await userRef.update(updateData);
+
+    logger.info('User updated successfully', { userId });
+
+    return sendSuccess(res, {
+      userId,
+      message: 'User updated successfully',
+    });
+  } catch (error: any) {
+    logger.error('Failed to update user', error);
     return sendError(res, error);
   }
 }

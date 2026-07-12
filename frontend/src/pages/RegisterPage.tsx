@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Briefcase, Loader2 } from 'lucide-react';
+import { COLORS } from '@/utils/theme';
+import { Navbar } from '@/components/Shared/Navbar';
 import { RegisterSPForm } from '@/components/Auth/RegisterSPForm';
 import { RegisterCustomerForm } from '@/components/Auth/RegisterCustomerForm';
 import { apiClient } from '@/services/apiClient';
@@ -51,10 +53,16 @@ export function RegisterPage() {
   if (!selectedService) {
     if (isLoadingServices) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto mb-4" />
-            <p className="text-gray-400">Loading services...</p>
+        <div className="min-h-screen flex flex-col" style={{ backgroundColor: COLORS.bg.primary }}>
+          <Navbar />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <Loader2
+                className="w-12 h-12 animate-spin mx-auto mb-4"
+                style={{ color: COLORS.semantic.info }}
+              />
+              <p style={{ color: COLORS.text.secondary }}>Loading services...</p>
+            </div>
           </div>
         </div>
       );
@@ -62,34 +70,45 @@ export function RegisterPage() {
 
     if (services.length === 0) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-red-400 mb-4">No services available</p>
-            <button
-              onClick={() => navigate('/')}
-              className="text-blue-400 hover:text-blue-300"
-            >
-              Back to Home
-            </button>
+        <div className="min-h-screen flex flex-col" style={{ backgroundColor: COLORS.bg.primary }}>
+          <Navbar />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <p className="mb-4" style={{ color: COLORS.semantic.error }}>
+                No services available
+              </p>
+              <button
+                onClick={() => navigate('/')}
+                className="font-medium"
+                style={{ color: COLORS.semantic.info }}
+              >
+                Back to Home
+              </button>
+            </div>
           </div>
         </div>
       );
     }
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-        <div className="max-w-5xl mx-auto px-6 py-20">
+      <div className="min-h-screen flex flex-col" style={{ backgroundColor: COLORS.bg.primary }}>
+        <Navbar />
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-5xl mx-auto px-6 py-20">
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-gray-400 hover:text-white mb-12"
+            className="flex items-center gap-2 mb-12 transition"
+            style={{ color: COLORS.text.secondary }}
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
 
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-white mb-4">Join ServiceVerse</h1>
-            <p className="text-gray-400">Select a service to get started</p>
+            <h1 className="text-4xl font-bold mb-4" style={{ color: COLORS.text.primary }}>
+              Join ServiceVerse
+            </h1>
+            <p style={{ color: COLORS.text.secondary }}>Select a service to get started</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -97,7 +116,11 @@ export function RegisterPage() {
               <button
                 key={service.serviceId}
                 onClick={() => setSelectedService(service)}
-                className="p-6 bg-white/5 border border-white/10 rounded-2xl hover:border-blue-500/50 hover:bg-white/10 transition group text-left"
+                className="p-6 border rounded-2xl transition group text-left"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  borderColor: COLORS.border.light,
+                }}
               >
                 {service.logo && (
                   <img
@@ -106,14 +129,21 @@ export function RegisterPage() {
                     className="w-16 h-16 rounded-lg mb-4 object-cover"
                   />
                 )}
-                <h3 className="text-xl font-bold text-white mb-2">{service.name}</h3>
-                <p className="text-gray-400 text-sm line-clamp-2">{service.description}</p>
+                <h3 className="text-xl font-bold mb-2" style={{ color: COLORS.text.primary }}>
+                  {service.name}
+                </h3>
+                <p className="text-sm line-clamp-2" style={{ color: COLORS.text.secondary }}>
+                  {service.description}
+                </p>
                 <div className="mt-4 flex items-center justify-start">
-                  <span className="text-blue-400 font-semibold text-sm">Select →</span>
+                  <span className="font-semibold text-sm" style={{ color: COLORS.semantic.info }}>
+                    Select →
+                  </span>
                 </div>
               </button>
             ))}
           </div>
+        </div>
         </div>
       </div>
     );
@@ -122,57 +152,98 @@ export function RegisterPage() {
   // Step 2: Role Selection
   if (!role) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="min-h-screen flex flex-col" style={{ backgroundColor: COLORS.bg.primary }}>
+        <Navbar />
+        <div className="flex-1 overflow-auto">
         <div className="max-w-2xl mx-auto px-6 py-20">
           <button
             onClick={() => setSelectedService(null)}
-            className="flex items-center gap-2 text-gray-400 hover:text-white mb-12"
+            className="flex items-center gap-2 mb-12 transition"
+            style={{ color: COLORS.text.secondary }}
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
 
           <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-white mb-2">Join ServiceVerse</h1>
-            <p className="text-gray-400 mb-2">Service: <span className="text-blue-400 font-semibold">{selectedService.name}</span></p>
-            <p className="text-gray-400">Choose how you want to get started</p>
+            <h1 className="text-4xl font-bold mb-2" style={{ color: COLORS.text.primary }}>
+              Join ServiceVerse
+            </h1>
+            <p className="mb-2" style={{ color: COLORS.text.secondary }}>
+              Service:{' '}
+              <span className="font-semibold" style={{ color: COLORS.semantic.info }}>
+                {selectedService.name}
+              </span>
+            </p>
+            <p style={{ color: COLORS.text.secondary }}>Choose how you want to get started</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Customer Option */}
             <button
               onClick={() => setRole('CUSTOMER')}
-              className="p-8 bg-white/5 border border-white/10 rounded-2xl hover:border-blue-500/50 hover:bg-white/10 transition group"
+              className="p-8 border rounded-2xl transition group"
+              style={{
+                backgroundColor: COLORS.bg.surface,
+                borderColor: COLORS.border.light,
+              }}
             >
               <div className="flex items-center justify-center mb-6">
-                <div className="p-4 bg-blue-500/20 rounded-xl group-hover:bg-blue-500/30 transition">
-                  <User className="w-8 h-8 text-blue-400" />
+                <div
+                  className="p-4 rounded-xl transition"
+                  style={{
+                    backgroundColor: `${COLORS.semantic.info}20`,
+                  }}
+                >
+                  <User className="w-8 h-8" style={{ color: COLORS.semantic.info }} />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">I'm a Customer</h2>
-              <p className="text-gray-400 text-sm">Book services and make orders</p>
+              <h2 className="text-2xl font-bold mb-2" style={{ color: COLORS.text.primary }}>
+                I'm a Customer
+              </h2>
+              <p className="text-sm" style={{ color: COLORS.text.secondary }}>
+                Book services and make orders
+              </p>
               <div className="mt-6 flex items-center justify-center">
-                <span className="text-blue-400 font-semibold">Get Started →</span>
+                <span className="font-semibold" style={{ color: COLORS.semantic.info }}>
+                  Get Started →
+                </span>
               </div>
             </button>
 
             {/* Service Provider Option */}
             <button
               onClick={() => setRole('SERVICE_PROVIDER')}
-              className="p-8 bg-white/5 border border-white/10 rounded-2xl hover:border-purple-500/50 hover:bg-white/10 transition group"
+              className="p-8 border rounded-2xl transition group"
+              style={{
+                backgroundColor: COLORS.bg.surface,
+                borderColor: COLORS.border.light,
+              }}
             >
               <div className="flex items-center justify-center mb-6">
-                <div className="p-4 bg-purple-500/20 rounded-xl group-hover:bg-purple-500/30 transition">
-                  <Briefcase className="w-8 h-8 text-purple-400" />
+                <div
+                  className="p-4 rounded-xl transition"
+                  style={{
+                    backgroundColor: `${COLORS.semantic.success}20`,
+                  }}
+                >
+                  <Briefcase className="w-8 h-8" style={{ color: COLORS.semantic.success }} />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">I'm a Service Provider</h2>
-              <p className="text-gray-400 text-sm">Provide services and grow your business</p>
+              <h2 className="text-2xl font-bold mb-2" style={{ color: COLORS.text.primary }}>
+                I'm a Service Provider
+              </h2>
+              <p className="text-sm" style={{ color: COLORS.text.secondary }}>
+                Provide services and grow your business
+              </p>
               <div className="mt-6 flex items-center justify-center">
-                <span className="text-purple-400 font-semibold">Get Started →</span>
+                <span className="font-semibold" style={{ color: COLORS.semantic.success }}>
+                  Get Started →
+                </span>
               </div>
             </button>
           </div>
+        </div>
         </div>
       </div>
     );
@@ -180,21 +251,25 @@ export function RegisterPage() {
 
   // Step 3: Registration Form
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="max-w-2xl mx-auto px-6 py-20">
-        <button
-          onClick={() => setRole(null)}
-          className="flex items-center gap-2 text-gray-400 hover:text-white mb-12"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </button>
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: COLORS.bg.primary }}>
+      <Navbar />
+      <div className="flex-1 overflow-auto">
+        <div className="max-w-2xl mx-auto px-6 py-20">
+          <button
+            onClick={() => setRole(null)}
+            className="flex items-center gap-2 mb-12 transition"
+            style={{ color: COLORS.text.secondary }}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
 
-        {role === 'CUSTOMER' ? (
-          <RegisterCustomerForm serviceId={selectedService.serviceId} />
-        ) : (
-          <RegisterSPForm serviceId={selectedService.serviceId} />
-        )}
+          {role === 'CUSTOMER' ? (
+            <RegisterCustomerForm serviceId={selectedService.serviceId} />
+          ) : (
+            <RegisterSPForm serviceId={selectedService.serviceId} />
+          )}
+        </div>
       </div>
     </div>
   );

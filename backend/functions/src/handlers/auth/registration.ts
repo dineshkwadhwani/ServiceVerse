@@ -25,8 +25,11 @@ export async function registerCustomer(req: any, res: Response) {
   try {
     const { name, email, phone, address, city, pin, serviceId, verifiedMethod } = req.body;
 
+    console.log('registerCustomer called with:', { name, email, phone, serviceId, verifiedMethod });
+
     // Validate required fields
     if (!name || !email || !phone || !serviceId || !verifiedMethod) {
+      console.log('Missing required fields:', { name, email, phone, serviceId, verifiedMethod });
       return sendError(res, new ValidationError('Missing required fields'));
     }
 
@@ -57,17 +60,43 @@ export async function registerCustomer(req: any, res: Response) {
     }
 
     // Create user in Firebase Auth (phone-based, no password)
-    const authUser = await auth.createUser({
-      email,
-      phoneNumber: `+91${phone}`,
-    });
+    let authUser;
+    let isNewAuthUser = false;
+    try {
+      authUser = await auth.createUser({
+        email,
+        phoneNumber: `+91${phone}`,
+      });
+      console.log('New auth user created', { uid: authUser.uid });
+      logger.info('Auth user created', { uid: authUser.uid });
+      isNewAuthUser = true;
+    } catch (authError: any) {
+      // If user already exists with this phone, registration was incomplete - complete it now
+      if (authError.code === 'auth/phone-number-already-exists') {
+        console.log('Phone number already exists (incomplete registration), retrieving auth user to complete registration');
+        try {
+          authUser = await auth.getUserByPhoneNumber(`+91${phone}`);
+          console.log('Found existing auth user, completing registration', { uid: authUser.uid });
+          // Update email if different
+          if (authUser.email !== email) {
+            await auth.updateUser(authUser.uid, { email });
+          }
+          isNewAuthUser = false; // User already existed in Auth
+        } catch (findError: any) {
+          console.error('Could not find user with phone:', findError.message);
+          throw authError; // Throw original error if user not found
+        }
+      } else {
+        throw authError;
+      }
+    }
 
-    logger.info('Auth user created', { uid: authUser.uid });
-
-    // Set custom claims for role
-    await auth.setCustomUserClaims(authUser.uid, {
-      role: 'CUSTOMER',
-    });
+    // Set custom claims for role (only if new user)
+    if (isNewAuthUser) {
+      await auth.setCustomUserClaims(authUser.uid, {
+        role: 'CUSTOMER',
+      });
+    }
 
     // Create user document in Firestore
     const userData = {
@@ -85,9 +114,21 @@ export async function registerCustomer(req: any, res: Response) {
       updatedAt: new Date(),
     };
 
-    await db.collection('users').doc(authUser.uid).set(userData);
+    // Check if user document already exists
+    const userDoc = await db.collection('users').doc(authUser.uid).get();
+    if (userDoc.exists) {
+      console.log('User document already exists, updating it');
+      await db.collection('users').doc(authUser.uid).update({
+        ...userData,
+        updatedAt: new Date(),
+      });
+    } else {
+      console.log('Creating new user document with:', userData);
+      await db.collection('users').doc(authUser.uid).set(userData);
+      console.log('User document created successfully');
+    }
 
-    logger.info('User document created', { uid: authUser.uid });
+    logger.info('User document created/updated', { uid: authUser.uid });
 
     // Create service association
     const associationId = uuidv4();
@@ -119,6 +160,12 @@ export async function registerCustomer(req: any, res: Response) {
       message: 'Customer registered successfully',
     }, 201);
   } catch (error: any) {
+    console.error('Customer registration error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+    });
     logger.error('Customer registration failed', error);
     return sendError(res, error);
   }
@@ -131,8 +178,11 @@ export async function registerServiceProvider(req: any, res: Response) {
   try {
     const { businessName, ownerName, email, phone, serviceId, verifiedMethod } = req.body;
 
+    console.log('registerServiceProvider called with:', { businessName, ownerName, email, phone, serviceId, verifiedMethod });
+
     // Validate required fields
     if (!businessName || !ownerName || !email || !phone || !serviceId || !verifiedMethod) {
+      console.log('Missing required fields');
       return sendError(res, new ValidationError('Missing required fields'));
     }
 
@@ -163,17 +213,43 @@ export async function registerServiceProvider(req: any, res: Response) {
     }
 
     // Create user in Firebase Auth
-    const authUser = await auth.createUser({
-      email,
-      phoneNumber: `+91${phone}`,
-    });
+    let authUser;
+    let isNewAuthUser = false;
+    try {
+      authUser = await auth.createUser({
+        email,
+        phoneNumber: `+91${phone}`,
+      });
+      console.log('New auth user created', { uid: authUser.uid });
+      logger.info('Auth user created', { uid: authUser.uid });
+      isNewAuthUser = true;
+    } catch (authError: any) {
+      // If user already exists with this phone, registration was incomplete - complete it now
+      if (authError.code === 'auth/phone-number-already-exists') {
+        console.log('Phone number already exists (incomplete registration), retrieving auth user to complete registration');
+        try {
+          authUser = await auth.getUserByPhoneNumber(`+91${phone}`);
+          console.log('Found existing auth user, completing registration', { uid: authUser.uid });
+          // Update email if different
+          if (authUser.email !== email) {
+            await auth.updateUser(authUser.uid, { email });
+          }
+          isNewAuthUser = false; // User already existed in Auth
+        } catch (findError: any) {
+          console.error('Could not find user with phone:', findError.message);
+          throw authError; // Throw original error if user not found
+        }
+      } else {
+        throw authError;
+      }
+    }
 
-    logger.info('Auth user created', { uid: authUser.uid });
-
-    // Set custom claims for role
-    await auth.setCustomUserClaims(authUser.uid, {
-      role: 'SERVICE_PROVIDER',
-    });
+    // Set custom claims for role (only if new user)
+    if (isNewAuthUser) {
+      await auth.setCustomUserClaims(authUser.uid, {
+        role: 'SERVICE_PROVIDER',
+      });
+    }
 
     // Create user document in Firestore
     const userData = {
@@ -190,9 +266,20 @@ export async function registerServiceProvider(req: any, res: Response) {
       updatedAt: new Date(),
     };
 
-    await db.collection('users').doc(authUser.uid).set(userData);
+    // Check if user document already exists
+    const userDoc = await db.collection('users').doc(authUser.uid).get();
+    if (userDoc.exists) {
+      console.log('User document already exists, updating it');
+      await db.collection('users').doc(authUser.uid).update({
+        ...userData,
+        updatedAt: new Date(),
+      });
+    } else {
+      console.log('Creating new user document');
+      await db.collection('users').doc(authUser.uid).set(userData);
+    }
 
-    logger.info('Service Provider user document created', { uid: authUser.uid });
+    logger.info('Service Provider user document created/updated', { uid: authUser.uid });
 
     // Create service association
     const associationId = uuidv4();
@@ -225,7 +312,184 @@ export async function registerServiceProvider(req: any, res: Response) {
       message: 'Service Provider registered successfully. Pending account manager assignment.',
     }, 201);
   } catch (error: any) {
+    console.error('Service Provider registration error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+    });
     logger.error('Service Provider registration failed', error);
+    return sendError(res, error);
+  }
+}
+
+/**
+ * Complete registration after phone verification
+ * This is called AFTER phone OTP is verified with Firebase Auth
+ * It creates the Firestore user document if it doesn't exist
+ * If document exists, user is already registered (login flow)
+ */
+export async function completeRegistration(req: any, res: Response) {
+  try {
+    // User should be authenticated via Firebase Auth at this point
+    const firebaseUser = req.user; // From middleware
+    if (!firebaseUser) {
+      return sendError(res, new ValidationError('User not authenticated via phone verification'));
+    }
+
+    const { uid: userId, email: firebaseEmail, phoneNumber } = firebaseUser;
+    const { name, email, phone, address, city, pin, serviceId, role } = req.body;
+
+    console.log('completeRegistration called', { userId, email, phone, role, serviceId });
+
+    if (!name || !email || !phone || !role || !serviceId) {
+      return sendError(res, new ValidationError('Missing required fields: name, email, phone, role, serviceId'));
+    }
+
+    // Extract phone number without +91
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+
+    // Check if user document already exists
+    const userDoc = await db.collection('users').doc(userId).get();
+
+    if (userDoc.exists) {
+      // User already registered, just return success (login flow)
+      console.log('User document already exists, registration already complete (login flow)', { userId });
+      return sendSuccess(res, {
+        uid: userId,
+        email,
+        role,
+        serviceId,
+        message: 'User already registered, logging in',
+      }, 200);
+    }
+
+    // User document doesn't exist, create it (registration flow)
+    console.log('Creating user document for new registration');
+
+    const userData = {
+      uid: userId,
+      name,
+      email,
+      phone: cleanPhone,
+      role,
+      address: address || '',
+      city: city || '',
+      pin: pin || '',
+      verified: true,
+      verifiedMethod: 'phone',
+      status: role === 'SERVICE_PROVIDER' ? 'PENDING' : 'ACTIVE',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Create user document
+    await db.collection('users').doc(userId).set(userData);
+    console.log('User document created successfully', { userId });
+    logger.info('User document created', { uid: userId, role });
+
+    // If service provider, create service association AND onboarding request
+    if (role === 'SERVICE_PROVIDER' && serviceId) {
+      const associationId = uuidv4();
+      const association = {
+        associationId,
+        userId,
+        serviceId,
+        role: 'SERVICE_PROVIDER',
+        status: 'INACTIVE',
+        joinedDate: new Date(),
+        isActive: false,
+        createdAt: new Date(),
+      };
+
+      await db
+        .collection('users')
+        .doc(userId)
+        .collection('serviceAssociations')
+        .doc(serviceId)
+        .set(association);
+
+      console.log('Service association created', { userId, serviceId });
+      logger.info('Service association created', { userId, serviceId });
+
+      // Create approval request for SuperAdmin
+      const approvalRequestId = uuidv4();
+      const approvalRequest = {
+        requestId: approvalRequestId,
+        requestType: 'SP_REGISTRATION', // Type of approval request
+        userId,
+        serviceId,
+        userEmail: email,
+        userName: name,
+        businessName: (req.body as any).businessName || name,
+        city: (req.body as any).city || null, // City from SP registration
+        approverName: null, // Set when assigned to AM
+        approverPhone: null, // Set when assigned to AM
+        status: 'PENDING_AM_ASSIGNMENT',
+        assignedAccountManagerId: null,
+        onboardingSteps: {
+          profileComplete: false,
+          documentsUploaded: false,
+          workingHoursSet: false,
+          commissionsSet: false,
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      await db
+        .collection('approvals')
+        .doc(approvalRequestId)
+        .set(approvalRequest);
+
+      console.log('SP approval request created', { requestId: approvalRequestId, userId, serviceId });
+      logger.info('SP approval request created', { requestId: approvalRequestId, userId, serviceId });
+    }
+
+    // If customer, create service association
+    if (role === 'CUSTOMER' && serviceId) {
+      const associationId = uuidv4();
+      const association = {
+        associationId,
+        userId,
+        serviceId,
+        role: 'CUSTOMER',
+        status: 'ACTIVE',
+        joinedDate: new Date(),
+        isActive: true,
+        createdAt: new Date(),
+      };
+
+      await db
+        .collection('users')
+        .doc(userId)
+        .collection('serviceAssociations')
+        .doc(serviceId)
+        .set(association);
+
+      console.log('Service association created', { userId, serviceId });
+      logger.info('Service association created', { userId, serviceId });
+    }
+
+    // Set custom claims for role
+    await auth.setCustomUserClaims(userId, { role });
+    console.log('Custom claims set', { userId, role });
+
+    return sendSuccess(res, {
+      uid: userId,
+      email,
+      role,
+      serviceId,
+      message: 'User registered successfully',
+    }, 201);
+  } catch (error: any) {
+    console.error('Complete registration error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+    });
+    logger.error('Complete registration failed', error);
     return sendError(res, error);
   }
 }

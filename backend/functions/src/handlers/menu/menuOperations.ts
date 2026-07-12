@@ -4,7 +4,7 @@ import { ValidationError, sendError, sendSuccess } from '@/middleware/errorHandl
 import type { AuthRequest } from '@/middleware/auth';
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 
 const logger = new Logger('MenuHandlers');
 
@@ -89,7 +89,7 @@ export async function addMenuItem(req: AuthRequest, res: Response) {
       .set(menuItemData);
 
     logger.info('Menu item added successfully', { menuItemId, serviceId });
-    return sendSuccess(res, { menuItemId, ...menuItemData }, 'Menu item added successfully');
+    return sendSuccess(res, menuItemData, 201);
   } catch (error) {
     logger.error('Error adding menu item:', error);
     return sendError(res, error);
@@ -181,7 +181,7 @@ export async function updateMenuItem(req: AuthRequest, res: Response) {
       .update(updateData);
 
     logger.info('Menu item updated', { menuItemId, serviceId });
-    return sendSuccess(res, updateData, 'Menu item updated successfully');
+    return sendSuccess(res, updateData, 200);
   } catch (error) {
     logger.error('Error updating menu item:', error);
     return sendError(res, error);
@@ -295,7 +295,7 @@ export async function updateSPMenuItem(req: AuthRequest, res: Response) {
     }
 
     logger.info('SP menu item updated', { serviceId, menuItemId, userId: req.user.uid });
-    return sendSuccess(res, updateData, 'Menu item updated successfully');
+    return sendSuccess(res, updateData, 200);
   } catch (error) {
     logger.error('Error updating SP menu item:', error);
     return sendError(res, error);
@@ -384,7 +384,7 @@ export async function requestMenuItemCreation(req: AuthRequest, res: Response) {
     await db.collection('menuItemRequests').doc(requestId).set(requestData);
 
     logger.info('Menu item request created successfully', { requestId, serviceId });
-    return sendSuccess(res, requestData, 'Request submitted successfully');
+    return sendSuccess(res, requestData, 201);
   } catch (error) {
     logger.error('Error creating menu item request:', error);
     return sendError(res, error);
@@ -474,14 +474,14 @@ export async function approveMenuItemRequest(req: AuthRequest, res: Response) {
       status: 'APPROVED',
       reviewedAt: new Date(),
       reviewedBy: req.user.uid,
-      reviewerName: req.user.name || 'Admin',
+      reviewerName: 'Admin',
     });
 
     logger.info('Menu item request approved', { requestId });
 
     // TODO: Send email notification to all SPs of this service
 
-    return sendSuccess(res, { status: 'APPROVED' }, 'Request approved successfully');
+    return sendSuccess(res, { status: 'APPROVED' }, 200);
   } catch (error) {
     logger.error('Error approving request:', error);
     return sendError(res, error);
@@ -510,7 +510,7 @@ export async function rejectMenuItemRequest(req: AuthRequest, res: Response) {
       status: 'REJECTED',
       reviewedAt: new Date(),
       reviewedBy: req.user.uid,
-      reviewerName: req.user.name || 'Admin',
+      reviewerName: 'Admin',
       rejectionReason: rejectionReason || null,
     });
 
@@ -518,7 +518,7 @@ export async function rejectMenuItemRequest(req: AuthRequest, res: Response) {
 
     // TODO: Send email notification to SP
 
-    return sendSuccess(res, { status: 'REJECTED' }, 'Request rejected successfully');
+    return sendSuccess(res, { status: 'REJECTED' }, 200);
   } catch (error) {
     logger.error('Error rejecting request:', error);
     return sendError(res, error);
@@ -543,7 +543,7 @@ export async function getMenuItemRequests(req: AuthRequest, res: Response) {
     }
 
     const snapshot = await query.get();
-    const requests = snapshot.docs.map((doc) => doc.data());
+    const requests = snapshot.docs.map((doc: any) => doc.data());
 
     return sendSuccess(res, {
       requests,

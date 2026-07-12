@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Phone, User, MapPin, Loader2 } from 'lucide-react';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { COLORS } from '@/utils/theme';
 import { auth } from '@/utils/firebase-config';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
+import { useAuthStore } from '@/store/authStore';
 import { OTPVerificationStep } from './OTPVerificationStep';
 
 interface FormData {
@@ -86,23 +88,57 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
     }
   };
 
-  const handleVerificationComplete = async (verifiedMethod: 'email' | 'phone') => {
+  const handleVerificationComplete = async (_verifiedMethod: 'email' | 'phone') => {
     setIsLoading(true);
+    console.log('[RegisterCustomer] 🔵 Step 1: handleVerificationComplete called', { method: _verifiedMethod });
+
     try {
       // For phone: user is already signed in via Firebase Auth
       // For email: user will be signed in via email link (handled in callback page)
 
-      // Register user in backend with Firebase Auth verified email/phone
-      await apiClient.registerCustomer({
-        ...formData,
-        serviceId,
-        verifiedMethod,
+      const currentUser = await auth.currentUser?.getIdToken();
+      console.log('[RegisterCustomer] 🔵 Step 2: Firebase auth check', {
+        hasUser: !!auth.currentUser,
+        uid: auth.currentUser?.uid,
+        hasToken: !!currentUser
       });
 
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        pin: formData.pin,
+        serviceId,
+        role: 'CUSTOMER',
+      };
+
+      console.log('[RegisterCustomer] 🔵 Step 3: Sending completeRegistration request', payload);
+
+      // Complete registration (creates Firestore document if needed)
+      const response = await apiClient.completeRegistration(payload);
+
+      console.log('[RegisterCustomer] 🟢 Step 4: Registration response received', response);
+
+      // Step 5: Load user profile to populate auth store before navigation
+      console.log('[RegisterCustomer] 🔵 Step 5: Loading user profile...');
+      const { loadUserProfile } = useAuthStore.getState();
+      if (auth.currentUser) {
+        await loadUserProfile(auth.currentUser);
+        console.log('[RegisterCustomer] 🟢 Step 6: User profile loaded, navigating to dashboard');
+      }
+
       toast.success('Registration successful!');
-      navigate(`/dashboard/customer`);
+      navigate(`/dashboard`);
     } catch (error: any) {
-      toast.error('Registration failed: ' + error.message);
+      console.error('[RegisterCustomer] 🔴 Registration ERROR:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        fullError: error,
+      });
+      toast.error('Registration failed: ' + (error.message || JSON.stringify(error)));
     } finally {
       setIsLoading(false);
     }
@@ -125,14 +161,25 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
   return (
     <div>
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Create Customer Account</h1>
-        <p className="text-gray-400">Join ServiceVerse to discover and book services</p>
+        <h1 className="text-3xl font-bold mb-2" style={{ color: COLORS.text.primary }}>
+          Create Customer Account
+        </h1>
+        <p style={{ color: COLORS.text.secondary }}>Join ServiceVerse to discover and book services</p>
       </div>
 
-      <form className="space-y-6 bg-white/5 border border-white/10 rounded-2xl p-8">
+      <form
+        className="space-y-6 border rounded-2xl p-8"
+        style={{
+          backgroundColor: COLORS.bg.surface,
+          borderColor: COLORS.border.light,
+        }}
+      >
         {/* Name */}
         <div>
-          <label className="flex items-center gap-2 text-white font-semibold mb-3">
+          <label
+            className="flex items-center gap-2 font-semibold mb-3"
+            style={{ color: COLORS.text.primary }}
+          >
             <User className="w-4 h-4" />
             Full Name
           </label>
@@ -142,14 +189,24 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
             value={formData.name}
             onChange={handleInputChange}
             placeholder="Enter your full name"
-            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+            className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
+            style={{
+              backgroundColor: COLORS.bg.primary,
+              borderColor: COLORS.border.light,
+              color: COLORS.text.primary,
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.info)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
             required
           />
         </div>
 
         {/* Email - For business communications only */}
         <div>
-          <label className="flex items-center gap-2 text-white font-semibold mb-3">
+          <label
+            className="flex items-center gap-2 font-semibold mb-3"
+            style={{ color: COLORS.text.primary }}
+          >
             <Mail className="w-4 h-4" />
             Email Address
           </label>
@@ -159,20 +216,39 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
             value={formData.email}
             onChange={handleInputChange}
             placeholder="your@email.com"
-            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+            className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
+            style={{
+              backgroundColor: COLORS.bg.primary,
+              borderColor: COLORS.border.light,
+              color: COLORS.text.primary,
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.info)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
             required
           />
-          <p className="text-xs text-gray-400 mt-1">For invoices and business communications</p>
+          <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
+            For invoices and business communications
+          </p>
         </div>
 
         {/* Phone */}
         <div>
-          <label className="flex items-center gap-2 text-white font-semibold mb-3">
+          <label
+            className="flex items-center gap-2 font-semibold mb-3"
+            style={{ color: COLORS.text.primary }}
+          >
             <Phone className="w-4 h-4" />
             Phone Number *
           </label>
           <div className="flex gap-2">
-            <span className="px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-gray-400">
+            <span
+              className="px-4 py-3 border rounded-lg"
+              style={{
+                backgroundColor: COLORS.bg.primary,
+                borderColor: COLORS.border.light,
+                color: COLORS.text.secondary,
+              }}
+            >
               +91
             </span>
             <input
@@ -182,18 +258,33 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
               onChange={handleInputChange}
               placeholder="10-digit phone number"
               maxLength={10}
-              className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+              className="flex-1 px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
+              style={{
+                backgroundColor: COLORS.bg.primary,
+                borderColor: COLORS.border.light,
+                color: COLORS.text.primary,
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.info)}
+              onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
               required
             />
           </div>
-          <p className="text-xs text-gray-400 mt-1">*Will use this to verify your account</p>
+          <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
+            *Will use this to verify your account
+          </p>
         </div>
 
         {/* Address (Optional) */}
         <div>
-          <label className="flex items-center gap-2 text-white font-semibold mb-3">
+          <label
+            className="flex items-center gap-2 font-semibold mb-3"
+            style={{ color: COLORS.text.primary }}
+          >
             <MapPin className="w-4 h-4" />
-            Address <span className="text-gray-400 text-sm">(Optional - complete before ordering)</span>
+            Address{' '}
+            <span className="text-sm" style={{ color: COLORS.text.secondary }}>
+              (Optional - complete before ordering)
+            </span>
           </label>
           <input
             type="text"
@@ -201,7 +292,14 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
             value={formData.address}
             onChange={handleInputChange}
             placeholder="Street address"
-            className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+            className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
+            style={{
+              backgroundColor: COLORS.bg.primary,
+              borderColor: COLORS.border.light,
+              color: COLORS.text.primary,
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.info)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
           />
         </div>
 
@@ -213,7 +311,14 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
             value={formData.city}
             onChange={handleInputChange}
             placeholder="City"
-            className="px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+            className="px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
+            style={{
+              backgroundColor: COLORS.bg.primary,
+              borderColor: COLORS.border.light,
+              color: COLORS.text.primary,
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.info)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
           />
           <input
             type="text"
@@ -221,17 +326,28 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
             value={formData.pin}
             onChange={handleInputChange}
             placeholder="PIN Code"
-            className="px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+            className="px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
+            style={{
+              backgroundColor: COLORS.bg.primary,
+              borderColor: COLORS.border.light,
+              color: COLORS.text.primary,
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.info)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
           />
         </div>
 
         {/* Verification */}
-        <div className="pt-4 border-t border-white/10">
+        <div
+          className="pt-4 border-t"
+          style={{ borderColor: COLORS.border.light }}
+        >
           <button
             type="button"
             onClick={handleSendPhoneOTP}
             disabled={isLoading || !formData.phone}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-white font-semibold rounded-lg transition hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: COLORS.semantic.info }}
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
             {isLoading ? 'Sending OTP...' : 'Verify with Phone OTP'}
@@ -241,11 +357,12 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
 
       <div id="recaptcha-container" className="mt-4"></div>
 
-      <p className="text-center text-gray-400 text-sm mt-6">
+      <p className="text-center text-sm mt-6" style={{ color: COLORS.text.secondary }}>
         Already have an account?{' '}
         <button
           onClick={() => navigate('/login')}
-          className="text-blue-400 hover:text-blue-300"
+          style={{ color: COLORS.semantic.info }}
+          className="hover:opacity-80"
         >
           Sign in
         </button>

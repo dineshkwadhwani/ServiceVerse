@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createServiceSchema } from '@/utils/validators';
 import { createService as createServiceInFirestore } from '@/services/serviceService';
+import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 import { DEFAULT_COLORS } from '@/utils/constants';
 import { FormInput } from '@/components/Form/FormInput';
@@ -120,12 +121,17 @@ export function CreateServiceModal({
     setIsSubmitting(true);
     try {
       if (service) {
-        toast.error('Update not implemented yet');
-        return;
+        // Update existing service
+        await apiClient.updateService(service.serviceId, {
+          ...data,
+          menuItems,
+        });
+        toast.success('Service updated successfully');
+      } else {
+        // Create new service with embedded menu items
+        await createServiceInFirestore(data, menuItems);
+        toast.success('Service created successfully');
       }
-
-      // Create service with embedded menu items
-      await createServiceInFirestore(data, menuItems);
       onSave();
       onClose();
     } catch (error: unknown) {

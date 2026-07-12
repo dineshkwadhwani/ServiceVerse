@@ -33,6 +33,14 @@ service cloud.firestore {
     }
 
     // ============================================================================
+    // Approvals - SuperAdmin can manage all, AM can read assigned to them
+    // ============================================================================
+    match /approvals/{requestId} {
+      allow read: if isSuperAdmin() || (isAccountManager() && resource.data.assignedAccountManagerId == request.auth.uid);
+      allow write, delete: if isSuperAdmin();
+    }
+
+    // ============================================================================
     // Services collection - publicly readable, write restricted to SuperAdmin
     // ============================================================================
     match /services/{serviceId} {

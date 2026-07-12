@@ -7,6 +7,90 @@ import type { Response } from 'express';
 const logger = new Logger('AMDashboardHandlers');
 
 /**
+ * Get Account Manager dashboard stats
+ */
+export async function getAMStats(req: any, res: Response) {
+  try {
+    if (!req.user) {
+      return sendError(res, new ValidationError('User not authenticated'));
+    }
+
+    const amId = req.user.uid;
+    logger.info('Fetching AM stats', { amId });
+
+    // Get assigned SPs
+    const spsSnapshot = await db
+      .collection('serviceProviders')
+      .where('accountManager.userId', '==', amId)
+      .get();
+
+    const totalSPs = spsSnapshot.size;
+    const activeSPs = spsSnapshot.docs.filter((doc) => doc.data().status === 'ACTIVE').length;
+    const pendingSPs = spsSnapshot.docs.filter((doc) => doc.data().status === 'ONBOARDING').length;
+
+    // Get pending onboarding requests
+    const approvalsSnapshot = await db
+      .collection('approvals')
+      .where('requestType', '==', 'SP_REGISTRATION')
+      .where('status', '==', 'PENDING_AM_ASSIGNMENT')
+      .where('assignedToAM', '==', amId)
+      .get();
+
+    const pendingApprovals = approvalsSnapshot.size;
+
+    return sendSuccess(res, {
+      totalSPs,
+      activeSPs,
+      pendingSPs,
+      inactiveSPs: totalSPs - activeSPs - pendingSPs,
+      pendingApprovals,
+    });
+  } catch (error: any) {
+    logger.error('Failed to fetch AM stats', error);
+    return sendError(res, error);
+  }
+}
+
+/**
+ * Get pending onboarding requests for this AM
+ */
+export async function getAMPendingOnboarding(req: any, res: Response) {
+  try {
+    if (!req.user) {
+      return sendError(res, new ValidationError('User not authenticated'));
+    }
+
+    const amId = req.user.uid;
+    logger.info('Fetching pending onboarding for AM', { amId });
+
+    // Get pending SP registrations assigned to this AM
+    const snapshot = await db
+      .collection('approvals')
+      .where('requestType', '==', 'SP_REGISTRATION')
+      .where('status', '==', 'PENDING_AM_ASSIGNMENT')
+      .where('assignedToAM', '==', amId)
+      .get();
+
+    const requests = snapshot.docs.map((doc) => ({
+      requestId: doc.id,
+      spName: doc.data().spName,
+      city: doc.data().city,
+      status: doc.data().status,
+      createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
+      assignedAt: doc.data().assignedAt?.toDate?.() || doc.data().assignedAt,
+    }));
+
+    return sendSuccess(res, {
+      requests,
+      total: requests.length,
+    });
+  } catch (error: any) {
+    logger.error('Failed to fetch pending onboarding', error);
+    return sendError(res, error);
+  }
+}
+
+/**
  * Get all unorphan requests for this AM
  */
 export async function getUnorphanRequests(req: AuthRequest, res: Response) {

@@ -5,13 +5,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
-import type { AccountManager, Service } from '@/types';
+import type { AccountManager } from '@/types';
 
 const amSchema = z.object({
   name: z.string().min(2, 'Name is required'),
   email: z.string().email('Valid email is required'),
-  phone: z.string().regex(/^[6-9]\d{9}$/, 'Valid phone number is required'),
-  serviceId: z.string().min(1, 'Service is required'),
+  phone: z.string().regex(/^[6-9]\d{9}$/, 'Valid 10-digit phone number is required'),
 });
 
 type AMFormData = z.infer<typeof amSchema>;
@@ -19,7 +18,6 @@ type AMFormData = z.infer<typeof amSchema>;
 interface CreateAccountManagerModalProps {
   isOpen: boolean;
   accountManager?: AccountManager | null;
-  services: Service[];
   onClose: () => void;
   onSave: () => void;
 }
@@ -27,7 +25,6 @@ interface CreateAccountManagerModalProps {
 export function CreateAccountManagerModal({
   isOpen,
   accountManager,
-  services,
   onClose,
   onSave,
 }: CreateAccountManagerModalProps) {
@@ -42,10 +39,9 @@ export function CreateAccountManagerModal({
   } = useForm<AMFormData>({
     resolver: zodResolver(amSchema),
     defaultValues: {
-      name: accountManager?.name || '',
-      email: accountManager?.email || '',
-      phone: accountManager?.phone || '',
-      serviceId: accountManager?.service?.serviceId || '',
+      name: '',
+      email: '',
+      phone: '',
     },
   });
 
@@ -55,7 +51,6 @@ export function CreateAccountManagerModal({
         name: accountManager?.name || '',
         email: accountManager?.email || '',
         phone: accountManager?.phone || '',
-        serviceId: accountManager?.service?.serviceId || '',
       });
     }
   }, [isOpen, accountManager, reset]);
@@ -126,52 +121,30 @@ export function CreateAccountManagerModal({
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               {...register('email')}
             />
+            <p className="text-xs text-gray-500 mt-1">Used for notifications and business communications</p>
             {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email.message}</p>}
           </div>
 
           {/* Phone */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Phone Number *
+              Phone Number * (Required for Login)
             </label>
             <input
               type="tel"
-              placeholder="9876543210"
+              placeholder="9876543210 (required for login)"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               {...register('phone')}
             />
+            <p className="text-xs text-gray-500 mt-1">Used for OTP-based authentication only</p>
             {errors.phone && <p className="text-red-600 text-sm mt-1">{errors.phone.message}</p>}
-          </div>
-
-          {/* Service Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Service to Manage *
-            </label>
-            <select
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              {...register('serviceId')}
-            >
-              <option value="">Select a service...</option>
-              {services
-                .filter((s) => s.status === 'ACTIVE')
-                .map((service) => (
-                  <option key={service.serviceId} value={service.serviceId}>
-                    {service.name}
-                  </option>
-                ))}
-            </select>
-            {errors.serviceId && (
-              <p className="text-red-600 text-sm mt-1">{errors.serviceId.message}</p>
-            )}
           </div>
 
           {/* Info Text */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
             <p className="font-medium mb-1">Note:</p>
             <p>
-              The Account Manager will manage all ServiceProviders for the selected service.
-              They can onboard providers and handle their portfolios.
+              The Account Manager can manage ServiceProviders and handle their portfolios after assignment.
             </p>
           </div>
 

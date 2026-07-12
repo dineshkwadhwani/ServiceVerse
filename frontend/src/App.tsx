@@ -6,7 +6,8 @@ import { useNotificationStore } from '@/store/notificationStore';
 import { USER_ROLES } from '@/utils/constants';
 
 import { LandingPage } from '@/pages/LandingPage';
-import { ServiceLandingPage } from '@/pages/ServiceLandingPage';
+import { ServiceDetailPage } from '@/pages/ServiceDetailPage';
+import { RegisterPage } from '@/pages/RegisterPage';
 import { VerifyEmailPage } from '@/pages/VerifyEmailPage';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { NotFound } from '@/pages/NotFound';
@@ -14,6 +15,7 @@ import { ToastContainer } from '@/components/Shared/Toast';
 import { ServiceDashboard } from '@/components/SuperAdmin/ServiceDashboard';
 import { AccountManagerDashboard } from '@/components/SuperAdmin/AccountManagerDashboard';
 import { CustomerDashboard } from '@/components/Dashboard/CustomerDashboard';
+import { ServiceCustomerDashboard } from '@/components/Dashboard/ServiceCustomerDashboard';
 import { SPDashboard } from '@/components/Dashboard/SPDashboard';
 import { AMDashboard } from '@/components/Dashboard/AMDashboard';
 import { SuperAdminDashboard } from '@/components/Dashboard/SuperAdminDashboard';
@@ -86,18 +88,20 @@ export function App() {
           {/* PUBLIC ROUTES - NO AUTH REQUIRED */}
           {/* ============================================================================ */}
 
-          {/* Main Landing Page - Shows all services (with login/register modals) */}
+          {/* Main Landing Page - Shows all active services */}
           <Route path="/" element={<LandingPage />} />
 
-          {/* Redirect old login/register routes to home */}
+          {/* Service Detail Page - Master Menu & SPs */}
+          <Route path="/service/:serviceId" element={<ServiceDetailPage />} />
+
+          {/* Registration Page with role pre-selection */}
+          <Route path="/register" element={<RegisterPage />} />
+
+          {/* Redirect old login route to home */}
           <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="/register" element={<Navigate to="/" replace />} />
 
           {/* Email Verification Page */}
           <Route path="/verify-email" element={<VerifyEmailPage />} />
-
-          {/* Service-Specific Landing Page */}
-          <Route path="/service/:serviceId" element={<ServiceLandingPage />} />
 
           {/* ============================================================================ */}
           {/* PROTECTED ROUTES - AUTH REQUIRED */}
@@ -111,6 +115,9 @@ export function App() {
               {/* SuperAdmin nested routes */}
               <Route path="services" element={<ServiceDashboard />} />
               <Route path="account-managers" element={<AccountManagerDashboard />} />
+
+              {/* Customer service dashboard */}
+              <Route path="service/:serviceId" element={<ServiceCustomerDashboard />} />
             </Route>
           </Route>
 

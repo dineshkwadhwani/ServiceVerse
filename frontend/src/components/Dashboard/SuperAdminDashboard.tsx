@@ -11,6 +11,14 @@ import {
   BarChart3,
   Edit2,
 } from 'lucide-react';
+import { COLORS } from '@/utils/theme';
+import { EditUserModal } from './EditUserModal';
+import { CreateServiceModal } from '@/components/SuperAdmin/CreateServiceModal';
+import { ApprovalsTab } from '@/components/SuperAdmin/ApprovalsTab';
+import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
+import { StatsGrid } from '@/components/Shared/StatsGrid';
+import { EmptyState } from '@/components/Shared/EmptyState';
+import { CheckCircle2 } from 'lucide-react';
 
 interface SystemStats {
   totalUsers: number;
@@ -31,14 +39,26 @@ interface User {
   createdAt: Date;
 }
 
-interface Service {
+interface ServiceListItem {
   serviceId: string;
   name: string;
   description: string;
   status: 'ACTIVE' | 'INACTIVE';
+  logo?: string;
+  heroImage?: string;
+  colorTheme?: any;
+  fromEmail?: string;
+  fromName?: string;
+  gstPercentage?: number;
+  defaultCommission?: any;
+  menuItems?: any[];
+  unorphanReasons?: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
+  createdBy?: string;
 }
 
-type ActiveTab = 'overview' | 'users' | 'services' | 'managers';
+type ActiveTab = 'overview' | 'users' | 'services' | 'managers' | 'approvals';
 
 export function SuperAdminDashboard() {
   const navigate = useNavigate();
@@ -48,13 +68,16 @@ export function SuperAdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
+  const [services, setServices] = useState<ServiceListItem[]>([]);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editingService, setEditingService] = useState<ServiceListItem | null>(null);
   const [newUserForm, setNewUserForm] = useState({
     name: '',
     email: '',
     phone: '',
     role: 'ACCOUNT_MANAGER' as 'ACCOUNT_MANAGER' | 'SERVICE_PROVIDER' | 'CUSTOMER',
+    serviceId: '', // For Account Managers
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -63,7 +86,7 @@ export function SuperAdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'users') {
+    if (activeTab === 'users' || activeTab === 'managers') {
       loadUsers();
     } else if (activeTab === 'services') {
       loadServices();
@@ -108,20 +131,35 @@ export function SuperAdminDashboard() {
 
     setIsSubmitting(true);
     try {
-      await apiClient.createUserByAdmin({
-        name: newUserForm.name,
-        email: newUserForm.email,
-        phone: newUserForm.phone || undefined,
-        role: newUserForm.role,
-      });
+      if (newUserForm.role === 'ACCOUNT_MANAGER') {
+        // For Account Managers, use the dedicated createAccountManager endpoint (phone-only auth)
+        // This endpoint does NOT create Firebase Auth email users
+        // Service assignment can be done separately
+        await apiClient.createAccountManager({
+          name: newUserForm.name,
+          email: newUserForm.email,
+          phone: newUserForm.phone || '',
+          serviceId: newUserForm.serviceId || undefined,
+        });
+        toast.success('Account Manager created successfully');
+      } else {
+        // For other roles, use the generic user creation endpoint
+        await apiClient.createUserByAdmin({
+          name: newUserForm.name,
+          email: newUserForm.email,
+          phone: newUserForm.phone || undefined,
+          role: newUserForm.role,
+        });
+        toast.success(`${newUserForm.role} user created successfully`);
+      }
 
-      toast.success(`${newUserForm.role} user created successfully`);
       setShowCreateUserModal(false);
       setNewUserForm({
         name: '',
         email: '',
         phone: '',
         role: 'ACCOUNT_MANAGER',
+        serviceId: '',
       });
       loadUsers();
     } catch (error: any) {
@@ -143,68 +181,52 @@ export function SuperAdminDashboard() {
     if (user.role === 'SUPERADMIN') {
       return 'Active';
     }
+    // Use status field if available, otherwise fallback to verified
+    if (user.status) {
+      return user.status === 'ACTIVE' ? 'Active' : (user.status === 'PENDING' ? 'Pending' : 'Inactive');
+    }
     return user.verified ? 'Active' : 'Pending';
   };
 
-  const tabs: { id: ActiveTab; icon: any; label: string }[] = [
+  const tabs: DashboardTab<ActiveTab>[] = [
     { id: 'overview', icon: BarChart3, label: 'Overview' },
     { id: 'users', icon: Users, label: 'Users' },
     { id: 'services', icon: Briefcase, label: 'Services' },
     { id: 'managers', icon: Settings, label: 'Managers' },
+    { id: 'approvals', icon: CheckCircle2, label: 'Approvals' },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Tab Navigation */}
-      <div className="border-b border-white/10 sticky top-0 z-40 bg-slate-900/95 backdrop-blur">
-        <div className="flex gap-1 md:gap-2 px-4 py-3 overflow-x-auto">
-          {tabs.map(({ id, icon: Icon, label }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg whitespace-nowrap transition ${
-                activeTab === id
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-white/10'
-              }`}
-              title={label}
-            >
-              <Icon className="w-5 h-5" />
-              <span className="hidden sm:inline text-sm font-semibold">{label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="min-h-screen" style={{ backgroundColor: COLORS.bg.primary }}>
+      <DashboardTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Content */}
       <div className="p-4 md:p-6">
         {/* Overview Tab */}
         {activeTab === 'overview' && stats && (
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-            {[
-              { label: 'Users', value: stats.totalUsers, icon: Users, color: 'text-blue-400' },
-              { label: 'Services', value: stats.totalServices, icon: Briefcase, color: 'text-green-400' },
-              { label: 'Providers', value: stats.totalServiceProviders, icon: Users, color: 'text-purple-400' },
-              { label: 'Customers', value: stats.totalCustomers, icon: Users, color: 'text-orange-400' },
-              { label: 'Managers', value: stats.totalAccountManagers, icon: Settings, color: 'text-indigo-400' },
-            ].map(({ label, value, icon: Icon, color }) => (
-              <div key={label} className="bg-white/5 border border-white/10 rounded-lg p-4">
-                <Icon className={`w-6 h-6 ${color} mb-2`} />
-                <p className="text-2xl md:text-3xl font-bold text-white">{value}</p>
-                <p className="text-gray-400 text-xs md:text-sm mt-1">{label}</p>
-              </div>
-            ))}
-          </div>
+          <StatsGrid
+            columns="grid-cols-2 lg:grid-cols-5"
+            stats={[
+              { label: 'Users', value: stats.totalUsers, icon: Users, color: COLORS.semantic.info },
+              { label: 'Services', value: stats.totalServices, icon: Briefcase, color: COLORS.semantic.success },
+              { label: 'Providers', value: stats.totalServiceProviders, icon: Users, color: COLORS.semantic.warning },
+              { label: 'Customers', value: stats.totalCustomers, icon: Users, color: COLORS.semantic.error },
+              { label: 'Managers', value: stats.totalAccountManagers, icon: Settings, color: COLORS.semantic.info },
+            ]}
+          />
         )}
 
         {/* Users Tab */}
         {activeTab === 'users' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg md:text-xl font-bold text-white">Users</h2>
+              <h2 className="text-lg md:text-xl font-bold" style={{ color: COLORS.text.primary }}>
+                Users
+              </h2>
               <button
                 onClick={() => setShowCreateUserModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold text-sm"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg transition font-semibold text-sm text-white hover:opacity-90"
+                style={{ backgroundColor: COLORS.semantic.info }}
               >
                 <Plus className="w-4 h-4" />
                 Add User
@@ -212,30 +234,38 @@ export function SuperAdminDashboard() {
             </div>
 
             {users.length === 0 ? (
-              <div className="bg-white/5 border border-white/10 rounded-lg p-8 text-center">
-                <p className="text-gray-400">No users yet</p>
-              </div>
+              <EmptyState message="No users yet" />
             ) : (
               <div className="space-y-2">
                 {users.map((u) => (
                   <div
                     key={u.id}
-                    className="bg-white/5 border border-white/10 rounded-lg p-4 flex items-center justify-between gap-3 hover:border-white/20 transition"
+                    className="rounded-lg p-4 flex items-center justify-between gap-3 border transition"
+                    style={{
+                      backgroundColor: COLORS.bg.surface,
+                      borderColor: COLORS.border.light,
+                    }}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-white font-semibold text-sm truncate">{u.name}</p>
-                      <p className={`text-xs mt-1 ${
-                        u.role === 'SUPERADMIN'
-                          ? 'text-green-400'
-                          : getUserStatus(u) === 'Active'
-                          ? 'text-green-400'
-                          : 'text-yellow-400'
-                      }`}>
+                      <p className="font-semibold text-sm truncate" style={{ color: COLORS.text.primary }}>
+                        {u.name}
+                      </p>
+                      <p
+                        className="text-xs mt-1"
+                        style={{
+                          color:
+                            u.role === 'SUPERADMIN' || getUserStatus(u) === 'Active'
+                              ? COLORS.semantic.success
+                              : COLORS.semantic.warning,
+                        }}
+                      >
                         {getUserStatus(u)}
                       </p>
                     </div>
                     <button
-                      className="flex-shrink-0 p-2 rounded-lg hover:bg-blue-600/30 text-blue-400 hover:text-blue-300 transition"
+                      onClick={() => setEditingUser(u)}
+                      className="flex-shrink-0 p-2 rounded-lg transition hover:opacity-80"
+                      style={{ color: COLORS.semantic.info }}
                       title="Edit user"
                     >
                       <Edit2 className="w-5 h-5" />
@@ -251,10 +281,13 @@ export function SuperAdminDashboard() {
         {activeTab === 'services' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg md:text-xl font-bold text-white">Services</h2>
+              <h2 className="text-lg md:text-xl font-bold" style={{ color: COLORS.text.primary }}>
+                Services
+              </h2>
               <button
                 onClick={() => navigate('/dashboard/services')}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold text-sm"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg transition font-semibold text-sm text-white hover:opacity-90"
+                style={{ backgroundColor: COLORS.semantic.info }}
               >
                 <Plus className="w-4 h-4" />
                 Create
@@ -262,26 +295,35 @@ export function SuperAdminDashboard() {
             </div>
 
             {services.length === 0 ? (
-              <div className="bg-white/5 border border-white/10 rounded-lg p-8 text-center">
-                <p className="text-gray-400">No services created yet</p>
-              </div>
+              <EmptyState message="No services created yet" />
             ) : (
               <div className="space-y-2">
                 {services.map((s) => (
                   <div
                     key={s.serviceId}
-                    className="bg-white/5 border border-white/10 rounded-lg p-4 flex items-center justify-between gap-3 hover:border-white/20 transition"
+                    className="rounded-lg p-4 flex items-center justify-between gap-3 border transition"
+                    style={{
+                      backgroundColor: COLORS.bg.surface,
+                      borderColor: COLORS.border.light,
+                    }}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-white font-semibold text-sm truncate">{s.name}</p>
-                      <p className={`text-xs mt-1 ${
-                        s.status === 'ACTIVE' ? 'text-green-400' : 'text-gray-400'
-                      }`}>
+                      <p className="font-semibold text-sm truncate" style={{ color: COLORS.text.primary }}>
+                        {s.name}
+                      </p>
+                      <p
+                        className="text-xs mt-1"
+                        style={{
+                          color: s.status === 'ACTIVE' ? COLORS.semantic.success : COLORS.text.secondary,
+                        }}
+                      >
                         {s.status}
                       </p>
                     </div>
                     <button
-                      className="flex-shrink-0 p-2 rounded-lg hover:bg-blue-600/30 text-blue-400 hover:text-blue-300 transition"
+                      onClick={() => setEditingService(s)}
+                      className="flex-shrink-0 p-2 rounded-lg transition hover:opacity-80"
+                      style={{ color: COLORS.semantic.info }}
                       title="Edit service"
                     >
                       <Edit2 className="w-5 h-5" />
@@ -297,13 +339,16 @@ export function SuperAdminDashboard() {
         {activeTab === 'managers' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg md:text-xl font-bold text-white">Account Managers</h2>
+              <h2 className="text-lg md:text-xl font-bold" style={{ color: COLORS.text.primary }}>
+                Account Managers
+              </h2>
               <button
                 onClick={() => {
                   setNewUserForm({ ...newUserForm, role: 'ACCOUNT_MANAGER' });
                   setShowCreateUserModal(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold text-sm"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg transition font-semibold text-sm text-white hover:opacity-90"
+                style={{ backgroundColor: COLORS.semantic.info }}
               >
                 <Plus className="w-4 h-4" />
                 Add Manager
@@ -311,9 +356,7 @@ export function SuperAdminDashboard() {
             </div>
 
             {users.filter((u) => u.role === 'ACCOUNT_MANAGER').length === 0 ? (
-              <div className="bg-white/5 border border-white/10 rounded-lg p-8 text-center">
-                <p className="text-gray-400">No account managers yet</p>
-              </div>
+              <EmptyState message="No account managers yet" />
             ) : (
               <div className="space-y-2">
                 {users
@@ -321,18 +364,29 @@ export function SuperAdminDashboard() {
                   .map((u) => (
                     <div
                       key={u.id}
-                      className="bg-white/5 border border-white/10 rounded-lg p-4 flex items-center justify-between gap-3 hover:border-white/20 transition"
+                      className="rounded-lg p-4 flex items-center justify-between gap-3 border transition"
+                      style={{
+                        backgroundColor: COLORS.bg.surface,
+                        borderColor: COLORS.border.light,
+                      }}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-white font-semibold text-sm truncate">{u.name}</p>
-                        <p className={`text-xs mt-1 ${
-                          getUserStatus(u) === 'Active' ? 'text-green-400' : 'text-yellow-400'
-                        }`}>
+                        <p className="font-semibold text-sm truncate" style={{ color: COLORS.text.primary }}>
+                          {u.name}
+                        </p>
+                        <p
+                          className="text-xs mt-1"
+                          style={{
+                            color: getUserStatus(u) === 'Active' ? COLORS.semantic.success : COLORS.semantic.warning,
+                          }}
+                        >
                           {getUserStatus(u)}
                         </p>
                       </div>
                       <button
-                        className="flex-shrink-0 p-2 rounded-lg hover:bg-blue-600/30 text-blue-400 hover:text-blue-300 transition"
+                        onClick={() => setEditingUser(u)}
+                        className="flex-shrink-0 p-2 rounded-lg transition hover:opacity-80"
+                        style={{ color: COLORS.semantic.info }}
                         title="Edit manager"
                       >
                         <Edit2 className="w-5 h-5" />
@@ -343,7 +397,34 @@ export function SuperAdminDashboard() {
             )}
           </div>
         )}
+
+        {/* Approvals Tab */}
+        <ApprovalsTab isActive={activeTab === 'approvals'} />
       </div>
+
+      {/* Edit User Modal */}
+      <EditUserModal
+        isOpen={!!editingUser}
+        user={editingUser}
+        onClose={() => setEditingUser(null)}
+        onSave={() => {
+          loadUsers();
+          loadDashboardData();
+        }}
+      />
+
+      {/* Edit Service Modal */}
+      {editingService && (
+        <CreateServiceModal
+          isOpen={true}
+          onClose={() => setEditingService(null)}
+          onSave={() => {
+            loadServices();
+            loadDashboardData();
+          }}
+          service={editingService as any}
+        />
+      )}
 
       {/* Create User Modal */}
       {showCreateUserModal && (
@@ -394,7 +475,7 @@ export function SuperAdminDashboard() {
                   type="tel"
                   value={newUserForm.phone}
                   onChange={(e) => setNewUserForm({ ...newUserForm, phone: e.target.value })}
-                  placeholder="Phone (optional)"
+                  placeholder="9876543210 (required for login)"
                   className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 text-sm"
                 />
               </div>

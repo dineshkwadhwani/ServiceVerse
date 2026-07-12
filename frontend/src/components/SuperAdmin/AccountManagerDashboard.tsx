@@ -168,7 +168,6 @@ export function AccountManagerDashboard() {
       <CreateAccountManagerModal
         isOpen={isModalOpen}
         accountManager={selectedAM}
-        services={services}
         onClose={() => setIsModalOpen(false)}
         onSave={handleAMSaved}
       />

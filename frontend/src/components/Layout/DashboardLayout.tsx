@@ -1,9 +1,13 @@
 import { Outlet } from 'react-router-dom';
 import { Navbar } from '@/components/Shared/Navbar';
+import { COLORS } from '@/utils/theme';
 
 export function DashboardLayout() {
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div
+      className="flex flex-col h-screen"
+      style={{ backgroundColor: COLORS.bg.primary }}
+    >
       {/* Navbar */}
       <Navbar />
 
