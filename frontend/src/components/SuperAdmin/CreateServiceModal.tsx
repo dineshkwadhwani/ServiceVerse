@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Upload, Loader2, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,7 +39,7 @@ export function CreateServiceModal({
       secondaryFontColor: DEFAULT_COLORS.secondaryFont,
     }
   );
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(service?.menuItems || []);
   const toast = useToast();
 
   const {
@@ -66,6 +66,13 @@ export function CreateServiceModal({
     },
     mode: 'onBlur',
   });
+
+  // Load existing service data when service prop changes
+  useEffect(() => {
+    if (service) {
+      setMenuItems(service.menuItems || []);
+    }
+  }, [service?.serviceId]);
 
   const { hasErrors, errorCount } = useFormErrors({ errors, setFocus });
   const commissionType = watch('defaultCommission.type');
