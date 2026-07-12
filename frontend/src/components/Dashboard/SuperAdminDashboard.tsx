@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/store/notificationStore';
 import { apiClient } from '@/services/apiClient';
 import {
@@ -40,6 +41,7 @@ interface Service {
 type ActiveTab = 'overview' | 'users' | 'services' | 'managers';
 
 export function SuperAdminDashboard() {
+  const navigate = useNavigate();
   const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
@@ -251,7 +253,7 @@ export function SuperAdminDashboard() {
             <div className="flex justify-between items-center">
               <h2 className="text-lg md:text-xl font-bold text-white">Services</h2>
               <button
-                onClick={() => {}}
+                onClick={() => navigate('/dashboard/services')}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold text-sm"
               >
                 <Plus className="w-4 h-4" />
@@ -297,7 +299,10 @@ export function SuperAdminDashboard() {
             <div className="flex justify-between items-center">
               <h2 className="text-lg md:text-xl font-bold text-white">Account Managers</h2>
               <button
-                onClick={() => setShowCreateUserModal(true)}
+                onClick={() => {
+                  setNewUserForm({ ...newUserForm, role: 'ACCOUNT_MANAGER' });
+                  setShowCreateUserModal(true);
+                }}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold text-sm"
               >
                 <Plus className="w-4 h-4" />
