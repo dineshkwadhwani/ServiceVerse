@@ -102,8 +102,9 @@ export interface Service {
 export interface MenuItem {
   menuItemId: string;
   name: string;
-  description: string;
+  description?: string;
   basePrice: number;
+  image?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -111,6 +112,26 @@ export interface MenuItem {
 export interface SPMenuItem extends MenuItem {
   spPrice: number;
   isActive: boolean;
+}
+
+export type MenuItemRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface MenuItemRequest {
+  requestId: string;
+  serviceId: string;
+  serviceName: string;
+  spId: string;
+  spName: string;
+  spEmail: string;
+  name: string;
+  basePrice: number;
+  image?: string;
+  status: MenuItemRequestStatus;
+  requestedAt: Date;
+  reviewedAt?: Date;
+  reviewedBy?: string;
+  reviewerName?: string;
+  rejectionReason?: string;
 }
 
 // Commission Types

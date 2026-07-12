@@ -6,9 +6,13 @@
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc && npx tsc-alias",
+    "dev": "tsc --watch",
+    "start": "node lib/index.js",
+    "test:firebase": "node test-firebase-connection.js",
     "seed:superadmin": "node scripts/seedSuperAdmin.js",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "clean": "rm -rf lib/"
   },
   "engines": {
     "node": "20"

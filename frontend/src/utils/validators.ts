@@ -36,11 +36,25 @@ export const createServiceSchema = z.object({
   }),
 });
 
-// Menu item schema
+// Menu item schema (for master menu creation)
 export const menuItemSchema = z.object({
   name: z.string().min(2, 'Item name is required').max(100),
-  description: z.string().min(5, 'Description is required').max(200),
+  description: z.string().min(5, 'Description required').max(200).optional(),
   basePrice: z.number().min(0, 'Price must be positive'),
+  image: z.instanceof(File).refine(file => file.size <= 100 * 1024, 'Image must be less than 100KB').optional().nullable(),
+});
+
+// Menu item request schema (for SP requests)
+export const menuItemRequestSchema = z.object({
+  name: z.string().min(2, 'Item name is required').max(100),
+  basePrice: z.number().min(0, 'Price must be positive'),
+  image: z.instanceof(File).refine(file => file.size <= 100 * 1024, 'Image must be less than 100KB').optional().nullable(),
+});
+
+// SP menu item modification schema
+export const spMenuItemSchema = z.object({
+  spPrice: z.number().min(0, 'Price must be positive'),
+  isActive: z.boolean(),
 });
 
 // Service Provider onboarding schema

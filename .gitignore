@@ -30,6 +30,13 @@ Thumbs.db
 # Firebase
 .firebase/
 firebase-debug.log
+firebase-service-account.json
+*-firebase-adminsdk-*.json
+
+# Cloud Functions
+backend/functions/lib/
+backend/functions/node_modules/
+backend/functions/.env
 firestore-debug.log
 ui-debug.log
 

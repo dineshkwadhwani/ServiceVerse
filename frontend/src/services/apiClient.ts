@@ -171,7 +171,7 @@ class ApiClient {
   }
 
   // ============================================================================
-  // MENU ITEMS
+  // MENU ITEMS - MASTER MENU
   // ============================================================================
 
   async addMenuItem(serviceId: string, data: any) {
@@ -187,6 +187,50 @@ class ApiClient {
 
   async getMenuItems(serviceId: string) {
     return this.axiosInstance.get(`/services/${serviceId}/menu-items`);
+  }
+
+  // ============================================================================
+  // SERVICE PROVIDER MENU MANAGEMENT
+  // ============================================================================
+
+  async getSPMenu(serviceId: string) {
+    return this.axiosInstance.get(`/service-providers/menu/${serviceId}`);
+  }
+
+  async updateSPMenuItem(serviceId: string, menuItemId: string, data: any) {
+    return this.axiosInstance.patch(
+      `/service-providers/menu/${serviceId}/items/${menuItemId}`,
+      data
+    );
+  }
+
+  // ============================================================================
+  // MENU ITEM REQUESTS
+  // ============================================================================
+
+  async requestMenuItemCreation(serviceId: string, data: any) {
+    return this.axiosInstance.post(`/service-providers/menu-item-requests`, {
+      serviceId,
+      ...data,
+    });
+  }
+
+  async getPendingMenuItemRequests() {
+    return this.axiosInstance.get('/admin/menu-item-requests/pending');
+  }
+
+  async approveMenuItemRequest(requestId: string) {
+    return this.axiosInstance.patch(`/admin/menu-item-requests/${requestId}/approve`);
+  }
+
+  async rejectMenuItemRequest(requestId: string, reason?: string) {
+    return this.axiosInstance.patch(`/admin/menu-item-requests/${requestId}/reject`, {
+      rejectionReason: reason,
+    });
+  }
+
+  async getMenuItemRequests(filters?: any) {
+    return this.axiosInstance.get('/admin/menu-item-requests', { params: filters });
   }
 
   // ============================================================================

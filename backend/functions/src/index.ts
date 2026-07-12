@@ -5,6 +5,7 @@ import { verifyToken, requireRole } from '@/middleware/auth';
 import { sendError, sendSuccess } from '@/middleware/errorHandler';
 import { Logger } from '@/utils/logger';
 import * as serviceHandlers from '@/handlers/services/createService';
+import * as menuHandlers from '@/handlers/menu/menuOperations';
 import * as phase2Handlers from '@/handlers/phase2/onboarding';
 import * as phase3Handlers from '@/handlers/phase3/orders';
 
@@ -110,6 +111,36 @@ app.get('/service-providers/customers', requireRole('SERVICE_PROVIDER'), async (
   spDashboardHandlers.getSPCustomers(req as any, res);
 });
 
+// SP Menu Management
+app.get('/service-providers/menu/:serviceId', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  menuHandlers.getSPMenu(req as any, res);
+});
+
+app.patch('/service-providers/menu/:serviceId/items/:menuItemId', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  menuHandlers.updateSPMenuItem(req as any, res);
+});
+
+// Menu Item Requests (SP requesting, Admin approving)
+app.post('/service-providers/menu-item-requests', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  menuHandlers.requestMenuItemCreation(req as any, res);
+});
+
+app.get('/admin/menu-item-requests/pending', requireRole('SUPERADMIN', 'ACCOUNT_MANAGER'), async (req, res) => {
+  menuHandlers.getPendingMenuItemRequests(req as any, res);
+});
+
+app.patch('/admin/menu-item-requests/:requestId/approve', requireRole('SUPERADMIN', 'ACCOUNT_MANAGER'), async (req, res) => {
+  menuHandlers.approveMenuItemRequest(req as any, res);
+});
+
+app.patch('/admin/menu-item-requests/:requestId/reject', requireRole('SUPERADMIN', 'ACCOUNT_MANAGER'), async (req, res) => {
+  menuHandlers.rejectMenuItemRequest(req as any, res);
+});
+
+app.get('/admin/menu-item-requests', requireRole('SUPERADMIN', 'ACCOUNT_MANAGER'), async (req, res) => {
+  menuHandlers.getMenuItemRequests(req as any, res);
+});
+
 // ============================================================================
 // ACCOUNT MANAGER DASHBOARD
 // ============================================================================
@@ -157,14 +188,17 @@ app.patch('/services/:serviceId/status', requireRole('SUPERADMIN'), (req, res) =
   serviceHandlers.toggleServiceStatus(req as any, res);
 });
 
-// Add Menu Item
-app.post('/services/:serviceId/menu-items', requireRole('SUPERADMIN'), (req, res) => {
-  serviceHandlers.addMenuItem(req as any, res);
+// Menu Items - Master Menu (SuperAdmin/AccountManager)
+app.post('/services/:serviceId/menu-items', requireRole('SUPERADMIN', 'ACCOUNT_MANAGER'), (req, res) => {
+  menuHandlers.addMenuItem(req as any, res);
 });
 
-// Update Menu Item
-app.put('/services/:serviceId/menu-items/:menuItemId', requireRole('SUPERADMIN'), (req, res) => {
-  serviceHandlers.updateMenuItem(req as any, res);
+app.put('/services/:serviceId/menu-items/:menuItemId', requireRole('SUPERADMIN', 'ACCOUNT_MANAGER'), (req, res) => {
+  menuHandlers.updateMenuItem(req as any, res);
+});
+
+app.get('/services/:serviceId/menu-items', (req, res) => {
+  menuHandlers.getMenuItems(req as any, res);
 });
 
 // ============================================================================
