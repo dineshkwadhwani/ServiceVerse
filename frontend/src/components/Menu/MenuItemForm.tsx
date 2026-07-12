@@ -70,6 +70,10 @@ export function MenuItemForm({ onAdd, items, onRemove, isLoading = false }: Menu
     }
   };
 
+  const handleAddClick = () => {
+    handleSubmit(onSubmit)();
+  };
+
   return (
     <div className="space-y-4">
       <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -163,7 +167,8 @@ export function MenuItemForm({ onAdd, items, onRemove, isLoading = false }: Menu
 
           {/* Add Button */}
           <button
-            type="submit"
+            type="button"
+            onClick={handleAddClick}
             disabled={isLoading || isSubmitting}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center gap-2 font-medium transition-colors"
           >
