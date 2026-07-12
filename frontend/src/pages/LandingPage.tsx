@@ -4,13 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import { getActiveServices } from '@/services/serviceService';
 import { useToast } from '@/store/notificationStore';
 import { useAuthStore } from '@/store/authStore';
+import { LoginModal } from '@/components/Auth/LoginModal';
+import { RegisterModal } from '@/components/Auth/RegisterModal';
 import type { Service } from '@/types';
 
 export function LandingPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDesktop, setIsDesktop] = useState(true);
-  const [showRoleSelection, setShowRoleSelection] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
   const toast = useToast();
   const navigate = useNavigate();
   const { user, isAuthenticated, signOut } = useAuthStore();
@@ -45,16 +48,15 @@ export function LandingPage() {
     }
   };
 
-  const handleServiceClick = (serviceId: string) => {
+  const handleServiceClick = () => {
     if (!isAuthenticated) {
-      // Not logged in: go to registration with service pre-selected
-      navigate(`/register?serviceId=${serviceId}`);
+      // Not logged in: show register modal
+      setShowRegisterModal(true);
     } else {
       // Logged in: all roles go to unified dashboard
       navigate('/dashboard');
     }
   };
-
 
   const handleSignOut = async () => {
     try {
@@ -65,18 +67,13 @@ export function LandingPage() {
     }
   };
 
-  const handleRoleSelection = (role: 'SERVICE_PROVIDER' | 'CUSTOMER') => {
-    setShowRoleSelection(false);
-    navigate(`/register?role=${role}`);
-  };
-
   const renderServiceTile = (service: Service) => {
     // Mobile: icon and name only
     if (!isDesktop) {
       return (
         <button
           key={service.serviceId}
-          onClick={() => handleServiceClick(service.serviceId)}
+          onClick={() => handleServiceClick()}
           className="flex flex-col items-center gap-3 p-4 rounded-lg hover:bg-white/10 transition group"
         >
           {service.logo && (
@@ -136,7 +133,7 @@ export function LandingPage() {
           <p className="text-gray-300 text-sm mb-6 line-clamp-2">{service.description}</p>
           <div className="flex gap-3 mb-4">
             <button
-              onClick={() => handleServiceClick(service.serviceId)}
+              onClick={() => handleServiceClick()}
               className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
             >
               Join Now
@@ -183,13 +180,13 @@ export function LandingPage() {
               </>
             ) : (
               <>
-                <a
-                  href="/login"
+                <button
+                  onClick={() => setShowLoginModal(true)}
                   className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition text-sm"
                 >
                   <LogIn className="w-4 h-4" />
                   Sign In
-                </a>
+                </button>
               </>
             )}
           </div>
@@ -220,15 +217,15 @@ export function LandingPage() {
             {/* Mobile: Auth buttons below hero on mobile */}
             {!isDesktop && (
               <div className="flex gap-3 justify-center flex-wrap mb-8">
-                <a
-                  href="/login"
+                <button
+                  onClick={() => setShowLoginModal(true)}
                   className="flex items-center gap-2 px-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold transition text-sm"
                 >
                   <LogIn className="w-4 h-4" />
                   Sign In
-                </a>
+                </button>
                 <button
-                  onClick={() => setShowRoleSelection(true)}
+                  onClick={() => setShowRegisterModal(true)}
                   className="flex items-center gap-2 px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition text-sm"
                 >
                   <UserPlus className="w-4 h-4" />
@@ -276,50 +273,6 @@ export function LandingPage() {
       </section>
 
 
-      {/* Role Selection Modal */}
-      {showRoleSelection && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 border border-white/10 rounded-2xl p-8 max-w-md w-full">
-            <h3 className="text-2xl font-bold text-white mb-2">Join ServiceVerse</h3>
-            <p className="text-gray-400 mb-8">Choose how you want to get started</p>
-
-            <div className="space-y-4">
-              <button
-                onClick={() => handleRoleSelection('CUSTOMER')}
-                className="w-full p-6 bg-white/5 border border-white/10 rounded-xl hover:border-blue-500/50 hover:bg-white/10 transition text-left group"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-1">I'm a Customer</h4>
-                    <p className="text-sm text-gray-400">Book and manage services</p>
-                  </div>
-                  <ArrowRight className="w-5 h-5 text-blue-400 group-hover:translate-x-1 transition" />
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleRoleSelection('SERVICE_PROVIDER')}
-                className="w-full p-6 bg-white/5 border border-white/10 rounded-xl hover:border-purple-500/50 hover:bg-white/10 transition text-left group"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-1">I'm a Service Provider</h4>
-                    <p className="text-sm text-gray-400">Provide services and grow</p>
-                  </div>
-                  <ArrowRight className="w-5 h-5 text-purple-400 group-hover:translate-x-1 transition" />
-                </div>
-              </button>
-            </div>
-
-            <button
-              onClick={() => setShowRoleSelection(false)}
-              className="w-full mt-6 px-4 py-2 text-gray-400 hover:text-white transition"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Footer */}
       <footer className="bg-black/40 border-t border-white/10 mt-12 sm:mt-20">
@@ -327,6 +280,24 @@ export function LandingPage() {
           <p>&copy; 2025 ServiceVerse. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Auth Modals */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSwitchToRegister={() => {
+          setShowLoginModal(false);
+          setShowRegisterModal(true);
+        }}
+      />
+      <RegisterModal
+        isOpen={showRegisterModal}
+        onClose={() => setShowRegisterModal(false)}
+        onSwitchToLogin={() => {
+          setShowRegisterModal(false);
+          setShowLoginModal(true);
+        }}
+      />
     </div>
   );
 }

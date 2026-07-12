@@ -5,10 +5,8 @@ import { useAuthStore } from '@/store/authStore';
 import { useNotificationStore } from '@/store/notificationStore';
 import { USER_ROLES } from '@/utils/constants';
 
-import { LoginPage } from '@/pages/LoginPage';
 import { LandingPage } from '@/pages/LandingPage';
 import { ServiceLandingPage } from '@/pages/ServiceLandingPage';
-import { RegisterPage } from '@/pages/RegisterPage';
 import { VerifyEmailPage } from '@/pages/VerifyEmailPage';
 import { DashboardLayout } from '@/components/Layout/DashboardLayout';
 import { NotFound } from '@/pages/NotFound';
@@ -88,14 +86,12 @@ export function App() {
           {/* PUBLIC ROUTES - NO AUTH REQUIRED */}
           {/* ============================================================================ */}
 
-          {/* Main Landing Page - Shows all services */}
+          {/* Main Landing Page - Shows all services (with login/register modals) */}
           <Route path="/" element={<LandingPage />} />
 
-          {/* Login Page */}
-          <Route path="/login" element={<LoginPage />} />
-
-          {/* Register Page */}
-          <Route path="/register" element={<RegisterPage />} />
+          {/* Redirect old login/register routes to home */}
+          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/register" element={<Navigate to="/" replace />} />
 
           {/* Email Verification Page */}
           <Route path="/verify-email" element={<VerifyEmailPage />} />
