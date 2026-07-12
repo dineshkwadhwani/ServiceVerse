@@ -36,14 +36,25 @@ function ProtectedRoute() {
   return <Outlet />;
 }
 
-function DashboardRedirect() {
+function RoleBasedDashboard() {
   const { user } = useAuthStore();
 
-  if (user?.role === USER_ROLES.SUPERADMIN) {
-    return <Navigate to="/superadmin/services" replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
   }
 
-  return <div className="p-8">Dashboard</div>;
+  switch (user.role) {
+    case USER_ROLES.SUPERADMIN:
+      return <SuperAdminDashboard />;
+    case USER_ROLES.ACCOUNT_MANAGER:
+      return <AMDashboard />;
+    case USER_ROLES.SERVICE_PROVIDER:
+      return <SPDashboard />;
+    case USER_ROLES.CUSTOMER:
+      return <CustomerDashboard />;
+    default:
+      return <Navigate to="/login" replace />;
+  }
 }
 
 export function App() {
@@ -97,28 +108,11 @@ export function App() {
           {/* ============================================================================ */}
 
           <Route element={<ProtectedRoute />}>
-            {/* Customer Dashboard */}
-            <Route path="/customer" element={<CustomerDashboard />} />
-
-            {/* Service Provider Dashboard */}
-            <Route path="/service-provider" element={<SPDashboard />} />
-
-            {/* Account Manager Dashboard */}
-            <Route path="/account-manager" element={<AMDashboard />} />
-
-            {/* SuperAdmin Dashboard */}
-            <Route path="/superadmin-dashboard" element={<SuperAdminDashboard />} />
-
-            {/* Admin Redirect */}
-            <Route path="/admin" element={<Navigate to="/superadmin/services" replace />} />
-
-            {/* Dashboard Routes */}
+            {/* Unified Dashboard with layout */}
             <Route path="/dashboard" element={<DashboardLayout />}>
-              <Route index element={<DashboardRedirect />} />
-            </Route>
+              <Route index element={<RoleBasedDashboard />} />
 
-            {/* SuperAdmin Routes */}
-            <Route path="/superadmin" element={<DashboardLayout />}>
+              {/* SuperAdmin nested routes */}
               <Route path="services" element={<ServiceDashboard />} />
               <Route path="account-managers" element={<AccountManagerDashboard />} />
             </Route>

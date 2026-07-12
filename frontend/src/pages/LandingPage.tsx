@@ -16,11 +16,17 @@ export function LandingPage() {
   const { user, isAuthenticated, signOut } = useAuthStore();
 
   useEffect(() => {
+    // Authenticated users go straight to dashboard
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
+
     fetchServices();
     checkDeviceSize();
     window.addEventListener('resize', checkDeviceSize);
     return () => window.removeEventListener('resize', checkDeviceSize);
-  }, []);
+  }, [isAuthenticated, navigate]);
 
   const checkDeviceSize = () => {
     setIsDesktop(window.innerWidth >= 768);
@@ -43,21 +49,9 @@ export function LandingPage() {
     if (!isAuthenticated) {
       // Not logged in: go to registration with service pre-selected
       navigate(`/register?serviceId=${serviceId}`);
-    } else if (user?.role === 'CUSTOMER') {
-      // Logged in as customer: go to customer dashboard
-      navigate('/dashboard/customer');
-    } else if (user?.role === 'SERVICE_PROVIDER') {
-      // Logged in as service provider: go to SP dashboard
-      navigate('/dashboard/service-provider');
-    } else if (user?.role === 'ACCOUNT_MANAGER') {
-      // Logged in as account manager: go to AM dashboard
-      navigate('/dashboard/account-manager');
-    } else if (user?.role === 'SUPERADMIN') {
-      // Logged in as superadmin: go to SuperAdmin dashboard
-      navigate('/dashboard/superadmin');
     } else {
-      // Default: go to registration
-      navigate(`/register?serviceId=${serviceId}`);
+      // Logged in: all roles go to unified dashboard
+      navigate('/dashboard');
     }
   };
 
