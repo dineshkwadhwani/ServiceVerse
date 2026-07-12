@@ -34,10 +34,6 @@ function mapServiceDoc(id: string, data: Record<string, unknown>): Service {
     description: item.description as string | undefined,
     basePrice: item.basePrice as number,
     image: item.image as string | undefined,
-    createdAt:
-      (item.createdAt as { toDate?: () => Date })?.toDate?.() || new Date(),
-    updatedAt:
-      (item.updatedAt as { toDate?: () => Date })?.toDate?.() || new Date(),
   }));
 
   return {
@@ -79,11 +75,10 @@ export async function createService(
   ]);
 
   // Transform menu items to include menuItemId
+  // Note: Cannot use serverTimestamp() inside arrays in Firestore
   const embeddedMenuItems = menuItems.map((item) => ({
     menuItemId: crypto.randomUUID(),
     ...item,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
   }));
 
   const serviceData = {
@@ -171,8 +166,6 @@ export async function addMenuItemToService(
   const newMenuItem = {
     menuItemId,
     ...itemData,
-    createdAt: new Date(),
-    updatedAt: new Date(),
   };
 
   // Append to the menuItems array in the service document

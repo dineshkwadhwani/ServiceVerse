@@ -7,7 +7,7 @@ import { FormInput } from '@/components/Form/FormInput';
 import type { MenuItem } from '@/types';
 
 interface MenuItemFormProps {
-  onAdd: (item: Omit<MenuItem, 'menuItemId' | 'createdAt' | 'updatedAt'>) => void;
+  onAdd: (item: Omit<MenuItem, 'menuItemId'>) => void;
   items: MenuItem[];
   onRemove: (index: number) => void;
   isLoading?: boolean;
@@ -54,8 +54,7 @@ export function MenuItemForm({ onAdd, items, onRemove, isLoading = false }: Menu
 
   const onSubmit = async (data: MenuItemFormData) => {
     try {
-      // Create menu item without image URL (will be uploaded separately)
-      const newItem: Omit<MenuItem, 'menuItemId' | 'createdAt' | 'updatedAt'> = {
+      const newItem: Omit<MenuItem, 'menuItemId'> = {
         name: data.name,
         description: data.description,
         basePrice: data.basePrice,

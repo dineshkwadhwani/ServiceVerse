@@ -109,8 +109,6 @@ export interface MenuItem {
   description?: string;
   basePrice: number;
   image?: string;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface SPMenuItem {

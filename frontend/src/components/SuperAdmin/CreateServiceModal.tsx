@@ -136,12 +136,10 @@ export function CreateServiceModal({
     }
   };
 
-  const handleAddMenuItem = (item: Omit<MenuItem, 'menuItemId' | 'createdAt' | 'updatedAt'>) => {
+  const handleAddMenuItem = (item: Omit<MenuItem, 'menuItemId'>) => {
     const newItem: MenuItem = {
       ...item,
       menuItemId: `temp-${Date.now()}`,
-      createdAt: new Date(),
-      updatedAt: new Date(),
     };
     setMenuItems([...menuItems, newItem]);
   };
