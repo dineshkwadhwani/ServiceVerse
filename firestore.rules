@@ -69,13 +69,13 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (
         resource.data.customerId == request.auth.uid ||
-        resource.data.serviceProviderId == request.auth.uid ||
+        resource.data.spId == request.auth.uid ||
         isSuperAdmin()
       );
       allow create: if isAuthenticated();
       allow update, delete: if isAuthenticated() && (
         resource.data.customerId == request.auth.uid ||
-        resource.data.serviceProviderId == request.auth.uid ||
+        resource.data.spId == request.auth.uid ||
         isSuperAdmin()
       );
 
@@ -83,7 +83,7 @@ service cloud.firestore {
       match /feedback/{feedbackId} {
         allow read: if isAuthenticated() && (
           get(/databases/$(database)/documents/orders/$(orderId)).data.customerId == request.auth.uid ||
-          get(/databases/$(database)/documents/orders/$(orderId)).data.serviceProviderId == request.auth.uid ||
+          get(/databases/$(database)/documents/orders/$(orderId)).data.spId == request.auth.uid ||
           isSuperAdmin()
         );
         allow write: if isAuthenticated();

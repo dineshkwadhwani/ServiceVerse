@@ -206,11 +206,83 @@ ServiceVerse is a comprehensive multi-utility SaaS platform for service provider
 - `frontend/src/services/apiClient.ts` — Cleaned up request/response interceptor logging
 - All 4 dashboard components + `ApprovalsTab.tsx` — Applied shared components, removed duplicate styling
 
+#### Phase 12: ServiceProvider Menu Selection During Onboarding ✅
+
+- Integrated master menu item selection into AM onboarding workflow
+- AM can assign menu items to SP with custom pricing during onboarding
+- Dynamic serviceId fetching from users/{uid}/serviceAssociations subcollection
+- Checkbox-based menu selection with price customization
+- Validation requiring prices for selected items (uses master menu default as suggestion)
+- Menu items saved to SP profile for customer visibility
+
+**Architecture Discovery**:
+
+- ServiceVerse uses a **single users collection** for all user types (not separate collections per role)
+- User type is determined by the `role` field: 'CUSTOMER', 'SERVICE_PROVIDER', 'ACCOUNT_MANAGER', 'COWORKER', 'SUPERADMIN'
+- Service associations stored in: `users/{uid}/serviceAssociations/{serviceId}` subcollection
+- No separate `serviceProviders` collection (clarified with user after multiple attempts)
+
+**Files Implemented/Modified**:
+
+New Files:
+- `frontend/src/components/Onboarding/SPOnboardingStepper.tsx` — 4-step modal stepper for AM onboarding
+- `frontend/src/components/Onboarding/MenuSelectionStep.tsx` — Menu selection with checkbox + price customization
+- `backend/functions/src/handlers/onboarding/spMenuSelection.ts` — Backend handlers for menu operations
+
+Modified Files:
+- `frontend/src/components/Dashboard/AMDashboard.tsx` — Integrated onboarding stepper, fixed status check from ONBOARDING to ASSIGNED
+- `frontend/src/services/apiClient.ts` — Added 4 new API methods:
+  - `getSPServiceId(spId)` — Fetch serviceId from serviceAssociations
+  - `getServiceMenuItems(serviceId)` — Get master menu for a service
+  - `saveSPMenuSelection(spId, serviceId, menuItems)` — Save selected menu with prices
+  - `getSPConfiguredMenu(spId)` — Get SP's configured menu
+- `backend/functions/src/index.ts` — Added 4 new API routes for menu selection
+- `backend/functions/src/handlers/phase2/onboarding.ts` — Fixed assignAccountManagerToSP:
+  - Now sets status to 'ASSIGNED' (not 'ONBOARDING')
+  - Saves both flat AND nested accountManager fields for backward compatibility
+  - Fixed AM-SP assignment bug where AMs couldn't see their assigned SPs
+
+**Bug Fixes Applied**:
+
+1. **AM-SP Assignment Not Working**
+   - Root cause: Backend code paths created SPs with inconsistent field structures (nested vs flat)
+   - Query in getServiceProviders looked for `accountManager.userId` but some SPs had flat `accountManagerId`
+   - Fix: Modified assignAccountManagerToSP to save BOTH structures:
+
+   ```text
+   accountManagerId, accountManagerName, accountManagerEmail (flat)
+   accountManager: { userId, name, email } (nested)
+   ```
+
+2. **Status Value Mismatch**
+   - Frontend was checking for `sp.status === 'ONBOARDING'` but backend set `'ASSIGNED'`
+   - Fix: Updated frontend AMDashboard to check for `sp.status === 'ASSIGNED'` and fetch serviceId dynamically
+
+3. **ServiceId Not Available**
+   - Frontend was sending placeholder 'SERVICE_ID_TO_BE_FETCHED' to menu API
+   - Root cause: User revealed there's no serviceProviders collection — all users in single collection
+   - Fix: Created GET `/service-providers/:spId/service-id` endpoint that fetches from `users/{uid}/serviceAssociations`
+
+**Backend Routes Added**:
+
+```bash
+GET    /service-providers/:spId/service-id         (requireRole: ACCOUNT_MANAGER)
+GET    /services/:serviceId/master-menu             (public)
+POST   /service-providers/:spId/menu-selection      (requireRole: ACCOUNT_MANAGER)
+GET    /service-providers/:spId/menu                (public)
+```
+
+**Deployment Status**:
+- Backend deployment to Firebase successful ✅
+- All new endpoints live and tested ✅
+- Frontend integration complete and type-checked ✅
+
 ---
 
 ## 🏗️ Architecture & Structure
 
 ### Frontend Structure
+
 ```
 frontend/
 ├── src/
@@ -236,6 +308,7 @@ frontend/
 ```
 
 ### Backend Structure
+
 ```
 backend/functions/src/
 ├── handlers/               # API endpoint handlers
@@ -293,7 +366,9 @@ backend/functions/src/
 | Customer Dashboard | ✅ Complete | Service browsing, order placement |
 | ServiceProvider Dashboard | ✅ Complete | Customer management, order handling |
 | AccountManager Dashboard | ✅ Complete | Onboarding, portfolio management |
-| Onboarding Forms | ✅ Complete | Commission, working hours, documents |
+| Onboarding Forms | ✅ Complete | Commission, working hours, documents, menu selection |
+| Menu Selection | ✅ Complete | AM assigns menu items with custom pricing during onboarding |
+| AM-SP Assignment | ✅ Complete | Fixed schema mismatch, now working correctly |
 | Payment Integration | 🔄 In Progress | Razorpay integration pending |
 | Order Management | 🔄 In Progress | Order creation and tracking |
 | Push Notifications | 🔄 In Progress | Firebase Cloud Messaging setup |
@@ -441,14 +516,16 @@ npm run logs          # View logs
 
 ## 📝 Recent Commits
 
-Latest work (as of July 2026):
-- Registration system fully functional with OTP verification
-- SuperAdmin dashboard with service and AccountManager management
-- Multi-role dashboards for all user types
-- Onboarding forms for ServiceProvider setup
-- Complete authentication flow implemented
-- Deployment configuration for Vercel and Firebase
-- API integration with Firebase backend
+Latest work (as of July 13, 2026):
+
+- **Milestone 1 Complete**: All 5 role-based logins working (Customer, SP, AM, Coworker, SuperAdmin)
+- ServiceProvider menu selection step integrated into AM onboarding workflow
+- Fixed AM-SP assignment bug (schema field mismatch: nested vs flat accountManager)
+- Dynamic serviceId fetching from users/{uid}/serviceAssociations during onboarding
+- Menu selection with checkbox-based items and custom pricing validation
+- Backend menu selection API endpoints deployed and tested
+- Frontend SPOnboardingStepper component with 4 steps (Commission, Working Hours, Documents, Menu)
+- Dashboard refactoring completed with shared components (DashboardTabs, StatsGrid, EmptyState)
 
 ---
 
@@ -466,12 +543,21 @@ Latest work (as of July 2026):
 
 ## 🔄 Current Development Focus
 
-**Phase Status**: Phase 4 Complete - Dashboard Implementation  
-**Current Work**: Integration of backend services with frontend dashboards  
+**Phase Status**: Phase 12 Complete - ServiceProvider Menu Selection During Onboarding  
+**Milestone**: Milestone 1 ✅ - All Logins Working (5 roles fully authenticated and assigned)  
+**Current Work**: Testing menu selection with real data and preparing for order management phase  
 **Blockers**: None  
-**Dependencies**: Firebase project credentials, Razorpay integration  
+**Dependencies**: Razorpay integration for payments, Firebase data validation rules  
+**Next Phase**: Order Management (Phase 13) - order creation, tracking, and status updates  
+
+**Known Issues to Address**:
+
+- Complete onboarding form implementation (Commission, Working Hours, Documents steps are placeholders)
+- Fix accountManager field structure (should be fully nested, not mixed flat/nested)
+- Implement SP profile completion with GST details and business address
+- Add Firestore security rules for multi-tenant data isolation
 
 ---
 
-**Last Updated**: July 12, 2026  
-**Next Review**: After payment integration completion
+**Last Updated**: July 13, 2026  
+**Next Review**: After order management implementation

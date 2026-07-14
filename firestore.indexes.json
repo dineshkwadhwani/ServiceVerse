@@ -1,19 +1,4 @@
 {
-  "indexes": [
-    {
-      "collectionGroup": "serviceProviders",
-      "queryScope": "Collection",
-      "fields": [
-        {
-          "fieldPath": "accountManager.userId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    }
-  ],
+  "indexes": [],
   "fieldOverrides": []
 }

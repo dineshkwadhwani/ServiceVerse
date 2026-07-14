@@ -7,9 +7,10 @@ import { COLORS } from '@/utils/theme';
 
 interface NavbarProps {
   onSignInClick?: () => void;
+  onProfileClick?: () => void;
 }
 
-export function Navbar({ onSignInClick }: NavbarProps) {
+export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
   const navigate = useNavigate();
   const { user, firebaseUser, signOut } = useAuthStore();
   const toast = useToast();
@@ -113,7 +114,11 @@ export function Navbar({ onSignInClick }: NavbarProps) {
                   >
                     <div className="p-2 space-y-1">
                       <button
-                        className="w-full text-left px-4 py-2 text-sm rounded flex items-center gap-2 transition"
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          onProfileClick?.();
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm rounded flex items-center gap-2 transition hover:bg-opacity-50"
                         style={{
                           color: COLORS.text.primary,
                         }}

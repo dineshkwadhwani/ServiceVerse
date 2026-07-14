@@ -18,9 +18,10 @@ export async function getAMStats(req: any, res: Response) {
     const amId = req.user.uid;
     logger.info('Fetching AM stats', { amId });
 
-    // Get assigned SPs
+    // Get assigned SPs from users collection (single source of truth)
     const spsSnapshot = await db
-      .collection('serviceProviders')
+      .collection('users')
+      .where('role', '==', 'SERVICE_PROVIDER')
       .where('accountManager.userId', '==', amId)
       .get();
 

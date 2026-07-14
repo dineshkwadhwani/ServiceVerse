@@ -259,6 +259,10 @@ export async function registerServiceProvider(req: any, res: Response) {
       email,
       phone,
       role: 'SERVICE_PROVIDER',
+      service: {
+        serviceId,
+        serviceName: '', // Will be fetched and updated if needed
+      },
       verified: verifiedMethod ? true : false,
       verifiedMethod: verifiedMethod || null,
       status: 'PENDING', // Awaiting account manager assignment
@@ -338,7 +342,7 @@ export async function completeRegistration(req: any, res: Response) {
     }
 
     const { uid: userId, email: firebaseEmail, phoneNumber } = firebaseUser;
-    const { name, email, phone, address, city, pin, serviceId, role } = req.body;
+    const { name, email, phone, address, area, city, pin, serviceId, role, businessName, ownerName } = req.body;
 
     console.log('completeRegistration called', { userId, email, phone, role, serviceId });
 
@@ -367,21 +371,42 @@ export async function completeRegistration(req: any, res: Response) {
     // User document doesn't exist, create it (registration flow)
     console.log('Creating user document for new registration');
 
-    const userData = {
+    const userData: any = {
       uid: userId,
       name,
       email,
       phone: cleanPhone,
       role,
-      address: address || '',
-      city: city || '',
-      pin: pin || '',
       verified: true,
       verifiedMethod: 'phone',
       status: role === 'SERVICE_PROVIDER' ? 'PENDING' : 'ACTIVE',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
+
+    // Add SP-specific fields if this is a service provider
+    if (role === 'SERVICE_PROVIDER') {
+      userData.businessName = businessName || name;
+      userData.ownerName = ownerName || name;
+      userData.address = address || '';
+      userData.area = area || '';
+      userData.city = city || '';
+      userData.pin = pin || '';
+    } else {
+      // For other roles
+      userData.address = address || '';
+      userData.area = area || '';
+      userData.city = city || '';
+      userData.pin = pin || '';
+    }
+
+    // If SP, add service info
+    if (role === 'SERVICE_PROVIDER' && serviceId) {
+      userData.service = {
+        serviceId,
+        serviceName: '', // Will be fetched and updated if needed
+      };
+    }
 
     // Create user document
     await db.collection('users').doc(userId).set(userData);

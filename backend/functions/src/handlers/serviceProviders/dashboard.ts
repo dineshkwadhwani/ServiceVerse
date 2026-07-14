@@ -125,60 +125,63 @@ export async function getSPCustomers(req: AuthRequest, res: Response) {
 
     logger.info('Fetching SP customers', { spId });
 
-    // Get SP's service ID first
-    const spServiceAssoc = await db
+    const customers: any[] = [];
+    const customerIds = new Set<string>();
+
+    // 1. Fetch customers created by this SP
+    const createdCustomersSnapshot = await db
       .collection('users')
-      .doc(spId)
-      .collection('serviceAssociations')
-      .limit(1)
+      .where('createdBySP', '==', spId)
+      .where('role', '==', 'CUSTOMER')
       .get();
 
-    if (spServiceAssoc.empty) {
-      logger.info('SP has no service association', { spId });
-      return sendSuccess(res, { customers: [] });
-    }
+    createdCustomersSnapshot.docs.forEach((doc) => {
+      customerIds.add(doc.id);
+      customers.push({
+        customerId: doc.id,
+        name: doc.data().name,
+        email: doc.data().email,
+        phone: doc.data().phone,
+        verified: doc.data().verified,
+        addedAt: doc.data().createdAt,
+      });
+    });
 
-    const serviceId = spServiceAssoc.docs[0].id;
+    logger.info('Created customers fetched', { spId, count: createdCustomersSnapshot.docs.length });
 
-    // Find all customers associated with this SP for this service
-    // We need to search through all users' serviceAssociations
-    // This is inefficient but necessary due to Firestore's query limitations
+    // 2. Fetch customers associated with this SP via serviceAssociations
     const allCustomersSnapshot = await db
       .collection('users')
       .where('role', '==', 'CUSTOMER')
       .get();
 
-    const customers: any[] = [];
-
     for (const customerDoc of allCustomersSnapshot.docs) {
       const customerId = customerDoc.id;
-      const customerData = customerDoc.data();
 
-      // Check if this customer has an association for this SP and service
-      const assocDoc = await db
-        .collection('users')
-        .doc(customerId)
+      // Skip if already added (created by this SP)
+      if (customerIds.has(customerId)) continue;
+
+      // Check if this customer has an association with this SP
+      const associationSnapshot = await customerDoc.ref
         .collection('serviceAssociations')
-        .doc(serviceId)
+        .doc(spId)
         .get();
 
-      if (assocDoc.exists) {
-        const assocData = assocDoc.data();
-        // Only include if associated with this SP
-        if (assocData?.spId === spId) {
-          customers.push({
-            customerId,
-            name: customerData.name,
-            email: customerData.email,
-            phone: customerData.phone,
-            verified: customerData.verified,
-            addedAt: customerData.createdAt,
-          });
-        }
+      if (associationSnapshot.exists) {
+        customerIds.add(customerId);
+        const assocData = associationSnapshot.data();
+        customers.push({
+          customerId,
+          name: customerDoc.data().name,
+          email: customerDoc.data().email,
+          phone: customerDoc.data().phone,
+          verified: customerDoc.data().verified,
+          addedAt: assocData?.createdAt,
+        });
       }
     }
 
-    logger.info('SP customers fetched', { spId, count: customers.length });
+    logger.info('SP customers fetched', { spId, count: customers.length, createdCount: createdCustomersSnapshot.docs.length });
 
     return sendSuccess(res, { customers });
   } catch (error: any) {

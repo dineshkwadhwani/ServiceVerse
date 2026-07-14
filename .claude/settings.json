@@ -7,7 +7,10 @@
       "Bash(curl -s http://localhost:5173)",
       "Bash(firebase deploy *)",
       "Bash(firebase functions:list)",
-      "Bash(grep -E \"\\\\.tsx$\")"
+      "Bash(grep -E \"\\\\.tsx$\")",
+      "Bash(pkill -f \"npm run dev\")",
+      "Bash(firebase functions:log --limit 50)",
+      "Bash(firebase functions:log)"
     ]
   }
 }

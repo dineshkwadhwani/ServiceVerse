@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, User, MapPin, Loader2 } from 'lucide-react';
+import { Mail, Phone, User, MapPin, Loader2, Briefcase } from 'lucide-react';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { COLORS } from '@/utils/theme';
 import { auth } from '@/utils/firebase-config';
@@ -14,11 +14,17 @@ interface FormData {
   email: string;
   phone: string;
   address?: string;
+  area?: string;
   city?: string;
   pin?: string;
 }
 
-export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
+interface Props {
+  serviceId: string;
+  serviceName?: string;
+}
+
+export function RegisterCustomerForm({ serviceId, serviceName }: Props) {
   const navigate = useNavigate();
   const toast = useToast();
   const [step, setStep] = useState<'details' | 'verification'>('details');
@@ -28,6 +34,7 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
     email: '',
     phone: '',
     address: '',
+    area: '',
     city: '',
     pin: '',
   });
@@ -108,6 +115,7 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
+        area: formData.area,
         city: formData.city,
         pin: formData.pin,
         serviceId,
@@ -174,6 +182,31 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
           borderColor: COLORS.border.light,
         }}
       >
+        {/* Service (Uneditable) */}
+        <div>
+          <label
+            className="flex items-center gap-2 font-semibold mb-3"
+            style={{ color: COLORS.text.primary }}
+          >
+            <Briefcase className="w-4 h-4" />
+            Service
+          </label>
+          <div
+            className="w-full px-4 py-3 border rounded-lg"
+            style={{
+              backgroundColor: COLORS.bg.primary,
+              borderColor: COLORS.border.light,
+              color: COLORS.text.primary,
+              opacity: 0.7,
+            }}
+          >
+            {serviceName || 'Service'}
+          </div>
+          <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
+            You are registering to use this service
+          </p>
+        </div>
+
         {/* Name */}
         <div>
           <label
@@ -292,6 +325,25 @@ export function RegisterCustomerForm({ serviceId }: { serviceId: string }) {
             value={formData.address}
             onChange={handleInputChange}
             placeholder="Street address"
+            className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
+            style={{
+              backgroundColor: COLORS.bg.primary,
+              borderColor: COLORS.border.light,
+              color: COLORS.text.primary,
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.info)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
+          />
+        </div>
+
+        {/* Area */}
+        <div>
+          <input
+            type="text"
+            name="area"
+            value={formData.area}
+            onChange={handleInputChange}
+            placeholder="Area / Locality"
             className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
             style={{
               backgroundColor: COLORS.bg.primary,

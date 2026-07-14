@@ -265,9 +265,9 @@ export function RegisterPage() {
           </button>
 
           {role === 'CUSTOMER' ? (
-            <RegisterCustomerForm serviceId={selectedService.serviceId} />
+            <RegisterCustomerForm serviceId={selectedService.serviceId} serviceName={selectedService.name} />
           ) : (
-            <RegisterSPForm serviceId={selectedService.serviceId} />
+            <RegisterSPForm serviceId={selectedService.serviceId} serviceName={selectedService.name} />
           )}
         </div>
       </div>

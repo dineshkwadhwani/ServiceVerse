@@ -2,39 +2,24 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/store/notificationStore';
 import { apiClient } from '@/services/apiClient';
 import { Loader2, Edit2, Users, CheckCircle2, Clock, BarChart3 } from 'lucide-react';
-import { Modal } from '@/components/Shared/Modal';
 import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
 import { StatsGrid } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
+import { SPOnboardingStepper } from '@/components/Onboarding/SPOnboardingStepper';
 import { COLORS } from '@/utils/theme';
 
 interface SP {
   uid: string;
   businessName: string;
-  status: 'ACTIVE' | 'ONBOARDING' | 'INACTIVE';
+  email: string;
+  phone: string;
+  status: 'ASSIGNED' | 'ONBOARDED' | 'ACTIVE';
   onboardedAt?: Date;
   createdAt: Date;
-}
-
-interface PendingOnboarding {
-  requestId: string;
-  spName: string;
-  city: string;
-  status: string;
-  createdAt: Date;
-}
-
-interface SPProfile {
-  uid: string;
-  businessName: string;
-  logo?: string;
-  address: string;
-  area: string;
-  city: string;
-  pincode: string;
-  gstNumber?: string;
-  chargeGST: boolean;
-  ownerName: string;
+  service?: {
+    serviceId: string;
+    serviceName: string;
+  };
 }
 
 type ActiveTab = 'overview' | 'sps' | 'approvals';
@@ -46,9 +31,7 @@ export function AMDashboard() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [stats, setStats] = useState<any>(null);
   const [sps, setSPs] = useState<SP[]>([]);
-  const [pendingOnboarding, setPendingOnboarding] = useState<PendingOnboarding[]>([]);
-  const [editingSP, setEditingSP] = useState<SPProfile | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [onboardingSP, setOnboardingSP] = useState<SP | null>(null);
 
   useEffect(() => {
     loadData();
@@ -56,15 +39,15 @@ export function AMDashboard() {
 
   const loadData = async () => {
     try {
-      const [statsResponse, spsResponse, onboardingResponse] = await Promise.all([
+      const [statsResponse, spsResponse] = await Promise.all([
         apiClient.getAMStats(),
         apiClient.getServiceProviders(),
-        apiClient.getAMPendingOnboarding(),
       ]);
 
       setStats(statsResponse.data || {});
-      setSPs(spsResponse.data?.serviceProviders || []);
-      setPendingOnboarding(onboardingResponse.data?.requests || []);
+      const spsList = spsResponse.data?.serviceProviders || [];
+      console.log('[AMDashboard] Loaded SPs:', spsList.map((sp: any) => ({ uid: sp.uid, businessName: sp.businessName, status: sp.status })));
+      setSPs(spsList);
     } catch (error: any) {
       toast.error('Failed to load dashboard data');
     } finally {
@@ -73,20 +56,18 @@ export function AMDashboard() {
   };
 
   const handleEditSP = (sp: SP) => {
-    const spProfile: SPProfile = {
-      uid: sp.uid,
-      businessName: sp.businessName,
-      logo: undefined,
-      address: 'N/A',
-      area: 'N/A',
-      city: 'N/A',
-      pincode: 'N/A',
-      gstNumber: 'N/A',
-      chargeGST: false,
-      ownerName: 'N/A',
-    };
-    setEditingSP(spProfile);
-    setShowEditModal(true);
+    // Open the onboarding stepper to allow editing and activation
+    setOnboardingSP(sp);
+  };
+
+  const handleActivateSP = async (spId: string, activate: boolean) => {
+    try {
+      await apiClient.updateSPActivationStatus(spId, activate);
+      toast.success(activate ? 'SP activated successfully!' : 'SP inactivated successfully!');
+      loadData(); // Refresh the list
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update SP status');
+    }
   };
 
   if (isLoading) {
@@ -163,7 +144,7 @@ export function AMDashboard() {
                                   color:
                                     sp.status === 'ACTIVE'
                                       ? COLORS.semantic.success
-                                      : sp.status === 'ONBOARDING'
+                                      : sp.status === 'ONBOARDED'
                                       ? COLORS.semantic.warning
                                       : COLORS.semantic.error,
                                 }}
@@ -219,7 +200,7 @@ export function AMDashboard() {
                             backgroundColor:
                               sp.status === 'ACTIVE'
                                 ? COLORS.semantic.success
-                                : sp.status === 'ONBOARDING'
+                                : sp.status === 'ONBOARDED'
                                 ? COLORS.semantic.warning
                                 : COLORS.semantic.error,
                           }}
@@ -239,13 +220,57 @@ export function AMDashboard() {
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleEditSP(sp)}
-                        className="w-full px-4 py-2 rounded-lg font-medium text-white transition"
-                        style={{ backgroundColor: COLORS.semantic.info }}
-                      >
-                        Edit Onboarding Profile
-                      </button>
+                      {sp.status === 'ASSIGNED' ? (
+                        <button
+                          onClick={() => setOnboardingSP(sp)}
+                          className="w-full px-4 py-2 rounded-lg font-medium text-white transition hover:opacity-90"
+                          style={{ backgroundColor: COLORS.semantic.info }}
+                        >
+                          Start Onboarding
+                        </button>
+                      ) : sp.status === 'ONBOARDED' ? (
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => setOnboardingSP(sp)}
+                            className="w-full px-4 py-2 rounded-lg font-medium text-white transition hover:opacity-90"
+                            style={{ backgroundColor: COLORS.semantic.info }}
+                          >
+                            Edit & Activate
+                          </button>
+                          <button
+                            onClick={() => handleActivateSP(sp.uid, true)}
+                            className="w-full px-4 py-2 rounded-lg font-medium text-white transition hover:opacity-90"
+                            style={{ backgroundColor: COLORS.semantic.success }}
+                          >
+                            Activate Now
+                          </button>
+                        </div>
+                      ) : sp.status === 'ACTIVE' ? (
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => handleEditSP(sp)}
+                            className="w-full px-4 py-2 rounded-lg font-medium text-white transition"
+                            style={{ backgroundColor: COLORS.semantic.info }}
+                          >
+                            Edit Profile
+                          </button>
+                          <button
+                            onClick={() => handleActivateSP(sp.uid, false)}
+                            className="w-full px-4 py-2 rounded-lg font-medium text-white transition"
+                            style={{ backgroundColor: COLORS.semantic.warning }}
+                          >
+                            Inactivate
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          disabled
+                          className="w-full px-4 py-2 rounded-lg font-medium text-white transition opacity-50 cursor-not-allowed"
+                          style={{ backgroundColor: COLORS.semantic.error }}
+                        >
+                          {sp.status}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -256,197 +281,41 @@ export function AMDashboard() {
         {/* Approvals Tab */}
         {activeTab === 'approvals' && (
             <div className="p-4 md:p-6">
-              {pendingOnboarding.length === 0 ? (
-                <EmptyState message="No pending onboarding requests" />
-              ) : (
-                <div className="space-y-4">
-                  {pendingOnboarding.map((request) => (
-                    <div
-                      key={request.requestId}
-                      className="p-4 rounded-lg border"
-                      style={{
-                        backgroundColor: COLORS.bg.surface,
-                        borderColor: COLORS.border.light,
-                      }}
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold" style={{ color: COLORS.text.primary }}>
-                              {request.spName}
-                            </p>
-                            <span
-                              className="text-xs px-2 py-1 rounded-full font-semibold text-white"
-                              style={{
-                                backgroundColor: COLORS.semantic.warning,
-                              }}
-                            >
-                              PENDING
-                            </span>
-                          </div>
-                          <p className="text-sm mt-2" style={{ color: COLORS.text.secondary }}>
-                            {request.city}
-                          </p>
-                          <p className="text-xs mt-2" style={{ color: COLORS.text.secondary }}>
-                            {new Date(request.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-
-                      <button
-                        className="w-full px-4 py-2 rounded-lg font-medium text-white transition"
-                        style={{ backgroundColor: COLORS.semantic.info }}
-                      >
-                        Start Onboarding
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <EmptyState message="No pending approvals" />
             </div>
         )}
       </main>
 
-      {/* Edit SP Modal */}
-      <Modal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        title="Edit SP Onboarding Profile"
-        size="lg"
-      >
-        {editingSP && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: COLORS.text.primary }}>
-                Business Name
-              </label>
-              <input
-                type="text"
-                defaultValue={editingSP.businessName}
-                className="w-full px-4 py-2 rounded-lg border"
-                style={{
-                  backgroundColor: COLORS.bg.primary,
-                  borderColor: COLORS.border.light,
-                  color: COLORS.text.primary,
-                }}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: COLORS.text.primary }}>
-                Owner Name
-              </label>
-              <input
-                type="text"
-                defaultValue={editingSP.ownerName}
-                className="w-full px-4 py-2 rounded-lg border"
-                style={{
-                  backgroundColor: COLORS.bg.primary,
-                  borderColor: COLORS.border.light,
-                  color: COLORS.text.primary,
-                }}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: COLORS.text.primary }}>
-                Address
-              </label>
-              <input
-                type="text"
-                defaultValue={editingSP.address}
-                className="w-full px-4 py-2 rounded-lg border"
-                style={{
-                  backgroundColor: COLORS.bg.primary,
-                  borderColor: COLORS.border.light,
-                  color: COLORS.text.primary,
-                }}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-semibold mb-2" style={{ color: COLORS.text.primary }}>
-                  Area
-                </label>
-                <input
-                  type="text"
-                  defaultValue={editingSP.area}
-                  className="w-full px-4 py-2 rounded-lg border"
-                  style={{
-                    backgroundColor: COLORS.bg.primary,
-                    borderColor: COLORS.border.light,
-                    color: COLORS.text.primary,
-                  }}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-2" style={{ color: COLORS.text.primary }}>
-                  City
-                </label>
-                <input
-                  type="text"
-                  defaultValue={editingSP.city}
-                  className="w-full px-4 py-2 rounded-lg border"
-                  style={{
-                    backgroundColor: COLORS.bg.primary,
-                    borderColor: COLORS.border.light,
-                    color: COLORS.text.primary,
-                  }}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: COLORS.text.primary }}>
-                Pincode
-              </label>
-              <input
-                type="text"
-                defaultValue={editingSP.pincode}
-                className="w-full px-4 py-2 rounded-lg border"
-                style={{
-                  backgroundColor: COLORS.bg.primary,
-                  borderColor: COLORS.border.light,
-                  color: COLORS.text.primary,
-                }}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: COLORS.text.primary }}>
-                GST Number
-              </label>
-              <input
-                type="text"
-                defaultValue={editingSP.gstNumber}
-                className="w-full px-4 py-2 rounded-lg border"
-                style={{
-                  backgroundColor: COLORS.bg.primary,
-                  borderColor: COLORS.border.light,
-                  color: COLORS.text.primary,
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                defaultChecked={editingSP.chargeGST}
-                id="chargeGST"
-                className="w-4 h-4"
-              />
-              <label htmlFor="chargeGST" style={{ color: COLORS.text.primary }}>
-                Charge GST
-              </label>
-            </div>
-            <button
-              className="w-full px-4 py-2 rounded-lg font-semibold text-white transition"
-              style={{ backgroundColor: COLORS.semantic.success }}
-              onClick={() => {
-                setShowEditModal(false);
-                toast.success('SP profile updated and onboarding marked complete');
-              }}
-            >
-              Complete Onboarding
-            </button>
-          </div>
-        )}
-      </Modal>
+      {/* Onboarding Stepper */}
+      {onboardingSP && (() => {
+        const serviceId = onboardingSP.service?.serviceId || '';
+        const customMenusObj = (onboardingSP as any).customMenus;
+        const currentServiceMenus = customMenusObj?.[serviceId] || [];
+
+        return (
+          <SPOnboardingStepper
+            spId={onboardingSP.uid}
+            spPhone={onboardingSP.phone}
+            spEmail={onboardingSP.email}
+            spBusinessName={onboardingSP.businessName}
+            spOwnerName={(onboardingSP as any).ownerName}
+            spAddress={(onboardingSP as any).address}
+            spArea={(onboardingSP as any).area}
+            spCity={(onboardingSP as any).city}
+            spPin={(onboardingSP as any).pin}
+            serviceId={serviceId}
+            existingOperations={(onboardingSP as any).operations}
+            existingDocumentation={(onboardingSP as any).documentation}
+            existingCommission={(onboardingSP as any).commission}
+            existingMenus={currentServiceMenus}
+            onComplete={() => {
+              setOnboardingSP(null);
+              loadData();
+            }}
+            onCancel={() => setOnboardingSP(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

@@ -316,6 +316,12 @@ export async function associateExistingCustomer(req: AuthRequest, res: Response)
       associatedBySP: spId,
     });
 
+    // Also update customer document to set createdBySP for easier querying
+    // This allows getSPCustomers to find both created and associated customers
+    await db.collection('users').doc(customerId).update({
+      createdBySP: spId,
+    });
+
     logger.info('Service association created for existing customer', {
       customerId,
       serviceId,

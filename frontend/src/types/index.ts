@@ -20,34 +20,30 @@ export interface SuperAdmin extends BaseUser {
 
 export interface AccountManager extends BaseUser {
   role: 'ACCOUNT_MANAGER';
-  service: {
-    serviceId: string;
-    serviceName: string;
-  };
-  managerId?: string; // For future hierarchy
   status: 'ACTIVE' | 'INACTIVE';
 }
 
 export interface ServiceProvider extends BaseUser {
   role: 'SERVICE_PROVIDER';
+  ownerName?: string; // Owner/Contact name
   service: {
     serviceId: string;
     serviceName: string;
   };
-  accountManager: {
+  accountManager?: {
     userId: string;
     name: string;
     email: string;
   };
-  businessName: string;
-  businessAddress: string;
-  businessPhone: string;
+  businessName?: string;
+  businessAddress?: string;
+  businessPhone?: string;
   gstNumber?: string;
-  bankAccountDetails: BankDetails;
-  businessLogo: string;
-  workingHours: WorkingHours;
-  status: 'CREATED' | 'ASSIGNED' | 'ONBOARDING' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-  commission: CommissionConfig;
+  bankAccountDetails?: BankDetails;
+  businessLogo?: string;
+  workingHours?: WorkingHours;
+  status: 'PENDING' | 'ASSIGNED' | 'ONBOARDED' | 'ACTIVE';
+  commission?: CommissionConfig;
   upiQRCode?: string;
   onboardedAt?: Date;
   customMenus?: {
@@ -57,7 +53,7 @@ export interface ServiceProvider extends BaseUser {
 
 export interface Coworker extends BaseUser {
   role: 'COWORKER';
-  serviceProviderId: string;
+  serviceProviderId: string; // Always tied to a specific SP
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -163,6 +159,68 @@ export interface WorkingHours {
     start: string;
     end: string;
     open?: boolean;
+  };
+}
+
+// Onboarding Types
+export interface WorkingHourDay {
+  open: boolean;
+  startHour?: number; // 0-23
+  endHour?: number; // 0-23
+}
+
+export interface BasicInfoData {
+  email: string;
+  name: string;
+  ownerName: string;
+  address: string;
+  area: string;
+  city: string;
+  pinCode: string;
+}
+
+export interface OperationsData {
+  workingHours: {
+    monday: WorkingHourDay;
+    tuesday: WorkingHourDay;
+    wednesday: WorkingHourDay;
+    thursday: WorkingHourDay;
+    friday: WorkingHourDay;
+    saturday: WorkingHourDay;
+    sunday: WorkingHourDay;
+  };
+  pickupAvailable: boolean;
+  deliveryAvailable: boolean;
+}
+
+export interface DocumentationData {
+  gstNumber: string;
+  gstCollectionMandatory: boolean;
+  directPaymentAllowed: boolean;
+  qrCodeUrl?: string; // Optional unless directPaymentAllowed is true
+}
+
+export interface OnboardingCommissionConfig {
+  type: 'FIXED' | 'PERCENTAGE';
+  value?: number; // Only for PERCENTAGE
+}
+
+export interface CustomMenuItemData {
+  menuItemId: string;
+  name: string;
+  basePrice: number;
+  customPrice: number;
+  isEnabled: boolean;
+  commissionPerItem?: number; // Only for FIXED commission
+}
+
+export interface OnboardingFormData {
+  basicInfo: BasicInfoData;
+  operations: OperationsData;
+  documentation: DocumentationData;
+  commission: OnboardingCommissionConfig;
+  customMenus: {
+    [serviceId: string]: CustomMenuItemData[];
   };
 }
 

@@ -127,13 +127,14 @@ export async function getAccountManagers(req: AuthRequest, res: Response) {
 
 /**
  * Assign ServiceProvider to AccountManager (SuperAdmin)
+ * This function is deprecated - use assignAccountManagerToSP instead
  */
 export async function assignAccountManager(req: AuthRequest, res: Response) {
   try {
     const { spId } = req.params;
     const { accountManagerId } = req.body;
 
-    logger.info('Assigning account manager', { spId, accountManagerId });
+    logger.info('Assigning account manager (deprecated endpoint)', { spId, accountManagerId });
 
     // Verify AM exists in users collection
     const amDoc = await db.collection('users').doc(accountManagerId).get();
@@ -146,8 +147,14 @@ export async function assignAccountManager(req: AuthRequest, res: Response) {
       return sendError(res, new ValidationError('User is not an Account Manager'));
     }
 
-    // Update SP document with AM reference
-    await db.collection('serviceProviders').doc(spId).update({
+    // Verify SP exists
+    const spDoc = await db.collection('users').doc(spId).get();
+    if (!spDoc.exists) {
+      return sendError(res, new ValidationError('Service Provider not found'));
+    }
+
+    // Update SP user document with nested AM object (single source of truth)
+    await db.collection('users').doc(spId).update({
       accountManager: {
         userId: accountManagerId,
         name: amData.name,
@@ -191,13 +198,17 @@ export async function onboardServiceProvider(req: AuthRequest, res: Response) {
 
     logger.info('Onboarding service provider', { spId });
 
-    // Verify SP exists and is assigned
-    const spDoc = await db.collection('serviceProviders').doc(spId).get();
+    // Verify SP exists and is assigned (from users collection)
+    const spDoc = await db.collection('users').doc(spId).get();
     if (!spDoc.exists) {
       return sendError(res, new ValidationError('Service Provider not found'));
     }
 
-    const spData = spDoc.data();
+    const spData = spDoc.data() as any;
+    if (spData.role !== 'SERVICE_PROVIDER') {
+      return sendError(res, new ValidationError('User is not a Service Provider'));
+    }
+
     if (spData?.status !== 'ASSIGNED') {
       return sendError(
         res,
@@ -211,7 +222,7 @@ export async function onboardServiceProvider(req: AuthRequest, res: Response) {
     // For now, use placeholders
     const logoUrl = 'https://via.placeholder.com/200?text=Logo';
 
-    // Update SP with onboarding data
+    // Update SP user document with onboarding data
     const updateData = {
       businessName,
       businessAddress,
@@ -231,37 +242,32 @@ export async function onboardServiceProvider(req: AuthRequest, res: Response) {
       updatedAt: new Date(),
     };
 
-    await db.collection('serviceProviders').doc(spId).update(updateData);
+    await db.collection('users').doc(spId).update(updateData);
 
-    // Create coworkers if provided
+    // Create coworkers if provided (as separate user documents)
     if (coworkers && Array.isArray(coworkers)) {
       for (const coworker of coworkers) {
-        const coworkerId = uuidv4();
 
         // Create auth user for coworker
         try {
           const coworkerUser = await auth.createUser({
             email: coworker.email,
-            password: Math.random().toString(36).slice(-12),
-            displayName: coworker.name,
             phoneNumber: `+91${coworker.phone}`,
+            displayName: coworker.name,
           });
 
-          // Create Firestore document
-          await db
-            .collection('serviceProviders')
-            .doc(spId)
-            .collection('coworkers')
-            .doc(coworkerUser.uid)
-            .set({
-              uid: coworkerUser.uid,
-              name: coworker.name,
-              phone: coworker.phone,
-              email: coworker.email,
-              role: 'COWORKER',
-              status: 'ACTIVE',
-              createdAt: new Date(),
-            });
+          // Create user document for coworker
+          await db.collection('users').doc(coworkerUser.uid).set({
+            uid: coworkerUser.uid,
+            name: coworker.name,
+            phone: coworker.phone,
+            email: coworker.email,
+            role: 'COWORKER',
+            serviceProviderId: spId,
+            status: 'ACTIVE',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
 
           // Set custom claims
           await auth.setCustomUserClaims(coworkerUser.uid, {
@@ -290,6 +296,7 @@ export async function onboardServiceProvider(req: AuthRequest, res: Response) {
 
 /**
  * Get ServiceProviders for AccountManager
+ * Returns all SPs assigned to the authenticated AM from the users collection (single source of truth)
  */
 export async function getServiceProviders(req: AuthRequest, res: Response) {
   try {
@@ -301,9 +308,10 @@ export async function getServiceProviders(req: AuthRequest, res: Response) {
 
     logger.info('Fetching service providers', { accountManagerId });
 
-    // Get all SPs assigned to this AM
+    // Get all SPs assigned to this AM from users collection
     const snapshot = await db
-      .collection('serviceProviders')
+      .collection('users')
+      .where('role', '==', 'SERVICE_PROVIDER')
       .where('accountManager.userId', '==', accountManagerId)
       .get();
 
@@ -312,7 +320,7 @@ export async function getServiceProviders(req: AuthRequest, res: Response) {
         uid: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate?.(),
-        onboardedAt: doc.data().onboardedAt?.toDate?.(),
+        updatedAt: doc.data().updatedAt?.toDate?.(),
       } as any))
       .sort((a: any, b: any) => (b.createdAt || new Date()) - (a.createdAt || new Date()));
 
@@ -320,8 +328,9 @@ export async function getServiceProviders(req: AuthRequest, res: Response) {
       serviceProviders,
       total: serviceProviders.length,
       byStatus: {
+        assigned: serviceProviders.filter((sp: any) => sp.status === 'ASSIGNED').length,
         active: serviceProviders.filter((sp: any) => sp.status === 'ACTIVE').length,
-        pending: serviceProviders.filter((sp: any) => sp.status === 'ONBOARDING').length,
+        pending: serviceProviders.filter((sp: any) => sp.status === 'PENDING').length,
         inactive: serviceProviders.filter((sp: any) => sp.status === 'INACTIVE').length,
       },
     });
@@ -426,6 +435,8 @@ export async function getPendingOnboardingRequests(req: AuthRequest, res: Respon
 
 /**
  * Assign Account Manager to SP (SuperAdmin only)
+ * Updates the SP's user document with the AM reference as a nested object
+ * Single source of truth: users collection only
  */
 export async function assignAccountManagerToSP(req: AuthRequest, res: Response) {
   try {
@@ -447,13 +458,19 @@ export async function assignAccountManagerToSP(req: AuthRequest, res: Response) 
     const requestData = requestDoc.data() as any;
     const { userId, serviceId } = requestData;
 
-    // Verify AM exists
+    // Verify AM exists in users collection
     const amDoc = await db.collection('users').doc(accountManagerId).get();
     if (!amDoc.exists || amDoc.data()?.role !== 'ACCOUNT_MANAGER') {
       return sendError(res, new ValidationError('Account Manager not found'));
     }
 
     const amData = amDoc.data() as any;
+
+    // Verify SP exists in users collection
+    const spDoc = await db.collection('users').doc(userId).get();
+    if (!spDoc.exists || spDoc.data()?.role !== 'SERVICE_PROVIDER') {
+      return sendError(res, new ValidationError('Service Provider not found'));
+    }
 
     // Update approval request with approver info
     await db.collection('approvals').doc(requestId).update({
@@ -467,46 +484,19 @@ export async function assignAccountManagerToSP(req: AuthRequest, res: Response) 
       updatedAt: new Date(),
     });
 
-    // Add AM info to SP user document (flat fields for backward compatibility)
+    // Update SP user document with nested AM object (SINGLE SOURCE OF TRUTH)
+    // This is the only place AM assignment should be stored
     await db.collection('users').doc(userId).update({
-      accountManagerId,
-      accountManagerName: amData.name,
-      accountManagerEmail: amData.email,
+      accountManager: {
+        userId: accountManagerId,
+        name: amData.name,
+        email: amData.email,
+      },
+      status: 'ASSIGNED',
       updatedAt: new Date(),
     });
 
-    // Also create/update SP entry in serviceProviders collection with nested structure
-    // This ensures getServiceProviders() query works correctly
-    const spServiceProvidersRef = db.collection('serviceProviders').doc(userId);
-    const spServiceProvidersDoc = await spServiceProvidersRef.get();
-
-    if (spServiceProvidersDoc.exists) {
-      // Update existing SP document
-      await spServiceProvidersRef.update({
-        accountManager: {
-          userId: accountManagerId,
-          name: amData.name,
-          email: amData.email,
-        },
-        status: 'ASSIGNED',
-        updatedAt: new Date(),
-      });
-    } else {
-      // Create new SP document if it doesn't exist (shouldn't happen, but safety check)
-      await spServiceProvidersRef.set({
-        userId,
-        accountManager: {
-          userId: accountManagerId,
-          name: amData.name,
-          email: amData.email,
-        },
-        status: 'ASSIGNED',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    }
-
-    logger.info('Account manager assigned to SP', { requestId, accountManagerId, userId });
+    logger.info('Account manager assigned to SP (users collection only)', { requestId, accountManagerId, userId });
 
     return sendSuccess(res, {
       requestId,

@@ -122,7 +122,7 @@ export function SPDashboard() {
       setEarnings(loadedEarnings);
 
       // Load customers
-      const customersResponse = await apiClient.getSPCustomers(firebaseUser.uid);
+      const customersResponse = await apiClient.getSPCustomers();
       const loadedCustomers = (customersResponse?.data?.customers || []);
       setCustomers(loadedCustomers);
     } catch (error: any) {

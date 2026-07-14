@@ -54,9 +54,6 @@ export function AccountManagerDashboard() {
     );
   };
 
-  const getServiceName = (serviceId: string) => {
-    return services.find((s) => s.serviceId === serviceId)?.name || 'N/A';
-  };
 
   return (
     <div className="space-y-6">
@@ -129,7 +126,7 @@ export function AccountManagerDashboard() {
                     <td className="px-6 py-4 text-sm text-gray-600">{am.email}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{am.phone}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {am.service ? getServiceName(am.service.serviceId) : 'N/A'}
+                      All Services
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <span

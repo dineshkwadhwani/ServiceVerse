@@ -427,9 +427,9 @@ class ApiClient {
     }
   }
 
-  async getSPCustomers(spId: string): Promise<any> {
+  async getSPCustomers(): Promise<any> {
     try {
-      return await this.axiosInstance.get(`/service-providers/${spId}/customers`);
+      return await this.axiosInstance.get(`/service-providers/customers`);
     } catch (error) {
       console.warn('Failed to fetch SP customers, returning empty');
       return { customers: [] };
