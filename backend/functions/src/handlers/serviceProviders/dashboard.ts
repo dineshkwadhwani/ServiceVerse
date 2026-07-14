@@ -112,7 +112,8 @@ export async function createCustomerBySP(req: AuthRequest, res: Response) {
 }
 
 /**
- * Get all customers created by this SP
+ * Get all customers associated with this SP
+ * Includes both customers created by SP and customers associated by SP
  */
 export async function getSPCustomers(req: AuthRequest, res: Response) {
   try {
@@ -124,20 +125,58 @@ export async function getSPCustomers(req: AuthRequest, res: Response) {
 
     logger.info('Fetching SP customers', { spId });
 
-    const customersSnapshot = await db
+    // Get SP's service ID first
+    const spServiceAssoc = await db
       .collection('users')
-      .where('createdBySP', '==', spId)
+      .doc(spId)
+      .collection('serviceAssociations')
+      .limit(1)
+      .get();
+
+    if (spServiceAssoc.empty) {
+      logger.info('SP has no service association', { spId });
+      return sendSuccess(res, { customers: [] });
+    }
+
+    const serviceId = spServiceAssoc.docs[0].id;
+
+    // Find all customers associated with this SP for this service
+    // We need to search through all users' serviceAssociations
+    // This is inefficient but necessary due to Firestore's query limitations
+    const allCustomersSnapshot = await db
+      .collection('users')
       .where('role', '==', 'CUSTOMER')
       .get();
 
-    const customers = customersSnapshot.docs.map((doc) => ({
-      customerId: doc.id,
-      name: doc.data().name,
-      email: doc.data().email,
-      phone: doc.data().phone,
-      verified: doc.data().verified,
-      addedAt: doc.data().createdAt,
-    }));
+    const customers: any[] = [];
+
+    for (const customerDoc of allCustomersSnapshot.docs) {
+      const customerId = customerDoc.id;
+      const customerData = customerDoc.data();
+
+      // Check if this customer has an association for this SP and service
+      const assocDoc = await db
+        .collection('users')
+        .doc(customerId)
+        .collection('serviceAssociations')
+        .doc(serviceId)
+        .get();
+
+      if (assocDoc.exists) {
+        const assocData = assocDoc.data();
+        // Only include if associated with this SP
+        if (assocData?.spId === spId) {
+          customers.push({
+            customerId,
+            name: customerData.name,
+            email: customerData.email,
+            phone: customerData.phone,
+            verified: customerData.verified,
+            addedAt: customerData.createdAt,
+          });
+        }
+      }
+    }
 
     logger.info('SP customers fetched', { spId, count: customers.length });
 
