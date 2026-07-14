@@ -139,9 +139,68 @@ export async function getSPCustomers(req: AuthRequest, res: Response) {
       addedAt: doc.data().createdAt,
     }));
 
+    logger.info('SP customers fetched', { spId, count: customers.length });
+
     return sendSuccess(res, { customers });
   } catch (error: any) {
     logger.error('Failed to fetch SP customers', error);
+    return sendError(res, error);
+  }
+}
+
+/**
+ * Get SP statistics (orders, revenue, rating, customer count)
+ */
+export async function getSPStats(req: AuthRequest, res: Response) {
+  try {
+    const spId = req.params.spId;
+    if (!spId) {
+      return sendError(res, new ValidationError('Service Provider ID is required'));
+    }
+
+    logger.info('Fetching SP stats', { spId });
+
+    // Get SP data
+    const spDoc = await db.collection('users').doc(spId).get();
+    if (!spDoc.exists) {
+      return sendError(res, new ValidationError('Service Provider not found'));
+    }
+
+    const spData = spDoc.data() || {};
+
+    // Calculate stats
+    const stats = {
+      totalOrders: spData.totalOrders || 0,
+      totalRevenue: spData.totalRevenue || 0,
+      averageRating: spData.averageRating || 0,
+      totalCustomers: spData.totalCustomers || 0,
+    };
+
+    return sendSuccess(res, stats);
+  } catch (error: any) {
+    logger.error('Failed to fetch SP stats', error);
+    return sendError(res, error);
+  }
+}
+
+/**
+ * Get SP earnings over time
+ */
+export async function getSPEarnings(req: AuthRequest, res: Response) {
+  try {
+    const spId = req.params.spId;
+    if (!spId) {
+      return sendError(res, new ValidationError('Service Provider ID is required'));
+    }
+
+    logger.info('Fetching SP earnings', { spId });
+
+    // For now, return empty earnings array (can be expanded to aggregate orders by date)
+    const earnings: any[] = [];
+
+    return sendSuccess(res, { earnings });
+  } catch (error: any) {
+    logger.error('Failed to fetch SP earnings', error);
     return sendError(res, error);
   }
 }

@@ -13,9 +13,18 @@ import * as authHandlers from '@/handlers/auth/registration';
 import * as phoneSignInHandlers from '@/handlers/auth/phoneSignIn';
 import * as customerHandlers from '@/handlers/customers/dashboard';
 import * as spDashboardHandlers from '@/handlers/serviceProviders/dashboard';
+import * as createCustomerHandlers from '@/handlers/serviceProviders/createCustomer';
 import * as amDashboardHandlers from '@/handlers/accountManagers/dashboard';
 import * as superAdminHandlers from '@/handlers/superAdmin/dashboard';
 import * as diagnosticsHandlers from '@/handlers/debug/diagnostics';
+import * as spMenuHandlers from '@/handlers/onboarding/spMenuSelection';
+import * as spActivationHandlers from '@/handlers/onboarding/spActivation';
+import * as completeOnboardingHandlers from '@/handlers/onboarding/completeOnboarding';
+import * as spDataHandlers from '@/handlers/serviceProviders/updateData';
+import * as customerSearchHandlers from '@/handlers/customers/search';
+import * as ordersHandlers from '@/handlers/orders/createOrder';
+import * as ordersListHandlers from '@/handlers/orders/getSPOrders';
+import * as orderMenuHandlers from '@/handlers/orders/getSPMenu';
 
 import { getSeedAdminConfig, seedSuperAdminUser } from '@/handlers/admin/seedAdmin';
 
@@ -26,7 +35,10 @@ const logger = new Logger('CloudFunctions');
 const app = express();
 
 // Middleware
-app.use(cors({ origin: true }));
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'https://serviceverse.vercel.app'],
+  credentials: true,
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
@@ -105,16 +117,52 @@ app.post('/customers/request-unorphan', async (req, res) => {
   customerHandlers.requestUnorphan(req as any, res);
 });
 
+app.get('/customers/search', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  customerSearchHandlers.searchCustomer(req as any, res);
+});
+
+app.get('/customers/:customerId/orders', requireRole('CUSTOMER', 'ACCOUNT_MANAGER', 'SUPERADMIN'), async (req, res) => {
+  ordersListHandlers.getCustomerOrders(req as any, res);
+});
+
+// ============================================================================
+// ORDERS
+// ============================================================================
+
+app.post('/orders', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  ordersHandlers.createOrder(req as any, res);
+});
+
+app.get('/service-providers/:spId/orders', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), async (req, res) => {
+  ordersListHandlers.getSPOrders(req as any, res);
+});
+
 // ============================================================================
 // SERVICE PROVIDER DASHBOARD
 // ============================================================================
 
-app.post('/service-providers/create-customer', requireRole('SERVICE_PROVIDER'), async (req, res) => {
-  spDashboardHandlers.createCustomerBySP(req as any, res);
+app.post('/service-providers/customers/search-phone', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  createCustomerHandlers.searchCustomerByPhone(req as any, res);
+});
+
+app.post('/service-providers/customers/create-new', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  createCustomerHandlers.createNewCustomerWithAssociation(req as any, res);
+});
+
+app.post('/service-providers/customers/associate', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  createCustomerHandlers.associateExistingCustomer(req as any, res);
 });
 
 app.get('/service-providers/customers', requireRole('SERVICE_PROVIDER'), async (req, res) => {
   spDashboardHandlers.getSPCustomers(req as any, res);
+});
+
+app.get('/service-providers/:spId/stats', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), async (req, res) => {
+  spDashboardHandlers.getSPStats(req as any, res);
+});
+
+app.get('/service-providers/:spId/earnings', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), async (req, res) => {
+  spDashboardHandlers.getSPEarnings(req as any, res);
 });
 
 // SP Menu Management
@@ -275,58 +323,10 @@ app.post('/sp-onboarding/:requestId/complete', requireRole('ACCOUNT_MANAGER'), (
 });
 
 // ============================================================================
-// PHASE 3: Orders & Payments
+// PHASE 3: Orders & Payments (these are older handlers - phase 3 orders are deprecated)
 // ============================================================================
 
-// Create Order
-app.post('/orders', async (req, res) => {
-  phase3Handlers.createOrder(req as any, res);
-});
-
-// Get Orders
-app.get('/orders', async (req, res) => {
-  phase3Handlers.getOrders(req as any, res);
-});
-
-// Get Order by ID
-app.get('/orders/:orderId', async (req, res) => {
-  phase3Handlers.getOrder(req as any, res);
-});
-
-// Confirm Order
-app.patch('/orders/:orderId/confirm', async (req, res) => {
-  phase3Handlers.confirmOrder(req as any, res);
-});
-
-// Mark Order Ready
-app.patch('/orders/:orderId/mark-ready', requireRole('SERVICE_PROVIDER', 'COWORKER'), (req, res) => {
-  phase3Handlers.markOrderReady(req as any, res);
-});
-
-// Mark Order Delivered
-app.patch('/orders/:orderId/mark-delivered', requireRole('SERVICE_PROVIDER', 'COWORKER'), (req, res) => {
-  phase3Handlers.markOrderDelivered(req as any, res);
-});
-
-// Initialize Razorpay Payment
-app.post('/orders/:orderId/initialize-payment', async (req, res) => {
-  phase3Handlers.initializeRazorpayPayment(req as any, res);
-});
-
-// Verify Razorpay Payment
-app.post('/orders/:orderId/verify-payment', async (req, res) => {
-  phase3Handlers.verifyRazorpayPayment(req as any, res);
-});
-
-// Confirm Direct Payment
-app.patch('/orders/:orderId/confirm-direct-payment', async (req, res) => {
-  phase3Handlers.confirmDirectPayment(req as any, res);
-});
-
-// Add Feedback
-app.post('/orders/:orderId/feedback', async (req, res) => {
-  phase3Handlers.addOrderFeedback(req as any, res);
-});
+// NOTE: Phase 3 handlers are deprecated. Use order endpoints above instead.
 
 // ============================================================================
 // Analytics
@@ -354,6 +354,53 @@ app.get('/analytics', async (req, res) => {
 // Check SP assignment for an AM (no auth required for debugging)
 app.get('/debug/check-sp-assignment', (req, res) => {
   diagnosticsHandlers.checkSPAssignment(req as any, res);
+});
+
+// ============================================================================
+// SP MENU SELECTION (Onboarding)
+// ============================================================================
+
+// Get SP's service ID from their service associations
+app.get('/service-providers/:spId/service-id', requireRole('ACCOUNT_MANAGER'), (req, res) => {
+  spMenuHandlers.getSPServiceId(req as any, res);
+});
+
+// Get master menu for a service
+app.get('/services/:serviceId/master-menu', (req, res) => {
+  spMenuHandlers.getServiceMasterMenu(req as any, res);
+});
+
+// Save SP's selected menu items (during AM onboarding)
+app.post('/service-providers/:spId/menu-selection', requireRole('ACCOUNT_MANAGER'), (req, res) => {
+  spMenuHandlers.saveSPMenuSelection(req as any, res);
+});
+
+// Get SP's configured menu (for order creation)
+app.get('/service-providers/:spId/menu', (req, res) => {
+  orderMenuHandlers.getSPConfiguredMenu(req as any, res);
+});
+
+// ============================================================================
+// SP DATA UPDATE (Consolidated - SP updates self, AM updates assigned SP)
+// ============================================================================
+
+// Must come BEFORE parameterized :spId routes to be matched correctly
+app.post('/service-providers/update-data', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), (req, res) => {
+  spDataHandlers.updateSPData(req as any, res);
+});
+
+// ============================================================================
+// SP COMPLETE ONBOARDING
+// ============================================================================
+
+// Complete SP onboarding (all 4 steps) - AccountManager only
+app.post('/service-providers/:spId/onboarding/complete', requireRole('ACCOUNT_MANAGER'), (req, res) => {
+  completeOnboardingHandlers.completeOnboarding(req as any, res);
+});
+
+// Update SP activation status (activate/inactivate) - AccountManager only
+app.post('/service-providers/:spId/activation', requireRole('ACCOUNT_MANAGER'), (req, res) => {
+  spActivationHandlers.updateSPActivationStatus(req as any, res);
 });
 
 // 404 handler

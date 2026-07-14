@@ -108,12 +108,16 @@ class ApiClient {
   // SERVICE PROVIDER DASHBOARD
   // ============================================================================
 
-  async createCustomerBySP(data: any) {
-    return this.axiosInstance.post('/service-providers/create-customer', data);
+  async searchCustomerByPhone(phone: string) {
+    return this.axiosInstance.post('/service-providers/customers/search-phone', { phone });
   }
 
-  async getSPCustomers() {
-    return this.axiosInstance.get('/service-providers/customers');
+  async createNewCustomerWithAssociation(data: { phone: string; name: string; address: string; email?: string }) {
+    return this.axiosInstance.post('/service-providers/customers/create-new', data);
+  }
+
+  async associateExistingCustomer(customerId: string) {
+    return this.axiosInstance.post('/service-providers/customers/associate', { customerId });
   }
 
   // ============================================================================
@@ -352,6 +356,100 @@ class ApiClient {
 
   async markOnboardingComplete(requestId: string) {
     return this.axiosInstance.post(`/sp-onboarding/${requestId}/complete`);
+  }
+
+  // ============================================================================
+  // MENU SELECTION (Onboarding)
+  // ============================================================================
+
+  async getSPServiceId(spId: string) {
+    return this.axiosInstance.get(`/service-providers/${spId}/service-id`);
+  }
+
+  async getServiceMenuItems(serviceId: string) {
+    return this.axiosInstance.get(`/services/${serviceId}/master-menu`);
+  }
+
+  async saveSPMenuSelection(spId: string, serviceId: string, menuItems: any[]) {
+    return this.axiosInstance.post(`/service-providers/${spId}/menu-selection`, {
+      spId,
+      serviceId,
+      menuItems,
+    });
+  }
+
+  async getSPConfiguredMenu(spId: string) {
+    return this.axiosInstance.get(`/service-providers/${spId}/menu`);
+  }
+
+  async completeOnboarding(spId: string, data: any) {
+    return this.axiosInstance.post(`/service-providers/${spId}/onboarding/complete`, data);
+  }
+
+  async updateSPActivationStatus(spId: string, activate: boolean) {
+    return this.axiosInstance.post(`/service-providers/${spId}/activation`, { activate });
+  }
+
+  async updateSPData(spId: string, data: any) {
+    return this.axiosInstance.post('/service-providers/update-data', { spId, ...data });
+  }
+
+  // ============================================================================
+  // SERVICE PROVIDER DASHBOARD
+  // ============================================================================
+
+  async getSPStats(spId: string): Promise<any> {
+    try {
+      return await this.axiosInstance.get(`/service-providers/${spId}/stats`);
+    } catch (error) {
+      console.warn('Failed to fetch SP stats, returning defaults');
+      return { totalOrders: 0, totalRevenue: 0, averageRating: 0, totalCustomers: 0 };
+    }
+  }
+
+  async getSPOrders(spId: string): Promise<any> {
+    try {
+      return await this.axiosInstance.get(`/service-providers/${spId}/orders`);
+    } catch (error) {
+      console.warn('Failed to fetch SP orders, returning empty');
+      return { orders: [] };
+    }
+  }
+
+  async getSPEarnings(spId: string, startDate?: string, endDate?: string): Promise<any> {
+    try {
+      return await this.axiosInstance.get(`/service-providers/${spId}/earnings`, {
+        params: { startDate, endDate },
+      });
+    } catch (error) {
+      console.warn('Failed to fetch SP earnings, returning empty');
+      return { earnings: [] };
+    }
+  }
+
+  async getSPCustomers(spId: string): Promise<any> {
+    try {
+      return await this.axiosInstance.get(`/service-providers/${spId}/customers`);
+    } catch (error) {
+      console.warn('Failed to fetch SP customers, returning empty');
+      return { customers: [] };
+    }
+  }
+
+  async searchCustomer(phone: string): Promise<any> {
+    return this.axiosInstance.get('/customers/search', { params: { phone } });
+  }
+
+  async getSPOrdersList(spId: string, limit?: number, startAfter?: string): Promise<any> {
+    return this.axiosInstance.get(`/service-providers/${spId}/orders`, {
+      params: { limit, startAfter },
+    });
+  }
+
+  async getCustomerOrdersList(customerId: string, limit?: number, startAfter?: string): Promise<any> {
+    return this.axiosInstance.get(`/customers/${customerId}/orders`, {
+      params: { limit, startAfter },
+    });
   }
 
   // ============================================================================
