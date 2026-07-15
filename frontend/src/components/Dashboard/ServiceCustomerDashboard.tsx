@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Clock, CheckCircle2, XCircle, BarChart3, ShoppingBag, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, Clock, CheckCircle2, XCircle, BarChart3, ShoppingBag, Plus, Search, X } from 'lucide-react';
 import { useToast } from '@/store/notificationStore';
 import { apiClient } from '@/services/apiClient';
 import { useAuthStore } from '@/store/authStore';
@@ -33,6 +33,8 @@ interface SPInfo {
   city?: string;
   averageRating?: number;
   totalOrders?: number;
+  email?: string;
+  phone?: string;
 }
 
 type ActiveTab = 'overview' | 'orders';
@@ -44,12 +46,15 @@ export function ServiceCustomerDashboard() {
   const toast = useToast();
 
   const [service, setService] = useState<Service | null>(null);
-  const [spInfo, setSPInfo] = useState<SPInfo | null>(null);
+  const [associatedSPs, setAssociatedSPs] = useState<SPInfo[]>([]);
+  const [selectedSP, setSelectedSP] = useState<SPInfo | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [showCreateOrder, setShowCreateOrder] = useState(false);
-  const [currentSpId, setCurrentSpId] = useState<string>('');
+  const [showSearchBox, setShowSearchBox] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredSPs, setFilteredSPs] = useState<SPInfo[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
 
@@ -66,8 +71,46 @@ export function ServiceCustomerDashboard() {
       const serviceResponse = await apiClient.getService(serviceId!);
       setService(serviceResponse.data?.service || serviceResponse.data);
 
-      // Load customer's orders (if authenticated)
-      if (firebaseUser?.uid) {
+      // Load customer's service providers for this service
+      if (firebaseUser?.uid && serviceId) {
+        try {
+          const spProvidersResponse = await apiClient.getCustomerServiceProviders(serviceId);
+          const spIds = spProvidersResponse.data?.providers || [];
+
+          // Fetch full details for each SP
+          const spDetails: SPInfo[] = [];
+          for (const provider of spIds) {
+            try {
+              const spDocRef = doc(db, 'users', provider.spId);
+              const spDoc = await getDoc(spDocRef);
+              if (spDoc.exists()) {
+                const spData = spDoc.data();
+                spDetails.push({
+                  spId: spDoc.id,
+                  businessName: spData.businessName || spData.name || 'Service Provider',
+                  logo: spData.businessLogo || spData.logo || undefined,
+                  area: spData.area || '',
+                  city: spData.city || '',
+                  email: spData.email || '',
+                  phone: spData.phone || '',
+                  averageRating: spData.averageRating || 0,
+                  totalOrders: spData.totalOrders || 0,
+                });
+              }
+            } catch (error) {
+              // Continue loading other SPs
+            }
+          }
+          setAssociatedSPs(spDetails);
+          setFilteredSPs(spDetails);
+          if (spDetails.length > 0) {
+            setSelectedSP(spDetails[0]);
+          }
+        } catch (error) {
+          // Providers not loaded
+        }
+
+        // Load customer's orders
         const ordersResponse = await apiClient.getCustomerOrdersList(firebaseUser.uid);
         const loadedOrders = (ordersResponse?.data?.orders || []).map((order: any) => ({
           orderId: order.orderId || '',
@@ -80,32 +123,6 @@ export function ServiceCustomerDashboard() {
         }));
 
         setOrders(loadedOrders);
-
-        // Load SP info from first order if available
-        if (loadedOrders.length > 0) {
-          const firstOrder = loadedOrders[0];
-          if (firstOrder.spId) {
-            setCurrentSpId(firstOrder.spId);
-            try {
-              // Get SP info from Firestore
-              const spDocRef = doc(db, 'users', firstOrder.spId);
-              const spDoc = await getDoc(spDocRef);
-              if (spDoc.exists()) {
-                const spData = spDoc.data();
-                setSPInfo({
-                  spId: spDoc.id,
-                  businessName: spData.businessName || spData.name || 'Service Provider',
-                  area: spData.area || '',
-                  city: spData.city || '',
-                  averageRating: spData.averageRating || 0,
-                  totalOrders: spData.totalOrders || 0,
-                });
-              }
-            } catch (spError) {
-              // SP info load failed - will show basic service info only
-            }
-          }
-        }
       }
     } catch (error: any) {
       toast.error('Failed to load service details');
@@ -151,6 +168,26 @@ export function ServiceCustomerDashboard() {
     return normalized === 'COMPLETED' || normalized === 'DELIVERED' || normalized === 'PAID';
   };
 
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    if (!query.trim()) {
+      setFilteredSPs(associatedSPs);
+    } else {
+      const lowercaseQuery = query.toLowerCase();
+      const filtered = associatedSPs.filter((sp) =>
+        sp.businessName.toLowerCase().includes(lowercaseQuery) ||
+        sp.area?.toLowerCase().includes(lowercaseQuery) ||
+        sp.city?.toLowerCase().includes(lowercaseQuery)
+      );
+      setFilteredSPs(filtered);
+    }
+  };
+
+  const handleStartOrder = (sp: SPInfo) => {
+    setSelectedSP(sp);
+    setShowCreateOrder(true);
+  };
+
   const tabs: DashboardTab<ActiveTab>[] = [
     { id: 'overview', icon: BarChart3, label: 'Overview' },
     { id: 'orders', icon: ShoppingBag, label: 'My Orders' },
@@ -158,45 +195,130 @@ export function ServiceCustomerDashboard() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: COLORS.bg.primary }}>
-      {/* Hero Image */}
-      <div className="h-48 md:h-64 w-full overflow-hidden">
-        {service.heroImage ? (
-          <img
-            src={service.heroImage}
-            alt={service.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div
-            className="w-full h-full flex items-center justify-center text-4xl font-bold text-white"
-            style={{ backgroundColor: service.colorTheme?.primary || COLORS.semantic.info }}
+      <main className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6">
+        {/* Back Button & Title */}
+        <div className="mb-6">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2 mb-4 font-medium transition"
+            style={{ color: COLORS.semantic.info }}
           >
-            {service.name.charAt(0)}
-          </div>
-        )}
-      </div>
-
-      <main className="max-w-4xl mx-auto px-4 md:px-6 lg:px-8">
-        {/* Back Button */}
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="flex items-center gap-2 mt-4 mb-6 font-medium transition"
-          style={{ color: COLORS.semantic.info }}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Services
-        </button>
-
-        {/* Service & SP Info */}
-        <div className="mb-8">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Services
+          </button>
           <h1
-            className="text-3xl md:text-4xl font-bold mb-4"
+            className="text-3xl md:text-4xl font-bold"
             style={{ color: COLORS.text.primary }}
           >
             {service.name}
           </h1>
+        </div>
 
-          {spInfo && (
+        {/* Service Providers Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2
+              className="text-xl font-semibold"
+              style={{ color: COLORS.text.primary }}
+            >
+              Service Providers
+            </h2>
+            <button
+              onClick={() => setShowSearchBox(!showSearchBox)}
+              className="p-2 rounded-lg transition"
+              style={{
+                backgroundColor: showSearchBox ? COLORS.semantic.info : COLORS.bg.surface,
+                color: showSearchBox ? 'white' : COLORS.semantic.info,
+              }}
+            >
+              <Search className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Search Box */}
+          {showSearchBox && (
+            <div className="mb-4 flex gap-2">
+              <input
+                type="text"
+                placeholder="Search by name, area, or city..."
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="flex-1 px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  borderColor: COLORS.border.light,
+                  color: COLORS.text.primary,
+                  '--tw-ring-color': COLORS.semantic.info,
+                } as any}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => handleSearch('')}
+                  className="p-2 rounded-lg"
+                  style={{ backgroundColor: COLORS.bg.surface }}
+                >
+                  <X className="w-5 h-5" style={{ color: COLORS.text.secondary }} />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* SP Grid */}
+          {filteredSPs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              {filteredSPs.map((sp) => (
+                <button
+                  key={sp.spId}
+                  onClick={() => setSelectedSP(sp)}
+                  className="p-4 rounded-lg border text-left transition"
+                  style={{
+                    backgroundColor: selectedSP?.spId === sp.spId ? COLORS.semantic.info : COLORS.bg.surface,
+                    borderColor: selectedSP?.spId === sp.spId ? COLORS.semantic.info : COLORS.border.light,
+                  }}
+                >
+                  {sp.logo ? (
+                    <img
+                      src={sp.logo}
+                      alt={sp.businessName}
+                      className="w-12 h-12 rounded-lg object-cover mb-2"
+                    />
+                  ) : (
+                    <div
+                      className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-white mb-2"
+                      style={{ backgroundColor: COLORS.semantic.info }}
+                    >
+                      {sp.businessName.charAt(0)}
+                    </div>
+                  )}
+                  <h3
+                    className="font-semibold"
+                    style={{
+                      color: selectedSP?.spId === sp.spId ? 'white' : COLORS.text.primary,
+                    }}
+                  >
+                    {sp.businessName}
+                  </h3>
+                  {(sp.area || sp.city) && (
+                    <p
+                      className="text-sm mt-1"
+                      style={{
+                        color: selectedSP?.spId === sp.spId ? 'rgba(255,255,255,0.8)' : COLORS.text.secondary,
+                      }}
+                    >
+                      {sp.area && sp.city ? `${sp.area}, ${sp.city}` : sp.city || sp.area}
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : showSearchBox ? (
+            <EmptyState message="No service providers found matching your search" />
+          ) : (
+            <EmptyState message="No service providers available for this service" />
+          )}
+
+          {/* Selected SP Details */}
+          {selectedSP && (
             <div
               className="p-6 rounded-lg border"
               style={{
@@ -204,57 +326,54 @@ export function ServiceCustomerDashboard() {
                 borderColor: COLORS.border.light,
               }}
             >
-              <h2
-                className="text-sm font-semibold mb-3"
-                style={{ color: COLORS.text.secondary }}
-              >
-                Your Service Provider
-              </h2>
-              <div className="flex items-start gap-4">
-                {spInfo.logo ? (
+              <div className="flex items-start gap-4 mb-4">
+                {selectedSP.logo ? (
                   <img
-                    src={spInfo.logo}
-                    alt={spInfo.businessName}
-                    className="w-16 h-16 rounded-lg object-cover"
+                    src={selectedSP.logo}
+                    alt={selectedSP.businessName}
+                    className="w-20 h-20 rounded-lg object-cover"
                   />
                 ) : (
                   <div
-                    className="w-16 h-16 rounded-lg flex items-center justify-center font-bold text-white"
+                    className="w-20 h-20 rounded-lg flex items-center justify-center font-bold text-white text-2xl"
                     style={{ backgroundColor: COLORS.semantic.info }}
                   >
-                    {spInfo.businessName.charAt(0)}
+                    {selectedSP.businessName.charAt(0)}
                   </div>
                 )}
-                <div>
+                <div className="flex-1">
                   <h3
                     className="font-semibold text-lg"
                     style={{ color: COLORS.text.primary }}
                   >
-                    {spInfo.businessName}
+                    {selectedSP.businessName}
                   </h3>
-                  {(spInfo.area || spInfo.city) && (
+                  {(selectedSP.area || selectedSP.city) && (
                     <p style={{ color: COLORS.text.secondary }}>
-                      {spInfo.area && spInfo.city
-                        ? `${spInfo.area}, ${spInfo.city}`
-                        : spInfo.city || spInfo.area}
+                      {selectedSP.area && selectedSP.city
+                        ? `${selectedSP.area}, ${selectedSP.city}`
+                        : selectedSP.city || selectedSP.area}
                     </p>
                   )}
-                  {spInfo.averageRating !== undefined && (
-                    <p className="text-sm mt-2">
-                      <span style={{ color: COLORS.semantic.warning }}>★</span>
-                      <span
-                        className="ml-1 font-semibold"
-                        style={{ color: COLORS.text.primary }}
-                      >
-                        {spInfo.averageRating.toFixed(1)}
-                      </span>
-                      <span style={{ color: COLORS.text.secondary }}>
-                        {' '}
-                        ({spInfo.totalOrders} orders)
-                      </span>
+                  {selectedSP.email && (
+                    <p className="text-sm mt-2" style={{ color: COLORS.text.secondary }}>
+                      {selectedSP.email}
+                    </p>
+                  )}
+                  {selectedSP.phone && (
+                    <p className="text-sm" style={{ color: COLORS.text.secondary }}>
+                      {selectedSP.phone}
                     </p>
                   )}
                 </div>
+                <button
+                  onClick={() => handleStartOrder(selectedSP)}
+                  className="px-6 py-2 rounded-lg font-semibold text-white transition flex items-center gap-2 whitespace-nowrap"
+                  style={{ backgroundColor: COLORS.semantic.success }}
+                >
+                  <Plus className="w-4 h-4" />
+                  Order
+                </button>
               </div>
             </div>
           )}
@@ -310,14 +429,96 @@ export function ServiceCustomerDashboard() {
           {/* Orders Tab */}
           {activeTab === 'orders' && (
             <div className="p-4 md:p-6 space-y-4">
-              <button
-                onClick={() => setShowCreateOrder(true)}
-                className="px-4 py-2 rounded-lg font-semibold text-white transition flex items-center gap-2 w-full md:w-auto justify-center md:justify-start"
-                style={{ backgroundColor: COLORS.semantic.info }}
+              {/* Create Order Section with SP Selection */}
+              <div
+                className="p-6 rounded-lg border"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  borderColor: COLORS.border.light,
+                }}
               >
-                <Plus className="w-4 h-4" />
-                Create Order
-              </button>
+                <h3
+                  className="font-semibold mb-4"
+                  style={{ color: COLORS.text.primary }}
+                >
+                  Create New Order
+                </h3>
+
+                <div className="mb-4">
+                  <p
+                    className="text-sm font-medium mb-3"
+                    style={{ color: COLORS.text.secondary }}
+                  >
+                    Select a Service Provider
+                  </p>
+                  <div className="relative mb-4">
+                    <input
+                      type="text"
+                      placeholder="Search by name, area, or city..."
+                      className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
+                      style={{
+                        backgroundColor: COLORS.bg.primary,
+                        borderColor: COLORS.border.light,
+                        color: COLORS.text.primary,
+                        '--tw-ring-color': COLORS.semantic.info,
+                      } as any}
+                      onChange={(e) => handleSearch(e.target.value)}
+                    />
+                  </div>
+
+                  {filteredSPs.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
+                      {filteredSPs.map((sp) => (
+                        <button
+                          key={sp.spId}
+                          onClick={() => {
+                            setSelectedSP(sp);
+                            setShowCreateOrder(true);
+                          }}
+                          className="p-3 rounded-lg border text-center transition"
+                          style={{
+                            backgroundColor: COLORS.bg.primary,
+                            borderColor: COLORS.border.light,
+                          }}
+                        >
+                          {sp.logo ? (
+                            <img
+                              src={sp.logo}
+                              alt={sp.businessName}
+                              className="w-12 h-12 rounded-lg object-cover mx-auto mb-2"
+                            />
+                          ) : (
+                            <div
+                              className="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-white mx-auto mb-2"
+                              style={{ backgroundColor: COLORS.semantic.info }}
+                            >
+                              {sp.businessName.charAt(0)}
+                            </div>
+                          )}
+                          <p
+                            className="text-xs font-semibold line-clamp-2"
+                            style={{ color: COLORS.text.primary }}
+                          >
+                            {sp.businessName}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ color: COLORS.text.secondary }}>No service providers found</p>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setShowCreateOrder(true)}
+                  disabled={!selectedSP}
+                  className="px-4 py-2 rounded-lg font-semibold text-white transition flex items-center gap-2 disabled:opacity-50"
+                  style={{ backgroundColor: COLORS.semantic.info }}
+                >
+                  <Plus className="w-4 h-4" />
+                  Create Order
+                </button>
+              </div>
               {orders.length > 0 ? (
                 <div className="space-y-4">
                   {orders.map((order) => (
@@ -405,9 +606,9 @@ export function ServiceCustomerDashboard() {
       </main>
 
       {/* Create Order Modal */}
-      {showCreateOrder && (
+      {showCreateOrder && selectedSP && (
         <CreateOrderModal
-          spId={currentSpId || ''}
+          spId={selectedSP.spId}
           serviceId={serviceId}
           isCustomerCreating={true}
           onClose={() => setShowCreateOrder(false)}
@@ -430,7 +631,7 @@ export function ServiceCustomerDashboard() {
       {invoiceOrder && (
         <InvoiceModal
           order={invoiceOrder}
-          businessNameHint={spInfo?.businessName || service.name}
+          businessNameHint={selectedSP?.businessName || service.name}
           onClose={() => setInvoiceOrder(null)}
         />
       )}
