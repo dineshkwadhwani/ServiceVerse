@@ -8,12 +8,21 @@ import { EmptyState } from '@/components/Shared/EmptyState';
 import { COLORS } from '@/utils/theme';
 import type { Service } from '@/types';
 
+interface ProviderInfo {
+  spId: string;
+  businessName: string;
+  ownerName: string;
+  phone: string;
+  email: string;
+  logo: string;
+}
+
 interface CustomerService {
   serviceId: string;
   serviceName: string;
-  spId?: string;
-  spName?: string;
-  spLogo?: string;
+  logo?: string;
+  provider?: ProviderInfo | null;
+  associatedAt?: Date;
 }
 
 export function CustomerDashboard() {
@@ -38,19 +47,15 @@ export function CustomerDashboard() {
       );
       setAllServices(activeServices);
 
-      // Load customer's services (mock for now)
-      const mockMyServices: CustomerService[] = [
-        {
-          serviceId: activeServices[0]?.serviceId || '1',
-          serviceName: activeServices[0]?.name || 'Laundry',
-          spId: 'sp1',
-          spName: 'Clean Pro',
-          spLogo: activeServices[0]?.logo,
-        },
-      ];
-      setMyServices(mockMyServices);
+      // Load customer's services with their assigned providers
+      const customerServicesResponse = await apiClient.getCustomerServices();
+      const customerServices = (customerServicesResponse.data?.services || []) as CustomerService[];
+      setMyServices(customerServices);
     } catch (error: any) {
       toast.error('Failed to load services');
+      console.error('Error loading services:', error);
+      // Set empty services on error
+      setMyServices([]);
     } finally {
       setIsLoading(false);
     }
@@ -119,9 +124,13 @@ export function CustomerDashboard() {
                       </p>
                       <p
                         className="font-semibold mt-1"
-                        style={{ color: COLORS.text.primary }}
+                        style={{
+                          color: ms.provider?.businessName
+                            ? COLORS.text.primary
+                            : COLORS.text.secondary,
+                        }}
                       >
-                        {ms.spName}
+                        {ms.provider?.businessName || 'No provider assigned'}
                       </p>
                     </div>
                   </div>

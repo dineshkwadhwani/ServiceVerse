@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 const logger = new Logger('CustomerHandlers');
 
 /**
- * Get all services a customer is associated with
+ * Get all services a customer is associated with (including assigned provider info)
  */
 export async function getCustomerServices(req: AuthRequest, res: Response) {
   try {
@@ -23,26 +23,50 @@ export async function getCustomerServices(req: AuthRequest, res: Response) {
       .collection('users')
       .doc(req.user.uid)
       .collection('serviceAssociations')
-      .where('role', '==', 'CUSTOMER')
       .where('isActive', '==', true)
       .get();
 
-    const serviceIds = associationsSnapshot.docs.map((doc) => doc.data().serviceId);
-
-    if (serviceIds.length === 0) {
-      return sendSuccess(res, { services: [] });
-    }
-
-    // Fetch service details for each service
+    // Fetch service details and provider info for each association
     const services = [];
-    for (const serviceId of serviceIds) {
+    for (const assocDoc of associationsSnapshot.docs) {
+      const assocData = assocDoc.data();
+      const serviceId = assocData.serviceId;
+      const spId = assocData.spId;
+
+      // Get service details
       const serviceDoc = await db.collection('services').doc(serviceId).get();
-      if (serviceDoc.exists) {
-        services.push({
-          serviceId: serviceDoc.id,
-          ...serviceDoc.data(),
-        });
+      if (!serviceDoc.exists) continue;
+
+      const serviceData = serviceDoc.data() || {};
+
+      // Get provider details if assigned
+      let providerInfo = null;
+      if (spId) {
+        try {
+          const spDoc = await db.collection('users').doc(spId).get();
+          if (spDoc.exists) {
+            const spData = spDoc.data() || {};
+            providerInfo = {
+              spId,
+              businessName: spData.businessName || spData.name || 'Service Provider',
+              ownerName: spData.ownerName || '',
+              phone: spData.phone || '',
+              email: spData.email || '',
+              logo: spData.businessLogo || '',
+            };
+          }
+        } catch (error) {
+          logger.warn('Failed to fetch provider details', { spId, serviceId });
+        }
       }
+
+      services.push({
+        serviceId,
+        serviceName: serviceData.name || 'Unknown Service',
+        logo: serviceData.logo || '',
+        provider: providerInfo,
+        associatedAt: assocData.associatedAt?.toDate?.() || new Date(),
+      });
     }
 
     return sendSuccess(res, { services });
