@@ -283,6 +283,17 @@ class ApiClient {
     return this.axiosInstance.get('/service-providers');
   }
 
+  async getSPProfile(spId: string) {
+    return this.axiosInstance.get(`/service-providers/${spId}/profile`);
+  }
+
+  async updateSPProfile(basicInfo: any, operations: any) {
+    return this.axiosInstance.patch(`/service-providers/profile`, {
+      basicInfo,
+      operations,
+    });
+  }
+
   async assignAccountManager(spId: string, accountManagerId: string) {
     return this.axiosInstance.post(
       `/service-providers/${spId}/assign-account-manager`,

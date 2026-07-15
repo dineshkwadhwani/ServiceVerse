@@ -14,6 +14,8 @@ import * as phoneSignInHandlers from '@/handlers/auth/phoneSignIn';
 import * as customerHandlers from '@/handlers/customers/dashboard';
 import * as spDashboardHandlers from '@/handlers/serviceProviders/dashboard';
 import * as createCustomerHandlers from '@/handlers/serviceProviders/createCustomer';
+import * as spProfileHandlers from '@/handlers/serviceProviders/getSPProfile';
+import * as spProfileUpdateHandlers from '@/handlers/serviceProviders/profileUpdate';
 import * as amDashboardHandlers from '@/handlers/accountManagers/dashboard';
 import * as superAdminHandlers from '@/handlers/superAdmin/dashboard';
 import * as diagnosticsHandlers from '@/handlers/debug/diagnostics';
@@ -220,6 +222,11 @@ app.get('/service-providers/customers', requireRole('SERVICE_PROVIDER'), async (
   spDashboardHandlers.getSPCustomers(req as any, res);
 });
 
+// SP Profile Update (SP can update their own profile)
+app.patch('/service-providers/profile', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  spProfileUpdateHandlers.updateSPProfile(req as any, res);
+});
+
 app.get('/service-providers/:spId/stats', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), async (req, res) => {
   spDashboardHandlers.getSPStats(req as any, res);
 });
@@ -375,6 +382,11 @@ app.post('/service-providers/:spId/onboard', requireRole('ACCOUNT_MANAGER'), (re
 // Get ServiceProviders (for AccountManager)
 app.get('/service-providers', requireRole('ACCOUNT_MANAGER'), (req, res) => {
   phase2Handlers.getServiceProviders(req as any, res);
+});
+
+// Get complete SP profile (for AM onboarding stepper)
+app.get('/service-providers/:spId/profile', requireRole('ACCOUNT_MANAGER'), (req, res) => {
+  spProfileHandlers.getSPProfile(req as any, res);
 });
 
 // SP Onboarding Workflow

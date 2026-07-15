@@ -81,6 +81,7 @@ export function AMDashboard() {
   const [stats, setStats] = useState<any>(null);
   const [sps, setSPs] = useState<SP[]>([]);
   const [onboardingSP, setOnboardingSP] = useState<SP | null>(null);
+  const [isLoadingSPProfile, setIsLoadingSPProfile] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -98,9 +99,22 @@ export function AMDashboard() {
     }
   };
 
-  const handleEditSP = (sp: SP) => {
-    // Open the onboarding stepper to allow editing and activation
-    setOnboardingSP(sp);
+  const handleEditSP = async (sp: SP) => {
+    // Fetch the complete SP profile with all onboarding data
+    setIsLoadingSPProfile(true);
+    try {
+      const profileResponse = await apiClient.getSPProfile(sp.uid);
+      const completeProfile = {
+        ...sp,
+        ...profileResponse.data,
+      };
+      setOnboardingSP(completeProfile);
+    } catch (error: any) {
+      toast.error('Failed to load SP profile');
+      console.error('Error loading SP profile:', error);
+    } finally {
+      setIsLoadingSPProfile(false);
+    }
   };
 
   const handleActivateSP = async (spId: string, activate: boolean) => {
@@ -265,20 +279,22 @@ export function AMDashboard() {
 
                       {sp.status === 'ASSIGNED' ? (
                         <button
-                          onClick={() => setOnboardingSP(sp)}
-                          className="w-full px-4 py-2 rounded-lg font-medium text-white transition hover:opacity-90"
+                          onClick={() => handleEditSP(sp)}
+                          disabled={isLoadingSPProfile}
+                          className="w-full px-4 py-2 rounded-lg font-medium text-white transition hover:opacity-90 disabled:opacity-50"
                           style={{ backgroundColor: COLORS.semantic.info }}
                         >
-                          Start Onboarding
+                          {isLoadingSPProfile ? 'Loading...' : 'Start Onboarding'}
                         </button>
                       ) : sp.status === 'ONBOARDED' ? (
                         <div className="space-y-2">
                           <button
-                            onClick={() => setOnboardingSP(sp)}
-                            className="w-full px-4 py-2 rounded-lg font-medium text-white transition hover:opacity-90"
+                            onClick={() => handleEditSP(sp)}
+                            disabled={isLoadingSPProfile}
+                            className="w-full px-4 py-2 rounded-lg font-medium text-white transition hover:opacity-90 disabled:opacity-50"
                             style={{ backgroundColor: COLORS.semantic.info }}
                           >
-                            Edit & Activate
+                            {isLoadingSPProfile ? 'Loading...' : 'Edit & Activate'}
                           </button>
                           <button
                             onClick={() => handleActivateSP(sp.uid, true)}
