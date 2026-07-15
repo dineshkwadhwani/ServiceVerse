@@ -387,74 +387,77 @@ export function OrderDetailsStep({
             Select Items
           </h3>
 
-          {/* Scrollable list */}
-          <div className="max-h-96 overflow-y-auto space-y-2 p-2 rounded-lg border" style={{ borderColor: COLORS.border.light, backgroundColor: COLORS.bg.surface }}>
-            {orderItems.map(item => (
-              <div
-                key={item.menuItemId}
-                className="p-3 rounded-lg border flex items-center justify-between"
-                style={{
-                  borderColor: COLORS.border.light,
-                  backgroundColor: item.qty > 0 ? `${COLORS.semantic.success}10` : COLORS.bg.primary,
-                }}
-              >
-                <div className="flex-1">
-                  <p className="font-semibold text-sm" style={{ color: COLORS.text.primary }}>
-                    {item.name}
-                  </p>
-                  <p className="text-xs" style={{ color: COLORS.text.secondary }}>
-                    ₹{item.customPrice}
-                  </p>
-                </div>
+          {/* Scrollable list with sticky footer */}
+          <div className="flex flex-col rounded-lg border overflow-hidden" style={{ borderColor: COLORS.border.light, backgroundColor: COLORS.bg.surface }}>
+            {/* Scrollable items container */}
+            <div className="max-h-96 overflow-y-auto space-y-2 p-2">
+              {orderItems.map(item => (
+                <div
+                  key={item.menuItemId}
+                  className="p-3 rounded-lg border flex items-center justify-between"
+                  style={{
+                    borderColor: COLORS.border.light,
+                    backgroundColor: item.qty > 0 ? `${COLORS.semantic.success}10` : COLORS.bg.primary,
+                  }}
+                >
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm" style={{ color: COLORS.text.primary }}>
+                      {item.name}
+                    </p>
+                    <p className="text-xs" style={{ color: COLORS.text.secondary }}>
+                      ₹{item.customPrice}
+                    </p>
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleQtyChange(item.menuItemId, -1)}
-                    disabled={item.qty === 0}
-                    className="p-1 rounded transition disabled:opacity-50"
-                    style={{ backgroundColor: COLORS.bg.surface }}
-                  >
-                    <Minus className="w-4 h-4" style={{ color: COLORS.text.primary }} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleQtyChange(item.menuItemId, -1)}
+                      disabled={item.qty === 0}
+                      className="p-1 rounded transition disabled:opacity-50"
+                      style={{ backgroundColor: COLORS.bg.surface }}
+                    >
+                      <Minus className="w-4 h-4" style={{ color: COLORS.text.primary }} />
+                    </button>
 
-                  <span className="w-8 text-center font-semibold text-sm" style={{ color: COLORS.text.primary }}>
-                    {item.qty}
+                    <span className="w-8 text-center font-semibold text-sm" style={{ color: COLORS.text.primary }}>
+                      {item.qty}
+                    </span>
+
+                    <button
+                      onClick={() => handleQtyChange(item.menuItemId, 1)}
+                      className="p-1 rounded transition"
+                      style={{ backgroundColor: COLORS.semantic.success + '20' }}
+                    >
+                      <Plus className="w-4 h-4" style={{ color: COLORS.semantic.success }} />
+                    </button>
+                  </div>
+
+                  <span className="ml-4 font-semibold text-sm w-16 text-right" style={{ color: COLORS.text.primary }}>
+                    ₹{item.itemTotal.toFixed(2)}
                   </span>
-
-                  <button
-                    onClick={() => handleQtyChange(item.menuItemId, 1)}
-                    className="p-1 rounded transition"
-                    style={{ backgroundColor: COLORS.semantic.success + '20' }}
-                  >
-                    <Plus className="w-4 h-4" style={{ color: COLORS.semantic.success }} />
-                  </button>
                 </div>
+              ))}
+            </div>
 
-                <span className="ml-4 font-semibold text-sm w-16 text-right" style={{ color: COLORS.text.primary }}>
-                  ₹{item.itemTotal.toFixed(2)}
+            {/* Sticky Summary at bottom of container */}
+            <div
+              className="p-4 border-t"
+              style={{
+                borderColor: COLORS.border.light,
+                backgroundColor: COLORS.bg.surface,
+              }}
+            >
+              <div className="flex justify-between mb-2">
+                <span style={{ color: COLORS.text.secondary }}>Subtotal</span>
+                <span className="font-semibold" style={{ color: COLORS.text.primary }}>
+                  ₹{subtotal.toFixed(2)}
                 </span>
               </div>
-            ))}
-          </div>
-
-          {/* Sticky Summary */}
-          <div
-            className="p-4 rounded-lg border sticky bottom-0"
-            style={{
-              borderColor: COLORS.border.light,
-              backgroundColor: COLORS.bg.surface,
-            }}
-          >
-            <div className="flex justify-between mb-2">
-              <span style={{ color: COLORS.text.secondary }}>Subtotal</span>
-              <span className="font-semibold" style={{ color: COLORS.text.primary }}>
-                ₹{subtotal.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span style={{ color: COLORS.text.secondary }}>
-                {orderItems.filter(i => i.qty > 0).length} items selected
-              </span>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: COLORS.text.secondary }}>
+                  {orderItems.filter(i => i.qty > 0).length} items selected
+                </span>
+              </div>
             </div>
           </div>
         </div>
