@@ -455,10 +455,10 @@ backend/functions/src/
 
 Available documentation:
 - `README.md` - Project overview and quick start
-- `SERVICEVERSE_ARCHITECTURE.md` - Detailed architecture document (100+ pages)
+- `docs/SERVICEVERSE_CONTEXT.md` - Project context and architecture
 - `backend/functions/README.md` - Backend setup and API endpoints
 - `frontend/README.md` - Frontend setup and component structure
-- `INITIALIZATION_COMPLETE.md` - Initial project setup record
+- `docs/` - All historical documentation and phase milestones
 
 ---
 

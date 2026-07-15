@@ -1,6 +1,7 @@
 import { db, messaging } from '@/utils/firebase';
 import { Logger } from '@/utils/logger';
 import * as functions from 'firebase-functions';
+import { notificationMessages } from '@/config/notificationMessages';
 
 const Resend = require('resend').Resend;
 
@@ -161,58 +162,64 @@ async function notifyUsers(params: {
   }
 }
 
-function htmlMessage(title: string, lines: string[]) {
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
-      <h2 style="margin: 0 0 12px;">${title}</h2>
-      ${lines.map((line) => `<p style="margin: 0 0 8px;">${line}</p>`).join('')}
-    </div>
-  `;
+// Interpolate template variables (e.g., ${orderId} with data.orderId)
+function interpolateTemplate(template: string, data: Record<string, any>): string {
+  return template.replace(/\$\{(\w+)\}/g, (match, key) => {
+    return data[key] !== undefined ? String(data[key]) : match;
+  });
 }
 
 export async function sendNotificationByEvent(event: NotificationEvent, payload: BasePayload) {
   try {
+    const template = notificationMessages[event];
+    if (!template) {
+      logger.warn('No notification template found', { event });
+      return;
+    }
+
     switch (event) {
       case 'ACCOUNT_CREATED': {
         await notifyUsers({
           userIds: payload.userId ? [payload.userId] : [],
           emails: payload.email ? [payload.email] : [],
-          emailSubject: 'Your ServiceVerse account is created',
-          emailHtml: htmlMessage('Welcome to ServiceVerse', [
-            `Hi ${payload.name || 'there'}, your ${payload.role || 'user'} account has been created successfully.`,
-          ]),
+          emailSubject: template.email.subject,
+          emailHtml: template.email.template(payload),
         });
         break;
       }
 
       case 'SP_REGISTERED': {
         const superAdmins = await getUsersByRole('SUPERADMIN');
+        const pushBody = interpolateTemplate(template.push.body, {
+          businessName: payload.businessName || payload.name,
+          name: payload.name,
+        });
         await notifyUsers({
           userIds: superAdmins.map((u) => u.uid),
-          pushTitle: 'New SP Registration',
-          pushBody: `${payload.businessName || payload.name || 'Service Provider'} has registered.`,
-          emailSubject: 'New Service Provider registered',
-          emailHtml: htmlMessage('New SP Registration', [
-            `${payload.businessName || payload.name || 'A service provider'} has registered and is awaiting assignment.`,
-          ]),
+          pushTitle: template.push.title,
+          pushBody,
+          emailSubject: template.email.subject,
+          emailHtml: template.email.template(payload),
         });
         break;
       }
 
       case 'SP_ASSIGNED_TO_AM': {
+        const pushBody = interpolateTemplate(template.push.body, {
+          spName: payload.spName || payload.spId,
+          amName: payload.amName || payload.amId,
+        });
         await notifyUsers({
           userIds: [payload.spId, payload.amId],
-          pushTitle: 'Service Provider Assignment',
-          pushBody: `SP assignment completed: ${payload.spName || payload.spId}`,
+          pushTitle: template.push.title,
+          pushBody,
           pushData: {
             type: 'SP_ASSIGNED_TO_AM',
             spId: String(payload.spId || ''),
             amId: String(payload.amId || ''),
           },
-          emailSubject: 'Service Provider assignment update',
-          emailHtml: htmlMessage('SP Assigned to Account Manager', [
-            `Service Provider ${payload.spName || payload.spId} has been assigned to ${payload.amName || payload.amId}.`,
-          ]),
+          emailSubject: template.email.subject,
+          emailHtml: template.email.template(payload),
         });
         break;
       }
@@ -220,16 +227,14 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
       case 'SP_ONBOARDING_COMPLETE': {
         await notifyUsers({
           userIds: [payload.spId],
-          pushTitle: 'Onboarding Completed',
-          pushBody: 'Your onboarding is complete.',
+          pushTitle: template.push.title,
+          pushBody: template.push.body,
           pushData: {
             type: 'SP_ONBOARDING_COMPLETE',
             spId: String(payload.spId || ''),
           },
-          emailSubject: 'Your onboarding is complete',
-          emailHtml: htmlMessage('Onboarding Complete', [
-            'Your onboarding has been completed successfully.',
-          ]),
+          emailSubject: template.email.subject,
+          emailHtml: template.email.template(payload),
         });
         break;
       }
@@ -237,35 +242,34 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
       case 'SP_ACTIVATION_COMPLETE': {
         const superAdmins = await getUsersByRole('SUPERADMIN');
 
+        // Notify SP
         await notifyUsers({
           userIds: [payload.spId],
-          pushTitle: 'Activation Complete',
-          pushBody: 'Your account is now active.',
+          pushTitle: template.push.title,
+          pushBody: template.push.body,
           pushData: {
             type: 'SP_ACTIVATION_COMPLETE',
             spId: String(payload.spId || ''),
           },
-          emailSubject: 'Your account is active now',
-          emailHtml: htmlMessage('Activation Complete', [
-            'Your Service Provider account is now active.',
-          ]),
+          emailSubject: template.email.subject,
+          emailHtml: template.email.template(payload),
         });
 
+        // Notify SuperAdmins
         await notifyUsers({
           userIds: superAdmins.map((u) => u.uid),
-          emailSubject: 'SP activation completed',
-          emailHtml: htmlMessage('SP Activation Completed', [
-            `${payload.spName || payload.spId} is now active.`,
-          ]),
+          emailSubject: template.email.subject,
+          emailHtml: template.email.template(payload),
         });
         break;
       }
 
       case 'ORDER_CREATED': {
+        const pushBody = interpolateTemplate(template.push.body, { orderId: payload.orderId });
         await notifyUsers({
           userIds: payload.notifyUserIds || [],
-          pushTitle: 'New Order Created',
-          pushBody: `Order ${payload.orderId} has been created.`,
+          pushTitle: template.push.title,
+          pushBody,
           pushData: {
             type: 'ORDER_CREATED',
             orderId: String(payload.orderId || ''),
@@ -275,52 +279,57 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
       }
 
       case 'ORDER_CONFIRMED': {
+        const pushBody = interpolateTemplate(template.push.body, { orderId: payload.orderId });
+        const subject = interpolateTemplate(template.email.subject, { orderId: payload.orderId });
         await notifyUsers({
           userIds: [payload.spId, payload.customerId],
-          emailSubject: `Order ${payload.orderId} confirmed`,
-          emailHtml: htmlMessage('Order Confirmed', [
-            `Order ${payload.orderId} has been confirmed.`,
-          ]),
+          pushTitle: template.push.title,
+          pushBody,
+          emailSubject: subject,
+          emailHtml: template.email.template(payload),
         });
         break;
       }
 
       case 'ORDER_COMPLETED': {
+        const pushBody = interpolateTemplate(template.push.body, { orderId: payload.orderId });
         await notifyUsers({
           userIds: [payload.customerId],
-          pushTitle: 'Order Completed',
-          pushBody: `Order ${payload.orderId} is completed.`,
+          pushTitle: template.push.title,
+          pushBody,
           pushData: {
             type: 'ORDER_COMPLETED',
             orderId: String(payload.orderId || ''),
           },
+          emailSubject: template.email.subject,
+          emailHtml: template.email.template(payload),
         });
         break;
       }
 
       case 'DEASSOCIATION_REQUESTED': {
+        const pushBody = interpolateTemplate(template.push.body, {
+          customerName: payload.customerName || 'Customer',
+        });
+        // Notify AM
         await notifyUsers({
           userIds: payload.amId ? [payload.amId] : [],
-          pushTitle: 'New Deassociation Request',
-          pushBody: `${payload.customerName || 'Customer'} requested deassociation.`,
+          pushTitle: template.push.title,
+          pushBody,
           pushData: {
             type: 'DEASSOCIATION_REQUESTED',
             requestId: String(payload.requestId || ''),
           },
-          emailSubject: 'New deassociation request',
-          emailHtml: htmlMessage('Deassociation Request', [
-            `${payload.customerName || 'A customer'} has requested deassociation.`,
-            `Reason: ${payload.reason || 'Not specified'}`,
-          ]),
+          emailSubject: template.email.subject,
+          emailHtml: template.email.template(payload),
         });
 
+        // Notify Customer (different message)
         await notifyUsers({
           userIds: payload.customerId ? [payload.customerId] : [],
           emails: payload.customerEmail ? [payload.customerEmail] : [],
-          emailSubject: 'Your deassociation request is submitted',
-          emailHtml: htmlMessage('Request Submitted', [
-            'Your deassociation request has been submitted to your Account Manager.',
-          ]),
+          emailSubject: 'Your deassociation request has been submitted',
+          emailHtml: notificationMessages['DEASSOCIATION_APPROVED'].email.template(payload),
         });
         break;
       }
@@ -329,16 +338,14 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
         await notifyUsers({
           userIds: payload.customerId ? [payload.customerId] : [],
           emails: payload.customerEmail ? [payload.customerEmail] : [],
-          pushTitle: 'Deassociation Approved',
-          pushBody: 'Your deassociation request has been approved.',
+          pushTitle: template.push.title,
+          pushBody: template.push.body,
           pushData: {
             type: 'DEASSOCIATION_APPROVED',
             requestId: String(payload.requestId || ''),
           },
-          emailSubject: 'Your deassociation request is approved',
-          emailHtml: htmlMessage('Request Approved', [
-            'Your deassociation request has been approved.',
-          ]),
+          emailSubject: template.email.subject,
+          emailHtml: template.email.template(payload),
         });
         break;
       }
