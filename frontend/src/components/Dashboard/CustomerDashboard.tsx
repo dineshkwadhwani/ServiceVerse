@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/store/notificationStore';
 import { apiClient } from '@/services/apiClient';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronRight } from 'lucide-react';
 import { ServiceCard } from '@/components/Landing/ServiceCard';
 import { EmptyState } from '@/components/Shared/EmptyState';
 import { COLORS } from '@/utils/theme';
@@ -94,46 +94,65 @@ export function CustomerDashboard() {
           </h2>
 
           {myServices.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="space-y-3">
               {myServices.map((ms) => {
                 const service = allServices.find((s) => s.serviceId === ms.serviceId);
                 if (!service) return null;
                 return (
-                  <div
+                  <button
                     key={ms.serviceId}
-                    className="cursor-pointer"
                     onClick={() => handleServiceClick(service)}
+                    className="w-full p-4 rounded-lg border flex items-center gap-4 transition hover:shadow-md active:shadow-sm"
+                    style={{
+                      backgroundColor: COLORS.bg.surface,
+                      borderColor: COLORS.border.light,
+                    }}
                   >
-                    <ServiceCard
-                      service={service}
-                      onClick={handleServiceClick}
-                      compact={false}
-                    />
-                    <div
-                      className="mt-3 p-4 rounded-lg border"
-                      style={{
-                        backgroundColor: COLORS.bg.surface,
-                        borderColor: COLORS.border.light,
-                      }}
-                    >
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: COLORS.text.secondary }}
+                    {/* Service Logo */}
+                    <div className="flex-shrink-0">
+                      {service.logo ? (
+                        <img
+                          src={service.logo}
+                          alt={service.name}
+                          className="w-16 h-16 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-16 h-16 rounded-lg flex items-center justify-center text-2xl font-bold text-white"
+                          style={{
+                            backgroundColor: service.colorTheme?.primary || COLORS.semantic.info,
+                          }}
+                        >
+                          {service.name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Service & Provider Info */}
+                    <div className="flex-1 min-w-0 text-left">
+                      <h3
+                        className="font-semibold text-base"
+                        style={{ color: COLORS.text.primary }}
                       >
-                        Your Provider
-                      </p>
+                        {service.name}
+                      </h3>
                       <p
-                        className="font-semibold mt-1"
+                        className="text-sm mt-1"
                         style={{
                           color: ms.provider?.businessName
-                            ? COLORS.text.primary
-                            : COLORS.text.secondary,
+                            ? COLORS.text.secondary
+                            : COLORS.semantic.warning,
                         }}
                       >
-                        {ms.provider?.businessName || 'No provider assigned'}
+                        {ms.provider?.businessName ? `Provider: ${ms.provider.businessName}` : 'No provider assigned'}
                       </p>
                     </div>
-                  </div>
+
+                    {/* Chevron */}
+                    <div style={{ color: COLORS.semantic.info }}>
+                      <ChevronRight className="w-5 h-5" />
+                    </div>
+                  </button>
                 );
               })}
             </div>
