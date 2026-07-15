@@ -25,6 +25,7 @@ import * as customerSearchHandlers from '@/handlers/customers/search';
 import * as ordersHandlers from '@/handlers/orders/createOrder';
 import * as ordersListHandlers from '@/handlers/orders/getSPOrders';
 import * as orderMenuHandlers from '@/handlers/orders/getSPMenu';
+import * as coworkerHandlers from '@/handlers/coworkers/manage';
 
 import { getSeedAdminConfig, seedSuperAdminUser } from '@/handlers/admin/seedAdmin';
 
@@ -109,6 +110,10 @@ app.get('/customers/search-providers', async (req, res) => {
   customerHandlers.searchServiceProviders(req as any, res);
 });
 
+app.get('/customers/service-providers', async (req, res) => {
+  customerHandlers.getCustomerServiceProviders(req as any, res);
+});
+
 app.post('/customers/add-provider', async (req, res) => {
   customerHandlers.addServiceProviderToCustomer(req as any, res);
 });
@@ -129,8 +134,28 @@ app.get('/customers/:customerId/orders', requireRole('CUSTOMER', 'ACCOUNT_MANAGE
 // ORDERS
 // ============================================================================
 
-app.post('/orders', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+app.post('/orders', requireRole('SERVICE_PROVIDER', 'CUSTOMER'), async (req, res) => {
   ordersHandlers.createOrder(req as any, res);
+});
+
+app.get('/orders/:orderId', requireRole('SERVICE_PROVIDER', 'CUSTOMER', 'COWORKER', 'ACCOUNT_MANAGER', 'SUPERADMIN'), async (req, res) => {
+  ordersHandlers.getOrderById(req as any, res);
+});
+
+app.patch('/orders/:orderId/lifecycle', requireRole('SERVICE_PROVIDER', 'CUSTOMER', 'COWORKER'), async (req, res) => {
+  ordersHandlers.updateOrderLifecycle(req as any, res);
+});
+
+app.patch('/orders/:orderId/details', requireRole('SERVICE_PROVIDER', 'COWORKER'), async (req, res) => {
+  ordersHandlers.updateOrderDetails(req as any, res);
+});
+
+app.post('/orders/:orderId/initialize-payment', requireRole('CUSTOMER'), async (req, res) => {
+  ordersHandlers.initializeOnlinePayment(req as any, res);
+});
+
+app.post('/orders/:orderId/verify-payment', requireRole('CUSTOMER'), async (req, res) => {
+  ordersHandlers.verifyOnlinePayment(req as any, res);
 });
 
 app.get('/service-providers/:spId/orders', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), async (req, res) => {
@@ -163,6 +188,19 @@ app.get('/service-providers/:spId/stats', requireRole('SERVICE_PROVIDER', 'ACCOU
 
 app.get('/service-providers/:spId/earnings', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), async (req, res) => {
   spDashboardHandlers.getSPEarnings(req as any, res);
+});
+
+// SP Coworker Management
+app.post('/service-providers/:spId/coworkers', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  coworkerHandlers.createCoworker(req as any, res);
+});
+
+app.get('/service-providers/:spId/coworkers', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  coworkerHandlers.getSPCoworkers(req as any, res);
+});
+
+app.patch('/service-providers/:spId/coworkers/:coworkerId', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+  coworkerHandlers.updateCoworkerStatus(req as any, res);
 });
 
 // SP Menu Management

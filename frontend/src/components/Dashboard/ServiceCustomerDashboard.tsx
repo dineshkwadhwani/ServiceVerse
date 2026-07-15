@@ -1,20 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Clock, CheckCircle2, XCircle, BarChart3, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Loader2, Clock, CheckCircle2, XCircle, BarChart3, ShoppingBag, Plus } from 'lucide-react';
 import { useToast } from '@/store/notificationStore';
 import { apiClient } from '@/services/apiClient';
+import { useAuthStore } from '@/store/authStore';
 import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
 import { StatsGrid } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
+import { CreateOrderModal } from '@/components/Orders/CreateOrderModal';
+import { OrderLifecycleModal } from '@/components/Orders/OrderLifecycleModal';
 import { COLORS } from '@/utils/theme';
+import { getDoc, doc } from 'firebase/firestore';
+import { db } from '@/utils/firebase-config';
 import type { Service } from '@/types';
 
 interface Order {
   orderId: string;
-  status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED';
+  spId?: string;
+  status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED' | 'NEW';
   totalAmount: number;
   createdAt: Date;
-  items: Array<{ name: string; quantity: number; price: number }>;
+  items: Array<{ name: string; quantity?: number; price?: number; qty?: number; customPrice?: number }>;
 }
 
 interface SPInfo {
@@ -31,6 +37,7 @@ type ActiveTab = 'overview' | 'orders';
 
 export function ServiceCustomerDashboard() {
   const { serviceId } = useParams<{ serviceId: string }>();
+  const { firebaseUser } = useAuthStore();
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -39,12 +46,15 @@ export function ServiceCustomerDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
+  const [showCreateOrder, setShowCreateOrder] = useState(false);
+  const [currentSpId, setCurrentSpId] = useState<string>('');
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   useEffect(() => {
-    if (serviceId) {
+    if (serviceId && firebaseUser?.uid) {
       loadData();
     }
-  }, [serviceId]);
+  }, [serviceId, firebaseUser?.uid]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -53,34 +63,46 @@ export function ServiceCustomerDashboard() {
       const serviceResponse = await apiClient.getService(serviceId!);
       setService(serviceResponse.data?.service || serviceResponse.data);
 
-      // Mock SP info
-      setSPInfo({
-        spId: 'sp1',
-        businessName: 'Clean Pro Services',
-        area: 'Downtown',
-        city: 'New York',
-        averageRating: 4.8,
-        totalOrders: 245,
-      });
+      // Load customer's orders (if authenticated)
+      if (firebaseUser?.uid) {
+        const ordersResponse = await apiClient.getCustomerOrdersList(firebaseUser.uid);
+        const loadedOrders = (ordersResponse?.data?.orders || []).map((order: any) => ({
+          orderId: order.orderId || '',
+          spId: order.spId || '',
+          status: order.status || 'NEW',
+          totalAmount: order.total || 0,
+          createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
+          items: order.items || [],
+        }));
 
-      // Mock orders
-      const mockOrders: Order[] = [
-        {
-          orderId: '1',
-          status: 'DELIVERED',
-          totalAmount: 45.99,
-          createdAt: new Date('2024-01-15'),
-          items: [{ name: 'Basic Laundry', quantity: 1, price: 45.99 }],
-        },
-        {
-          orderId: '2',
-          status: 'READY',
-          totalAmount: 89.99,
-          createdAt: new Date('2024-01-20'),
-          items: [{ name: 'Premium Laundry', quantity: 1, price: 89.99 }],
-        },
-      ];
-      setOrders(mockOrders);
+        setOrders(loadedOrders);
+
+        // Load SP info from first order if available
+        if (loadedOrders.length > 0) {
+          const firstOrder = loadedOrders[0];
+          if (firstOrder.spId) {
+            setCurrentSpId(firstOrder.spId);
+            try {
+              // Get SP info from Firestore
+              const spDocRef = doc(db, 'users', firstOrder.spId);
+              const spDoc = await getDoc(spDocRef);
+              if (spDoc.exists()) {
+                const spData = spDoc.data();
+                setSPInfo({
+                  spId: spDoc.id,
+                  businessName: spData.businessName || spData.name || 'Service Provider',
+                  area: spData.area || '',
+                  city: spData.city || '',
+                  averageRating: spData.averageRating || 0,
+                  totalOrders: spData.totalOrders || 0,
+                });
+              }
+            } catch (spError) {
+              // SP info load failed - will show basic service info only
+            }
+          }
+        }
+      }
     } catch (error: any) {
       toast.error('Failed to load service details');
     } finally {
@@ -278,12 +300,21 @@ export function ServiceCustomerDashboard() {
 
           {/* Orders Tab */}
           {activeTab === 'orders' && (
-            <div className="p-4 md:p-6">
+            <div className="p-4 md:p-6 space-y-4">
+              <button
+                onClick={() => setShowCreateOrder(true)}
+                className="px-4 py-2 rounded-lg font-semibold text-white transition flex items-center gap-2 w-full md:w-auto justify-center md:justify-start"
+                style={{ backgroundColor: COLORS.semantic.info }}
+              >
+                <Plus className="w-4 h-4" />
+                Create Order
+              </button>
               {orders.length > 0 ? (
                 <div className="space-y-4">
                   {orders.map((order) => (
                     <div
                       key={order.orderId}
+                      onClick={() => setSelectedOrder(order)}
                       className="p-4 rounded-lg border"
                       style={{
                         backgroundColor: COLORS.bg.surface,
@@ -315,18 +346,22 @@ export function ServiceCustomerDashboard() {
                       </div>
 
                       <div className="border-t border-b py-3 mb-3" style={{ borderColor: COLORS.border.light }}>
-                        {order.items.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className="flex justify-between text-sm"
-                            style={{ color: COLORS.text.primary }}
-                          >
-                            <span>
-                              {item.quantity}x {item.name}
-                            </span>
-                            <span>${item.price.toFixed(2)}</span>
-                          </div>
-                        ))}
+                        {order.items.map((item, idx) => {
+                          const qty = item.quantity || item.qty || 0;
+                          const price = item.price || item.customPrice || 0;
+                          return (
+                            <div
+                              key={idx}
+                              className="flex justify-between text-sm"
+                              style={{ color: COLORS.text.primary }}
+                            >
+                              <span>
+                                {qty}x {item.name}
+                              </span>
+                              <span>${price.toFixed(2)}</span>
+                            </div>
+                          );
+                        })}
                       </div>
 
                       <div className="flex justify-between font-bold">
@@ -344,6 +379,29 @@ export function ServiceCustomerDashboard() {
             </div>
           )}
       </main>
+
+      {/* Create Order Modal */}
+      {showCreateOrder && (
+        <CreateOrderModal
+          spId={currentSpId || ''}
+          serviceId={serviceId}
+          isCustomerCreating={true}
+          onClose={() => setShowCreateOrder(false)}
+          onOrderCreated={() => {
+            setShowCreateOrder(false);
+            loadData();
+          }}
+        />
+      )}
+
+      {selectedOrder && (
+        <OrderLifecycleModal
+          order={selectedOrder}
+          role="CUSTOMER"
+          onClose={() => setSelectedOrder(null)}
+          onSaved={() => loadData()}
+        />
+      )}
     </div>
   );
 }

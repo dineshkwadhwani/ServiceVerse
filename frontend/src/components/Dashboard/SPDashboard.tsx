@@ -6,6 +6,8 @@ import { EmptyState } from '@/components/Shared/EmptyState';
 import { SPProfileEditModal } from '@/components/Onboarding/SPProfileEditModal';
 import { CreateOrderModal } from '@/components/Orders/CreateOrderModal';
 import { CreateCustomerModal } from '@/components/Orders/CreateCustomerModal';
+import { CreateCoworkerModal } from '@/components/Orders/CreateCoworkerModal';
+import { OrderLifecycleModal } from '@/components/Orders/OrderLifecycleModal';
 import { useDashboardContext } from '@/context/DashboardContext';
 import { apiClient } from '@/services/apiClient';
 import { COLORS } from '@/utils/theme';
@@ -18,6 +20,8 @@ interface Order {
   customerId: string;
   customerName: string;
   status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED';
+  deliveryType?: 'DROP' | 'PICKUP';
+  selectedCoworker?: string;
   totalAmount: number;
   createdAt: Date;
   items: Array<{ name: string; quantity: number; price: number }>;
@@ -30,7 +34,124 @@ interface SPStats {
   totalCustomers: number;
 }
 
-type ActiveTab = 'overview' | 'orders' | 'earnings' | 'customers';
+interface SPDashboardData {
+  stats: SPStats;
+  orders: Order[];
+  earnings: any[];
+  customers: any[];
+  hasMoreOrders: boolean;
+}
+
+const DASHBOARD_CACHE_TTL_MS = 30_000;
+const dashboardDataCache = new Map<string, { timestamp: number; data: SPDashboardData }>();
+const dashboardDataInFlight = new Map<string, Promise<SPDashboardData>>();
+
+const USER_DOC_CACHE_TTL_MS = 30_000;
+const userDocCache = new Map<string, { timestamp: number; data: any }>();
+const userDocInFlight = new Map<string, Promise<any>>();
+
+async function fetchSPDashboardData(uid: string, forceRefresh = false): Promise<SPDashboardData> {
+  const now = Date.now();
+
+  if (!forceRefresh) {
+    const cached = dashboardDataCache.get(uid);
+    if (cached && now - cached.timestamp < DASHBOARD_CACHE_TTL_MS) {
+      return cached.data;
+    }
+
+    const inFlight = dashboardDataInFlight.get(uid);
+    if (inFlight) {
+      return inFlight;
+    }
+  }
+
+  const requestPromise = (async () => {
+    const [statsResponse, ordersResponse, earningsResponse, customersResponse] = await Promise.all([
+      apiClient.getSPStats(uid),
+      apiClient.getSPOrdersList(uid, 10),
+      apiClient.getSPEarnings(uid),
+      apiClient.getSPCustomers(),
+    ]);
+
+    const loadedOrders = (ordersResponse?.data?.orders || []).map((order: any) => ({
+      orderId: order.orderId || '',
+      customerId: order.customerId || '',
+      customerName: order.customerName || 'Unknown',
+      status: order.status || 'NEW',
+      deliveryType: order.deliveryType || 'DROP',
+      selectedCoworker: order.selectedCoworker || '',
+      totalAmount: order.total || order.totalAmount || 0,
+      createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
+      items: order.items || [],
+    }));
+
+    const loadedEarnings = (earningsResponse?.data?.earnings || []).map((earning: any) => ({
+      date: earning.date || '',
+      amount: earning.amount || 0,
+      orders: earning.orders || 0,
+    }));
+
+    const loadedCustomers = (customersResponse?.data?.customers || []);
+
+    const data: SPDashboardData = {
+      stats: {
+        totalOrders: statsResponse?.data?.totalOrders || 0,
+        totalRevenue: statsResponse?.data?.totalRevenue || 0,
+        averageRating: statsResponse?.data?.averageRating || 0,
+        totalCustomers: statsResponse?.data?.totalCustomers || 0,
+      },
+      orders: loadedOrders,
+      earnings: loadedEarnings,
+      customers: loadedCustomers,
+      hasMoreOrders: ordersResponse?.data?.hasMore || false,
+    };
+
+    dashboardDataCache.set(uid, { timestamp: Date.now(), data });
+    return data;
+  })();
+
+  dashboardDataInFlight.set(uid, requestPromise);
+
+  try {
+    return await requestPromise;
+  } finally {
+    dashboardDataInFlight.delete(uid);
+  }
+}
+
+async function fetchSPUserDoc(uid: string, forceRefresh = false): Promise<any> {
+  const now = Date.now();
+
+  if (!forceRefresh) {
+    const cached = userDocCache.get(uid);
+    if (cached && now - cached.timestamp < USER_DOC_CACHE_TTL_MS) {
+      return cached.data;
+    }
+
+    const inFlight = userDocInFlight.get(uid);
+    if (inFlight) {
+      return inFlight;
+    }
+  }
+
+  const requestPromise = (async () => {
+    const docRef = doc(db, 'users', uid);
+    const docSnap = await getDoc(docRef);
+    const data = docSnap.exists() ? docSnap.data() : null;
+    userDocCache.set(uid, { timestamp: Date.now(), data });
+    return data;
+  })();
+
+  userDocInFlight.set(uid, requestPromise);
+
+  try {
+    return await requestPromise;
+  } finally {
+    userDocInFlight.delete(uid);
+  }
+}
+
+type ActiveTab = 'overview' | 'orders' | 'pickup' | 'earnings' | 'customers' | 'coworkers';
 
 export function SPDashboard() {
   const { user, firebaseUser } = useAuthStore();
@@ -47,10 +168,13 @@ export function SPDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [earnings, setEarnings] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [coworkers, setCoworkers] = useState<any[]>([]);
   const [filterFromDate, setFilterFromDate] = useState('');
   const [filterToDate, setFilterToDate] = useState('');
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [showCreateCustomer, setShowCreateCustomer] = useState(false);
+  const [showCreateCoworker, setShowCreateCoworker] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [orderSearchDate, setOrderSearchDate] = useState('');
   const [loadingMoreOrders, setLoadingMoreOrders] = useState(false);
@@ -61,77 +185,42 @@ export function SPDashboard() {
     loadFullUserData();
   }, [firebaseUser?.uid]);
 
-  const loadFullUserData = async () => {
+  const loadFullUserData = async (forceRefresh = false) => {
     if (!firebaseUser?.uid) return;
+
     try {
-      const docRef = doc(db, 'users', firebaseUser.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setFullUserData(docSnap.data());
-      }
+      const userData = await fetchSPUserDoc(firebaseUser.uid, forceRefresh);
+      setFullUserData(userData);
     } catch (error) {
-      console.error('Failed to load full user data:', error);
+      // User data load failed
     }
   };
 
-  const loadData = async () => {
+  const loadData = async (forceRefresh = false) => {
     if (!firebaseUser?.uid) {
-      console.log('[SPDashboard] No firebaseUser.uid, skipping load');
       setIsLoading(false);
       return;
     }
 
-    console.log('[SPDashboard] loadData started for:', firebaseUser.uid);
-
     try {
-      // Load stats
-      const statsResponse = await apiClient.getSPStats(firebaseUser.uid);
-      console.log('[SPDashboard] statsResponse:', statsResponse);
-      setStats({
-        totalOrders: statsResponse?.data?.totalOrders || 0,
-        totalRevenue: statsResponse?.data?.totalRevenue || 0,
-        averageRating: statsResponse?.data?.averageRating || 0,
-        totalCustomers: statsResponse?.data?.totalCustomers || 0,
-      });
-
-      // Load orders with pagination (first 10)
-      console.log('[SPDashboard] Calling getSPOrdersList for:', firebaseUser.uid);
-      const ordersResponse = await apiClient.getSPOrdersList(firebaseUser.uid, 10);
-      console.log('[SPDashboard] ordersResponse:', ordersResponse);
-
-      const loadedOrders = (ordersResponse?.data?.orders || []).map((order: any) => ({
-        orderId: order.orderId || '',
-        customerId: order.customerId || '',
-        customerName: order.customerName || 'Unknown',
-        status: order.status || 'NEW',
-        totalAmount: order.total || order.totalAmount || 0,
-        createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
-        items: order.items || [],
-      }));
-      console.log('[SPDashboard] Loaded orders count:', loadedOrders.length);
-      setOrders(loadedOrders);
-      setHasMoreOrders(ordersResponse?.data?.hasMore || false);
-
-      // Load earnings
-      const earningsResponse = await apiClient.getSPEarnings(firebaseUser.uid);
-      const loadedEarnings = (earningsResponse?.data?.earnings || []).map((earning: any) => ({
-        date: earning.date || '',
-        amount: earning.amount || 0,
-        orders: earning.orders || 0,
-      }));
-      setEarnings(loadedEarnings);
-
-      // Load customers
-      const customersResponse = await apiClient.getSPCustomers();
-      const loadedCustomers = (customersResponse?.data?.customers || []);
-      setCustomers(loadedCustomers);
+      const [data, coworkersResponse] = await Promise.all([
+        fetchSPDashboardData(firebaseUser.uid, forceRefresh),
+        apiClient.getSPCoworkers(firebaseUser.uid),
+      ]);
+      setStats(data.stats);
+      setOrders(data.orders);
+      setEarnings(data.earnings);
+      setCustomers(data.customers);
+      setHasMoreOrders(data.hasMoreOrders);
+      setCoworkers((coworkersResponse?.data?.coworkers || []).map((c: any) => ({
+        coworkerId: c.uid,
+        phone: c.phone,
+        name: c.name,
+        status: c.status,
+        createdAt: c.createdAt,
+      })));
     } catch (error: any) {
-      console.error('[SPDashboard] Failed to load SP data:', {
-        error: error?.message || error,
-        code: error?.code,
-        response: error?.response?.data,
-      });
-      // Keep default empty values
+      // Failed to load SP data - keep default empty values
     } finally {
       setIsLoading(false);
     }
@@ -149,6 +238,8 @@ export function SPDashboard() {
         customerId: order.customerId || '',
         customerName: order.customerName || 'Unknown',
         status: order.status || 'NEW',
+        deliveryType: order.deliveryType || 'DROP',
+        selectedCoworker: order.selectedCoworker || '',
         totalAmount: order.total || order.totalAmount || 0,
         createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
         items: order.items || [],
@@ -156,7 +247,7 @@ export function SPDashboard() {
       setOrders(prev => [...prev, ...newOrders]);
       setHasMoreOrders(response?.data?.hasMore || false);
     } catch (error) {
-      console.error('Failed to load more orders:', error);
+      // Failed to load more orders
     } finally {
       setLoadingMoreOrders(false);
     }
@@ -208,7 +299,6 @@ export function SPDashboard() {
           </p>
           <button
             onClick={() => {
-              console.log('[SPDashboard] Complete Profile button clicked');
               setShowProfileModal(true);
             }}
             className="w-full px-4 py-3 rounded-lg font-semibold text-white transition"
@@ -242,10 +332,46 @@ export function SPDashboard() {
 
   const totalFilteredEarnings = filteredEarnings.reduce((sum, e) => sum + e.amount, 0);
 
+  const normalizeAssigneeName = (value?: string) =>
+    (value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^self\s*-\s*/, '')
+      .replace(/\s*\([^)]*\)\s*$/, '');
+
+  const spSelfNames = [
+    fullUserData?.ownerName,
+    fullUserData?.businessName,
+    fullUserData?.name,
+    (user as any)?.ownerName,
+    (user as any)?.businessName,
+    (user as any)?.name,
+    firebaseUser?.displayName,
+  ]
+    .filter(Boolean)
+    .map((name: string) => normalizeAssigneeName(name));
+
+  const spSelfNamesSet = new Set([
+    ...spSelfNames,
+    normalizeAssigneeName(firebaseUser?.uid),
+    'self',
+  ]);
+
+  const pickupOrdersForSP = orders
+    .filter((order) => {
+      const assignedTo = normalizeAssigneeName(order.selectedCoworker || '');
+      const statusValue = String(order.status || '').toUpperCase();
+      const isPickupOrder = order.deliveryType === 'PICKUP' || statusValue === 'ASSIGNED_FOR_PICKUP';
+      return isPickupOrder && assignedTo !== '' && spSelfNamesSet.has(assignedTo);
+    })
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
   const tabs: DashboardTab<ActiveTab>[] = [
     { id: 'overview', icon: BarChart3, label: 'Overview' },
     { id: 'orders', icon: ShoppingBag, label: 'Orders' },
+    { id: 'pickup', icon: Package, label: 'Pickup' },
     { id: 'customers', icon: Users, label: 'Customers' },
+    { id: 'coworkers', icon: Users, label: 'Coworkers' },
     { id: 'earnings', icon: DollarSign, label: 'Earnings' },
   ];
 
@@ -289,6 +415,7 @@ export function SPDashboard() {
                   {orders.slice(0, 5).map((order) => (
                     <div
                       key={order.orderId}
+                      onClick={() => setSelectedOrder(order)}
                       className="p-4 rounded-lg border flex items-center justify-between"
                       style={{
                         backgroundColor: COLORS.bg.primary,
@@ -303,7 +430,7 @@ export function SPDashboard() {
                           Order #{order.orderId} • ${order.totalAmount.toFixed(2)}
                         </p>
                       </div>
-                      <div
+                        <div
                         className="px-3 py-1 rounded-full text-xs font-semibold text-white"
                         style={{ backgroundColor: getStatusColor(order.status) }}
                       >
@@ -363,6 +490,7 @@ export function SPDashboard() {
                     {getFilteredOrders().map((order) => (
                       <div
                         key={order.orderId}
+                        onClick={() => setSelectedOrder(order)}
                         className="p-4 rounded-lg border"
                         style={{
                           backgroundColor: COLORS.bg.surface,
@@ -434,6 +562,54 @@ export function SPDashboard() {
             </div>
           )}
 
+          {/* Pickup Tab */}
+          {activeTab === 'pickup' && (
+            <div className="p-4 md:p-6 space-y-3">
+              {pickupOrdersForSP.length > 0 ? (
+                pickupOrdersForSP.map((order) => (
+                  <div
+                    key={order.orderId}
+                    onClick={() => setSelectedOrder(order)}
+                    className="p-4 rounded-lg border"
+                    style={{
+                      backgroundColor: COLORS.bg.surface,
+                      borderColor: COLORS.border.light,
+                    }}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-semibold" style={{ color: COLORS.text.primary }}>
+                          {order.customerName}
+                        </p>
+                        <p className="text-sm" style={{ color: COLORS.text.secondary }}>
+                          Order #{order.orderId} • {order.createdAt.toLocaleDateString()}
+                        </p>
+                        <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
+                          Assigned pickup: {order.selectedCoworker}
+                        </p>
+                      </div>
+                      <div
+                        className="px-3 py-1 rounded-full text-xs font-semibold text-white"
+                        style={{ backgroundColor: getStatusColor(order.status) }}
+                      >
+                        {order.status}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between font-bold">
+                      <span style={{ color: COLORS.text.primary }}>Total</span>
+                      <span style={{ color: COLORS.semantic.success }}>
+                        ₹{order.totalAmount.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <EmptyState message="No pickup orders assigned to you yet" />
+              )}
+            </div>
+          )}
+
           {/* Customers Tab */}
           {activeTab === 'customers' && (
             <div className="p-4 md:p-6 space-y-4">
@@ -491,6 +667,63 @@ export function SPDashboard() {
                   ))
                 ) : (
                   <EmptyState message="No customers created yet" />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Coworkers Tab */}
+          {activeTab === 'coworkers' && (
+            <div className="p-4 md:p-6 space-y-4">
+              {/* Create Button */}
+              <button
+                onClick={() => setShowCreateCoworker(true)}
+                className="px-4 py-2 rounded-lg font-semibold text-white transition flex items-center gap-2 w-full md:w-auto justify-center md:justify-start"
+                style={{ backgroundColor: COLORS.semantic.info }}
+              >
+                <Plus className="w-4 h-4" />
+                Create Coworker
+              </button>
+
+              {/* Coworkers List */}
+              <div className="space-y-3">
+                {coworkers.length > 0 ? (
+                  coworkers.map((coworker: any) => (
+                    <div
+                      key={coworker.coworkerId}
+                      className="p-4 rounded-lg border"
+                      style={{
+                        backgroundColor: COLORS.bg.surface,
+                        borderColor: COLORS.border.light,
+                      }}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-semibold" style={{ color: COLORS.text.primary }}>
+                            {coworker.name}
+                          </p>
+                          <p className="text-sm" style={{ color: COLORS.text.secondary }}>
+                            {coworker.phone}
+                          </p>
+                        </div>
+                        <div
+                          className="px-3 py-1 rounded-full text-xs font-semibold text-white"
+                          style={{
+                            backgroundColor: coworker.status === 'ACTIVE' ? COLORS.semantic.success : COLORS.semantic.warning,
+                          }}
+                        >
+                          {coworker.status}
+                        </div>
+                      </div>
+                      {coworker.createdAt && (
+                        <p className="text-xs mt-2" style={{ color: COLORS.text.secondary }}>
+                          Created on {new Date(coworker.createdAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <EmptyState message="No coworkers created yet" />
                 )}
               </div>
             </div>
@@ -615,7 +848,7 @@ export function SPDashboard() {
           onClose={() => setShowCreateOrder(false)}
           onOrderCreated={() => {
             // Reload orders data to show new order
-            loadData();
+            loadData(true);
           }}
         />
       )}
@@ -625,8 +858,29 @@ export function SPDashboard() {
         <CreateCustomerModal
           onClose={() => setShowCreateCustomer(false)}
           onCustomerCreated={() => {
-            loadData();
+            loadData(true);
           }}
+        />
+      )}
+
+      {/* Create Coworker Modal */}
+      {showCreateCoworker && firebaseUser?.uid && (
+        <CreateCoworkerModal
+          spId={firebaseUser.uid}
+          onClose={() => setShowCreateCoworker(false)}
+          onCoworkerCreated={() => {
+            loadData(true);
+          }}
+        />
+      )}
+
+      {selectedOrder && (
+        <OrderLifecycleModal
+          order={selectedOrder}
+          role={((user as any)?.role || 'SERVICE_PROVIDER') as any}
+          coworkers={coworkers.map((c: any) => ({ uid: c.coworkerId, name: c.name }))}
+          onClose={() => setSelectedOrder(null)}
+          onSaved={() => loadData(true)}
         />
       )}
     </div>

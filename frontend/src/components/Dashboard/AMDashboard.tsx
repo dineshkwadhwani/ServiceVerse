@@ -22,6 +22,55 @@ interface SP {
   };
 }
 
+interface AMDashboardData {
+  stats: any;
+  sps: SP[];
+}
+
+const AM_CACHE_TTL_MS = 30_000;
+let amDashboardCache: { timestamp: number; data: AMDashboardData | null } = {
+  timestamp: 0,
+  data: null,
+};
+let amDashboardInFlight: Promise<AMDashboardData> | null = null;
+
+async function fetchAMDashboardData(forceRefresh = false): Promise<AMDashboardData> {
+  const now = Date.now();
+
+  if (!forceRefresh && amDashboardCache.data && now - amDashboardCache.timestamp < AM_CACHE_TTL_MS) {
+    return amDashboardCache.data;
+  }
+
+  if (!forceRefresh && amDashboardInFlight) {
+    return amDashboardInFlight;
+  }
+
+  amDashboardInFlight = (async () => {
+    const [statsResponse, spsResponse] = await Promise.all([
+      apiClient.getAMStats(),
+      apiClient.getServiceProviders(),
+    ]);
+
+    const data: AMDashboardData = {
+      stats: statsResponse.data || {},
+      sps: spsResponse.data?.serviceProviders || [],
+    };
+
+    amDashboardCache = {
+      timestamp: Date.now(),
+      data,
+    };
+
+    return data;
+  })();
+
+  try {
+    return await amDashboardInFlight;
+  } finally {
+    amDashboardInFlight = null;
+  }
+}
+
 type ActiveTab = 'overview' | 'sps' | 'approvals';
 
 export function AMDashboard() {
@@ -37,17 +86,11 @@ export function AMDashboard() {
     loadData();
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (forceRefresh = false) => {
     try {
-      const [statsResponse, spsResponse] = await Promise.all([
-        apiClient.getAMStats(),
-        apiClient.getServiceProviders(),
-      ]);
-
-      setStats(statsResponse.data || {});
-      const spsList = spsResponse.data?.serviceProviders || [];
-      console.log('[AMDashboard] Loaded SPs:', spsList.map((sp: any) => ({ uid: sp.uid, businessName: sp.businessName, status: sp.status })));
-      setSPs(spsList);
+      const data = await fetchAMDashboardData(forceRefresh);
+      setStats(data.stats || {});
+      setSPs(data.sps || []);
     } catch (error: any) {
       toast.error('Failed to load dashboard data');
     } finally {
@@ -64,7 +107,7 @@ export function AMDashboard() {
     try {
       await apiClient.updateSPActivationStatus(spId, activate);
       toast.success(activate ? 'SP activated successfully!' : 'SP inactivated successfully!');
-      loadData(); // Refresh the list
+      loadData(true); // Refresh the list
     } catch (error: any) {
       toast.error(error.message || 'Failed to update SP status');
     }
@@ -310,7 +353,7 @@ export function AMDashboard() {
             existingMenus={currentServiceMenus}
             onComplete={() => {
               setOnboardingSP(null);
-              loadData();
+              loadData(true);
             }}
             onCancel={() => setOnboardingSP(null)}
           />

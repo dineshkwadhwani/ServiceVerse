@@ -100,6 +100,77 @@ export async function searchServiceProviders(req: AuthRequest, res: Response) {
 }
 
 /**
+ * Get service providers available for a service and the customer's associated SP (if any)
+ */
+export async function getCustomerServiceProviders(req: AuthRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return sendError(res, new ValidationError('User not authenticated'));
+    }
+
+    const { serviceId } = req.query;
+    if (!serviceId) {
+      return sendError(res, new ValidationError('serviceId is required'));
+    }
+
+    const customerId = req.user.uid;
+
+    // Find current association for this service (if customer is already linked to an SP)
+    let associatedSpId: string | null = null;
+    const assocDoc = await db
+      .collection('users')
+      .doc(customerId)
+      .collection('serviceAssociations')
+      .doc(serviceId as string)
+      .get();
+
+    if (assocDoc.exists) {
+      associatedSpId = assocDoc.data()?.spId || null;
+    }
+
+    // Find active SPs that provide this service
+    const spSnapshot = await db
+      .collection('users')
+      .where('role', '==', 'SERVICE_PROVIDER')
+      .where('status', '==', 'ACTIVE')
+      .get();
+
+    const providersCheck = await Promise.all(
+      spSnapshot.docs.map(async (spDoc) => {
+        const serviceAssoc = await spDoc.ref
+          .collection('serviceAssociations')
+          .doc(serviceId as string)
+          .get();
+
+        return {
+          spDoc,
+          supportsService: serviceAssoc.exists,
+        };
+      })
+    );
+
+    const providers = providersCheck
+      .filter((item) => item.supportsService)
+      .map((item) => ({
+        spId: item.spDoc.id,
+        businessName: item.spDoc.data().businessName || item.spDoc.data().name || 'Service Provider',
+        ownerName: item.spDoc.data().ownerName || '',
+        phone: item.spDoc.data().phone || '',
+        city: item.spDoc.data().city || '',
+        area: item.spDoc.data().area || '',
+      }));
+
+    return sendSuccess(res, {
+      providers,
+      associatedSpId,
+    });
+  } catch (error: any) {
+    logger.error('Failed to fetch customer service providers', error);
+    return sendError(res, error);
+  }
+}
+
+/**
  * Add a service provider to customer's list
  */
 export async function addServiceProviderToCustomer(req: AuthRequest, res: Response) {

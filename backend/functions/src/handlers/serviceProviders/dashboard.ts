@@ -7,6 +7,54 @@ import { v4 as uuidv4 } from 'uuid';
 
 const logger = new Logger('SPDashboardHandlers');
 
+async function getAssociatedCustomerIds(spId: string): Promise<Set<string>> {
+  // 1) Direct link on customer docs (legacy + fast path)
+  const directCustomersSnapshot = await db
+    .collection('users')
+    .where('createdBySP', '==', spId)
+    .where('role', '==', 'CUSTOMER')
+    .get();
+
+  const customerIds = new Set<string>();
+
+  directCustomersSnapshot.docs.forEach((doc) => {
+    customerIds.add(doc.id);
+  });
+
+  // 2) Read association exactly from each customer's subcollection
+  // to mirror how associations are written.
+  const allCustomersSnapshot = await db
+    .collection('users')
+    .where('role', '==', 'CUSTOMER')
+    .get();
+
+  const associationChecks = await Promise.all(
+    allCustomersSnapshot.docs
+      .filter((customerDoc) => !customerIds.has(customerDoc.id))
+      .map(async (customerDoc) => {
+        const assocDocs = await customerDoc.ref
+          .collection('serviceAssociations')
+          .where('spId', '==', spId)
+          .where('status', '==', 'ASSOCIATED')
+          .limit(1)
+          .get();
+
+        return {
+          customerId: customerDoc.id,
+          isAssociated: !assocDocs.empty,
+        };
+      })
+  );
+
+  associationChecks.forEach((result) => {
+    if (result.isAssociated) {
+      customerIds.add(result.customerId);
+    }
+  });
+
+  return customerIds;
+}
+
 /**
  * Create a customer from SP dashboard
  * SP sends email or phone, we create customer and send invitation
@@ -113,7 +161,8 @@ export async function createCustomerBySP(req: AuthRequest, res: Response) {
 
 /**
  * Get all customers associated with this SP
- * Includes both customers created by SP and customers associated by SP
+ * Combines direct links (createdBySP) and serviceAssociations links
+ * to support both legacy and current association flows.
  */
 export async function getSPCustomers(req: AuthRequest, res: Response) {
   try {
@@ -125,63 +174,24 @@ export async function getSPCustomers(req: AuthRequest, res: Response) {
 
     logger.info('Fetching SP customers', { spId });
 
-    const customers: any[] = [];
-    const customerIds = new Set<string>();
+    const customerIds = await getAssociatedCustomerIds(spId);
 
-    // 1. Fetch customers created by this SP
-    const createdCustomersSnapshot = await db
-      .collection('users')
-      .where('createdBySP', '==', spId)
-      .where('role', '==', 'CUSTOMER')
-      .get();
+    const customerDocs = await Promise.all(
+      Array.from(customerIds).map((customerId) => db.collection('users').doc(customerId).get())
+    );
 
-    createdCustomersSnapshot.docs.forEach((doc) => {
-      customerIds.add(doc.id);
-      customers.push({
+    const customers: any[] = customerDocs
+      .filter((doc) => doc.exists && doc.data()?.role === 'CUSTOMER')
+      .map((doc) => ({
         customerId: doc.id,
-        name: doc.data().name,
-        email: doc.data().email,
-        phone: doc.data().phone,
-        verified: doc.data().verified,
-        addedAt: doc.data().createdAt,
-      });
-    });
+        name: doc.data()?.name,
+        email: doc.data()?.email,
+        phone: doc.data()?.phone,
+        verified: doc.data()?.verified,
+        addedAt: doc.data()?.createdAt,
+      }));
 
-    logger.info('Created customers fetched', { spId, count: createdCustomersSnapshot.docs.length });
-
-    // 2. Fetch customers associated with this SP via serviceAssociations
-    const allCustomersSnapshot = await db
-      .collection('users')
-      .where('role', '==', 'CUSTOMER')
-      .get();
-
-    for (const customerDoc of allCustomersSnapshot.docs) {
-      const customerId = customerDoc.id;
-
-      // Skip if already added (created by this SP)
-      if (customerIds.has(customerId)) continue;
-
-      // Check if this customer has an association with this SP
-      const associationSnapshot = await customerDoc.ref
-        .collection('serviceAssociations')
-        .doc(spId)
-        .get();
-
-      if (associationSnapshot.exists) {
-        customerIds.add(customerId);
-        const assocData = associationSnapshot.data();
-        customers.push({
-          customerId,
-          name: customerDoc.data().name,
-          email: customerDoc.data().email,
-          phone: customerDoc.data().phone,
-          verified: customerDoc.data().verified,
-          addedAt: assocData?.createdAt,
-        });
-      }
-    }
-
-    logger.info('SP customers fetched', { spId, count: customers.length, createdCount: createdCustomersSnapshot.docs.length });
+    logger.info('SP customers fetched', { spId, count: customers.length });
 
     return sendSuccess(res, { customers });
   } catch (error: any) {
@@ -209,13 +219,14 @@ export async function getSPStats(req: AuthRequest, res: Response) {
     }
 
     const spData = spDoc.data() || {};
+    const associatedCustomerIds = await getAssociatedCustomerIds(spId);
 
     // Calculate stats
     const stats = {
       totalOrders: spData.totalOrders || 0,
       totalRevenue: spData.totalRevenue || 0,
       averageRating: spData.averageRating || 0,
-      totalCustomers: spData.totalCustomers || 0,
+      totalCustomers: associatedCustomerIds.size,
     };
 
     return sendSuccess(res, stats);

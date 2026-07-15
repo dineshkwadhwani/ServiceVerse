@@ -55,10 +55,22 @@ service cloud.firestore {
     }
 
     // ============================================================================
-    // Users collection - read own document, SuperAdmin can read/write all
+    // Users collection - read own document, SPs can read their coworkers, Customers can read SPs, SuperAdmin can read/write all
     // ============================================================================
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        isSuperAdmin()
+      );
+
+      // SPs can read coworker documents that belong to them
+      allow read: if isServiceProvider() &&
+        resource.data.role == 'COWORKER' &&
+        resource.data.spId == request.auth.uid;
+
+      // Customers can read SERVICE_PROVIDER documents
+      allow read: if isCustomer() && resource.data.role == 'SERVICE_PROVIDER';
+
       allow create: if isAuthenticated();
       allow update, delete: if isSuperAdmin();
     }

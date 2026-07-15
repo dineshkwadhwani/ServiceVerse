@@ -86,6 +86,12 @@ class ApiClient {
     });
   }
 
+  async getCustomerServiceProviders(serviceId: string) {
+    return this.axiosInstance.get('/customers/service-providers', {
+      params: { serviceId },
+    });
+  }
+
   async addServiceProviderToCustomer(serviceId: string, spId: string) {
     return this.axiosInstance.post('/customers/add-provider', {
       serviceId,
@@ -300,6 +306,14 @@ class ApiClient {
     return this.axiosInstance.get(`/orders/${orderId}`);
   }
 
+  async updateOrderLifecycle(orderId: string, data: { status: string; selectedCoworker?: string; paymentProofUrl?: string }) {
+    return this.axiosInstance.patch(`/orders/${orderId}/lifecycle`, data);
+  }
+
+  async updateOrderDetails(orderId: string, data: { items?: any[]; specialInstructions?: string; deliveryType?: string; selectedCoworker?: string; paymentMethod?: string }) {
+    return this.axiosInstance.patch(`/orders/${orderId}/details`, data);
+  }
+
   async confirmOrder(orderId: string, confirmedBy: string) {
     return this.axiosInstance.patch(`/orders/${orderId}/confirm`, { confirmedBy });
   }
@@ -402,7 +416,6 @@ class ApiClient {
     try {
       return await this.axiosInstance.get(`/service-providers/${spId}/stats`);
     } catch (error) {
-      console.warn('Failed to fetch SP stats, returning defaults');
       return { totalOrders: 0, totalRevenue: 0, averageRating: 0, totalCustomers: 0 };
     }
   }
@@ -411,7 +424,6 @@ class ApiClient {
     try {
       return await this.axiosInstance.get(`/service-providers/${spId}/orders`);
     } catch (error) {
-      console.warn('Failed to fetch SP orders, returning empty');
       return { orders: [] };
     }
   }
@@ -422,7 +434,6 @@ class ApiClient {
         params: { startDate, endDate },
       });
     } catch (error) {
-      console.warn('Failed to fetch SP earnings, returning empty');
       return { earnings: [] };
     }
   }
@@ -431,7 +442,6 @@ class ApiClient {
     try {
       return await this.axiosInstance.get(`/service-providers/customers`);
     } catch (error) {
-      console.warn('Failed to fetch SP customers, returning empty');
       return { customers: [] };
     }
   }
@@ -450,6 +460,22 @@ class ApiClient {
     return this.axiosInstance.get(`/customers/${customerId}/orders`, {
       params: { limit, startAfter },
     });
+  }
+
+  // ============================================================================
+  // COWORKERS
+  // ============================================================================
+
+  async createCoworker(spId: string, data: { phone: string; name: string; status: string }): Promise<any> {
+    return this.axiosInstance.post(`/service-providers/${spId}/coworkers`, data);
+  }
+
+  async getSPCoworkers(spId: string): Promise<any> {
+    try {
+      return await this.axiosInstance.get(`/service-providers/${spId}/coworkers`);
+    } catch (error) {
+      return { coworkers: [] };
+    }
   }
 
   // ============================================================================

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { X, ChevronLeft } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
+import { useAuthStore } from '@/store/authStore';
 import { OrderDetailsStep } from './OrderDetailsStep';
 import { OrderReviewStep } from './OrderReviewStep';
 import { getDoc, doc } from 'firebase/firestore';
 import { db } from '@/utils/firebase-config';
+import { apiClient } from '@/services/apiClient';
 
 type Step = 'details' | 'review';
 
@@ -18,14 +20,19 @@ interface OrderItem {
 
 interface Props {
   spId: string;
+  serviceId?: string;
+  isCustomerCreating?: boolean;
   onClose: () => void;
   onOrderCreated?: () => void;
 }
 
-export function CreateOrderModal({ spId, onClose, onOrderCreated }: Props) {
-  const [currentStep, setCurrentStep] = useState<Step>('details');
+export function CreateOrderModal({ spId, serviceId, isCustomerCreating, onClose, onOrderCreated }: Props) {
+  const { firebaseUser } = useAuthStore();
+  const [currentStep, setCurrentStep] = useState<Step>(isCustomerCreating ? 'details' : 'details');
   const [spGstPercent, setSpGstPercent] = useState(0);
   const [spGstMandatory, setSpGstMandatory] = useState(false);
+  const [selectedSpId, setSelectedSpId] = useState(spId || '');
+  const [availableSPs, setAvailableSPs] = useState<Array<{ spId: string; businessName: string }>>([]);
 
   // Order data
   const [orderData, setOrderData] = useState<{
@@ -35,16 +42,33 @@ export function CreateOrderModal({ spId, onClose, onOrderCreated }: Props) {
     deliveryDateTime?: string;
     specialInstructions: string;
     paymentMethod: 'ONLINE' | 'DIRECT';
+    deliveryType: 'DROP' | 'PICKUP';
+    selectedCoworker: string;
   } | null>(null);
 
-  // Load SP's GST settings
+  // Load SP's GST settings and customer data (if customer creating order)
   useEffect(() => {
-    loadSPGSTSettings();
-  }, [spId]);
+    if (!isCustomerCreating) {
+      setSelectedSpId(spId);
+    }
+  }, [spId, isCustomerCreating]);
 
-  const loadSPGSTSettings = async () => {
+  useEffect(() => {
+    if (selectedSpId) {
+      loadSPGSTSettings(selectedSpId);
+    }
+  }, [selectedSpId]);
+
+  useEffect(() => {
+    if (isCustomerCreating && firebaseUser?.uid) {
+      loadCustomerData();
+      loadCustomerServiceProviders();
+    }
+  }, [isCustomerCreating, firebaseUser?.uid, serviceId]);
+
+  const loadSPGSTSettings = async (targetSpId: string) => {
     try {
-      const docRef = doc(db, 'users', spId);
+      const docRef = doc(db, 'users', targetSpId);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -52,7 +76,57 @@ export function CreateOrderModal({ spId, onClose, onOrderCreated }: Props) {
         setSpGstMandatory(data?.documentation?.gstCollectionMandatory || false);
       }
     } catch (error) {
-      console.error('Failed to load SP GST settings:', error);
+      // SP GST settings load failed - defaults to 0% are used
+    }
+  };
+
+  const loadCustomerServiceProviders = async () => {
+    if (!serviceId) return;
+    try {
+      const response: any = await apiClient.getCustomerServiceProviders(serviceId);
+      const providers = response?.data?.providers || [];
+      setAvailableSPs(providers);
+
+      const associatedSpId = response?.data?.associatedSpId || '';
+      if (associatedSpId) {
+        setSelectedSpId(associatedSpId);
+      } else if (providers.length > 0 && !selectedSpId) {
+        setSelectedSpId(providers[0].spId);
+      }
+    } catch (error) {
+      setAvailableSPs([]);
+    }
+  };
+
+  const loadCustomerData = async () => {
+    if (!firebaseUser?.uid) return;
+    try {
+      const docRef = doc(db, 'users', firebaseUser.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const customerInfo = {
+          customerId: firebaseUser.uid,
+          phone: data?.phone || '',
+          name: data?.name || '',
+          email: data?.email || '',
+          address: data?.address || '',
+        };
+
+        // Pre-populate order with customer data
+        setOrderData({
+          customer: customerInfo,
+          items: [],
+          deliveryAddress: data?.address || '',
+          deliveryDateTime: undefined,
+          specialInstructions: '',
+          paymentMethod: 'DIRECT',
+          deliveryType: 'DROP',
+          selectedCoworker: '',
+        });
+      }
+    } catch (error) {
+      // Customer data load failed - will show empty forms
     }
   };
 
@@ -151,7 +225,11 @@ export function CreateOrderModal({ spId, onClose, onOrderCreated }: Props) {
         <div className="flex-1 overflow-y-auto px-6 py-6">
           {currentStep === 'details' && (
             <OrderDetailsStep
-              spId={spId}
+              spId={selectedSpId}
+              isCustomerCreating={isCustomerCreating}
+              availableSPs={availableSPs}
+              selectedSpId={selectedSpId}
+              onSPChange={setSelectedSpId}
               initialData={orderData || undefined}
               onNext={handleDetailsNext}
               onCancel={handleCancel}
@@ -160,13 +238,15 @@ export function CreateOrderModal({ spId, onClose, onOrderCreated }: Props) {
 
           {currentStep === 'review' && orderData && (
             <OrderReviewStep
-              spId={spId}
+              spId={selectedSpId}
               customer={orderData.customer}
               items={orderData.items}
               deliveryAddress={orderData.deliveryAddress}
               deliveryDateTime={orderData.deliveryDateTime}
               specialInstructions={orderData.specialInstructions}
               paymentMethod={orderData.paymentMethod}
+              deliveryType={orderData.deliveryType}
+              selectedCoworker={orderData.selectedCoworker}
               spGstPercent={spGstPercent}
               spGstMandatory={spGstMandatory}
               onBack={handleReviewBack}

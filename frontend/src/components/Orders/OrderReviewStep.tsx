@@ -20,6 +20,8 @@ interface Props {
   deliveryDateTime?: string;
   specialInstructions: string;
   paymentMethod: 'ONLINE' | 'DIRECT';
+  deliveryType?: 'DROP' | 'PICKUP';
+  selectedCoworker?: string;
   spGstPercent?: number;
   spGstMandatory?: boolean;
   onBack: () => void;
@@ -35,6 +37,8 @@ export function OrderReviewStep({
   deliveryDateTime,
   specialInstructions,
   paymentMethod,
+  deliveryType = 'DROP',
+  selectedCoworker = '',
   spGstPercent = 0,
   spGstMandatory = false,
   onBack,
@@ -67,6 +71,8 @@ export function OrderReviewStep({
         deliveryDateTime: deliveryDateTime ? new Date(deliveryDateTime).toISOString() : null,
         specialInstructions,
         paymentMethod,
+        deliveryType,
+        selectedCoworker,
         items: items.map(item => ({
           menuItemId: item.menuItemId,
           name: item.name,
@@ -85,7 +91,6 @@ export function OrderReviewStep({
       onComplete(response?.data?.orderId);
     } catch (error: any) {
       toast.error(error?.message || 'Failed to create order');
-      console.error('Order creation error:', error);
     } finally {
       setIsCreating(false);
     }
@@ -130,6 +135,20 @@ export function OrderReviewStep({
               <span style={{ color: COLORS.text.secondary }}>Instructions</span>
               <span className="font-semibold text-right" style={{ color: COLORS.text.primary }}>
                 {specialInstructions}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span style={{ color: COLORS.text.secondary }}>Delivery Type</span>
+            <span className="font-semibold" style={{ color: COLORS.text.primary }}>
+              {deliveryType === 'DROP' ? 'Delivery (Drop)' : 'Pickup'}
+            </span>
+          </div>
+          {deliveryType === 'PICKUP' && (
+            <div className="flex justify-between">
+              <span style={{ color: COLORS.text.secondary }}>Coworker</span>
+              <span className="font-semibold" style={{ color: COLORS.text.primary }}>
+                {selectedCoworker}
               </span>
             </div>
           )}

@@ -58,6 +58,92 @@ interface ServiceListItem {
   createdBy?: string;
 }
 
+const SA_CACHE_TTL_MS = 30_000;
+
+const saStatsCache = { timestamp: 0, data: null as SystemStats | null };
+let saStatsInFlight: Promise<SystemStats | null> | null = null;
+
+const saUsersCache = { timestamp: 0, data: [] as User[] };
+let saUsersInFlight: Promise<User[]> | null = null;
+
+const saServicesCache = { timestamp: 0, data: [] as ServiceListItem[] };
+let saServicesInFlight: Promise<ServiceListItem[]> | null = null;
+
+async function fetchSAStats(forceRefresh = false): Promise<SystemStats | null> {
+  const now = Date.now();
+  if (!forceRefresh && saStatsCache.data && now - saStatsCache.timestamp < SA_CACHE_TTL_MS) {
+    return saStatsCache.data;
+  }
+
+  if (!forceRefresh && saStatsInFlight) {
+    return saStatsInFlight;
+  }
+
+  saStatsInFlight = (async () => {
+    const response = await apiClient.getSuperAdminStats();
+    const data = (response.data || null) as SystemStats | null;
+    saStatsCache.timestamp = Date.now();
+    saStatsCache.data = data;
+    return data;
+  })();
+
+  try {
+    return await saStatsInFlight;
+  } finally {
+    saStatsInFlight = null;
+  }
+}
+
+async function fetchSAUsers(forceRefresh = false): Promise<User[]> {
+  const now = Date.now();
+  if (!forceRefresh && now - saUsersCache.timestamp < SA_CACHE_TTL_MS) {
+    return saUsersCache.data;
+  }
+
+  if (!forceRefresh && saUsersInFlight) {
+    return saUsersInFlight;
+  }
+
+  saUsersInFlight = (async () => {
+    const response = await apiClient.getAllUsers();
+    const data = (response.data?.users || []) as User[];
+    saUsersCache.timestamp = Date.now();
+    saUsersCache.data = data;
+    return data;
+  })();
+
+  try {
+    return await saUsersInFlight;
+  } finally {
+    saUsersInFlight = null;
+  }
+}
+
+async function fetchSAServices(forceRefresh = false): Promise<ServiceListItem[]> {
+  const now = Date.now();
+  if (!forceRefresh && now - saServicesCache.timestamp < SA_CACHE_TTL_MS) {
+    return saServicesCache.data;
+  }
+
+  if (!forceRefresh && saServicesInFlight) {
+    return saServicesInFlight;
+  }
+
+  saServicesInFlight = (async () => {
+    const response = await apiClient.getServices();
+    const data = (response.data?.services || []) as ServiceListItem[];
+    saServicesCache.timestamp = Date.now();
+    saServicesCache.data = data;
+    return data;
+  })();
+
+  try {
+    return await saServicesInFlight;
+  } finally {
+    saServicesInFlight = null;
+  }
+}
+
 type ActiveTab = 'overview' | 'users' | 'services' | 'managers' | 'approvals';
 
 export function SuperAdminDashboard() {
@@ -93,11 +179,11 @@ export function SuperAdminDashboard() {
     }
   }, [activeTab]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (forceRefresh = false) => {
     setIsLoading(true);
     try {
-      const response = await apiClient.getSuperAdminStats();
-      setStats(response.data);
+      const data = await fetchSAStats(forceRefresh);
+      setStats(data);
     } catch (error: any) {
       toast.error('Failed to load dashboard stats');
     } finally {
@@ -105,19 +191,19 @@ export function SuperAdminDashboard() {
     }
   };
 
-  const loadUsers = async () => {
+  const loadUsers = async (forceRefresh = false) => {
     try {
-      const response = await apiClient.getAllUsers();
-      setUsers(response.data?.users || []);
+      const data = await fetchSAUsers(forceRefresh);
+      setUsers(data);
     } catch (error: any) {
       toast.error('Failed to load users');
     }
   };
 
-  const loadServices = async () => {
+  const loadServices = async (forceRefresh = false) => {
     try {
-      const response = await apiClient.getServices();
-      setServices(response.data?.services || []);
+      const data = await fetchSAServices(forceRefresh);
+      setServices(data);
     } catch (error: any) {
       toast.error('Failed to load services');
     }
@@ -161,7 +247,7 @@ export function SuperAdminDashboard() {
         role: 'ACCOUNT_MANAGER',
         serviceId: '',
       });
-      loadUsers();
+      loadUsers(true);
     } catch (error: any) {
       toast.error('Failed to create user');
     } finally {
@@ -408,8 +494,8 @@ export function SuperAdminDashboard() {
         user={editingUser}
         onClose={() => setEditingUser(null)}
         onSave={() => {
-          loadUsers();
-          loadDashboardData();
+          loadUsers(true);
+          loadDashboardData(true);
         }}
       />
 
@@ -419,8 +505,8 @@ export function SuperAdminDashboard() {
           isOpen={true}
           onClose={() => setEditingService(null)}
           onSave={() => {
-            loadServices();
-            loadDashboardData();
+            loadServices(true);
+            loadDashboardData(true);
           }}
           service={editingService as any}
         />

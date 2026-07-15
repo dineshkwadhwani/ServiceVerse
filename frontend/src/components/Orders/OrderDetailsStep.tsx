@@ -4,6 +4,7 @@ import { COLORS } from '@/utils/theme';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 import { CustomerNotFoundModal } from './CustomerNotFoundModal';
+import { useAuthStore } from '@/store/authStore';
 
 interface MenuItem {
   menuItemId: string;
@@ -18,6 +19,10 @@ interface OrderItem extends MenuItem {
 
 interface Props {
   spId: string;
+  isCustomerCreating?: boolean;
+  availableSPs?: Array<{ spId: string; businessName: string }>;
+  selectedSpId?: string;
+  onSPChange?: (spId: string) => void;
   initialData?: {
     customer: any;
     items: OrderItem[];
@@ -25,6 +30,8 @@ interface Props {
     deliveryDateTime?: string;
     specialInstructions: string;
     paymentMethod: 'ONLINE' | 'DIRECT';
+    deliveryType?: 'DROP' | 'PICKUP';
+    selectedCoworker?: string;
   };
   onNext: (data: {
     customer: any;
@@ -33,12 +40,24 @@ interface Props {
     deliveryDateTime?: string;
     specialInstructions: string;
     paymentMethod: 'ONLINE' | 'DIRECT';
+    deliveryType: 'DROP' | 'PICKUP';
+    selectedCoworker: string;
   }) => void;
   onCancel: () => void; // eslint-disable-line @typescript-eslint/no-unused-vars
 }
 
-export function OrderDetailsStep({ spId, initialData, onNext, onCancel }: Props) {
+export function OrderDetailsStep({
+  spId,
+  isCustomerCreating,
+  availableSPs,
+  selectedSpId,
+  onSPChange,
+  initialData,
+  onNext,
+  onCancel,
+}: Props) {
   const toast = useToast();
+  const { user, firebaseUser } = useAuthStore();
 
   // Customer search
   const [customerPhone, setCustomerPhone] = useState(initialData?.customer?.phone || '');
@@ -56,15 +75,96 @@ export function OrderDetailsStep({ spId, initialData, onNext, onCancel }: Props)
   const [specialInstructions, setSpecialInstructions] = useState(initialData?.specialInstructions || '');
   const [paymentMethod, setPaymentMethod] = useState<'ONLINE' | 'DIRECT'>(initialData?.paymentMethod || 'DIRECT');
 
-  // Load menu items
+  // Pickup/Drop delivery type
+  const [deliveryType, setDeliveryType] = useState<'DROP' | 'PICKUP'>(
+    initialData?.deliveryType || (isCustomerCreating ? 'PICKUP' : 'DROP')
+  );
+  const [selectedCoworker, setSelectedCoworker] = useState('');
+
+  // Coworkers
+  const [coworkers, setCoworkers] = useState<any[]>([]);
+  const [isLoadingCoworkers, setIsLoadingCoworkers] = useState(false);
+
+  const spSelfName =
+    (user as any)?.name ||
+    (user as any)?.ownerName ||
+    (user as any)?.businessName ||
+    firebaseUser?.displayName ||
+    'Self';
+
+  // Load menu items and coworkers
   useEffect(() => {
+    if (!spId) {
+      setOrderItems([]);
+      setIsLoadingMenu(false);
+      return;
+    }
+
     // Only load if we don't have initial data with items
     if (!initialData?.items || initialData.items.length === 0) {
       loadMenuItems();
     } else {
       setIsLoadingMenu(false);
     }
+
+    if (!isCustomerCreating) {
+      loadCoworkers();
+    } else {
+      setCoworkers([]);
+      setSelectedCoworker('');
+    }
   }, [spId]);
+
+  // Sync state when initial data arrives asynchronously (customer flow prefill)
+  useEffect(() => {
+    if (!initialData) return;
+
+    setCustomer(initialData.customer || null);
+    setCustomerPhone(initialData.customer?.phone || '');
+    setDeliveryAddress(initialData.deliveryAddress || initialData.customer?.address || '');
+    setDeliveryDateTime(initialData.deliveryDateTime || '');
+    setSpecialInstructions(initialData.specialInstructions || '');
+    setPaymentMethod(initialData.paymentMethod || 'DIRECT');
+    setDeliveryType(initialData.deliveryType || (isCustomerCreating ? 'PICKUP' : 'DROP'));
+    setSelectedCoworker(initialData.selectedCoworker || '');
+  }, [initialData, isCustomerCreating]);
+
+  const loadCoworkers = async () => {
+    setIsLoadingCoworkers(true);
+    try {
+      const response: any = await apiClient.getSPCoworkers(spId);
+      const coworkerList = (response?.data?.coworkers || []).map((c: any) => ({
+        uid: c.uid,
+        name: c.name,
+        phone: c.phone,
+        status: c.status,
+      }));
+
+      const selfEntry = {
+        uid: firebaseUser?.uid || spId,
+        name: spSelfName,
+        phone: (user as any)?.phone || '',
+        status: 'ACTIVE',
+      };
+
+      // Keep self as a guaranteed, explicit option using UID-based detection.
+      const hasSelf = coworkerList.some((c: any) => c.uid === (firebaseUser?.uid || spId));
+      const mergedList = hasSelf ? coworkerList : [selfEntry, ...coworkerList];
+
+      setCoworkers(mergedList);
+    } catch (error: any) {
+      setCoworkers([
+        {
+          uid: firebaseUser?.uid || spId,
+          name: spSelfName,
+          phone: (user as any)?.phone || '',
+          status: 'ACTIVE',
+        },
+      ]);
+    } finally {
+      setIsLoadingCoworkers(false);
+    }
+  };
 
   const loadMenuItems = async () => {
     setIsLoadingMenu(true);
@@ -140,9 +240,19 @@ export function OrderDetailsStep({ spId, initialData, onNext, onCancel }: Props)
       return;
     }
 
+    if (!spId) {
+      toast.error('Please select a service provider');
+      return;
+    }
+
     const selectedItems = orderItems.filter(item => item.qty > 0);
     if (selectedItems.length === 0) {
       toast.error('Please select at least one item');
+      return;
+    }
+
+    if (!isCustomerCreating && deliveryType === 'PICKUP' && !selectedCoworker) {
+      toast.error('Please select a coworker for pickup');
       return;
     }
 
@@ -153,10 +263,18 @@ export function OrderDetailsStep({ spId, initialData, onNext, onCancel }: Props)
       deliveryDateTime,
       specialInstructions,
       paymentMethod,
+      deliveryType,
+      selectedCoworker,
     });
   };
 
   const subtotal = orderItems.reduce((sum, item) => sum + item.itemTotal, 0);
+  const selectedItemsCount = orderItems.filter(i => i.qty > 0).length;
+  const isReviewDisabled =
+    !customer ||
+    !spId ||
+    selectedItemsCount === 0 ||
+    (!isCustomerCreating && deliveryType === 'PICKUP' && !selectedCoworker);
 
   const handleCancel = () => {
     onCancel();
@@ -164,7 +282,8 @@ export function OrderDetailsStep({ spId, initialData, onNext, onCancel }: Props)
 
   return (
     <div className="space-y-6">
-      {/* Customer Search */}
+      {/* Customer Section */}
+      {!isCustomerCreating ? (
       <div className="p-4 rounded-lg border" style={{ borderColor: COLORS.border.light, backgroundColor: COLORS.bg.surface }}>
         <h3 className="font-semibold mb-3" style={{ color: COLORS.text.primary }}>
           Find Customer
@@ -218,6 +337,48 @@ export function OrderDetailsStep({ spId, initialData, onNext, onCancel }: Props)
           </div>
         )}
       </div>
+      ) : (
+      <div className="p-4 rounded-lg border" style={{ borderColor: COLORS.border.light, backgroundColor: COLORS.bg.surface }}>
+        <h3 className="font-semibold mb-3" style={{ color: COLORS.text.primary }}>
+          Your Information
+        </h3>
+        <div className="mb-3">
+          <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>
+            Service Provider
+          </label>
+          <select
+            value={selectedSpId || ''}
+            onChange={(e) => onSPChange?.(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border focus:outline-none text-sm"
+            style={{
+              borderColor: COLORS.border.light,
+              backgroundColor: COLORS.bg.primary,
+              color: COLORS.text.primary,
+            }}
+          >
+            <option value="">-- Select Service Provider --</option>
+            {(availableSPs || []).map((sp) => (
+              <option key={sp.spId} value={sp.spId}>
+                {sp.businessName}
+              </option>
+            ))}
+          </select>
+        </div>
+        {customer && (
+          <div className="space-y-2">
+            <p style={{ color: COLORS.text.secondary }}>
+              <span className="font-medium">Name:</span> {customer.name}
+            </p>
+            <p style={{ color: COLORS.text.secondary }}>
+              <span className="font-medium">Phone:</span> {customer.phone}
+            </p>
+            <p style={{ color: COLORS.text.secondary }}>
+              <span className="font-medium">Email:</span> {customer.email}
+            </p>
+          </div>
+        )}
+      </div>
+      )}
 
       {/* Menu Items - Scrollable with sticky summary */}
       {!isLoadingMenu ? (
@@ -304,62 +465,145 @@ export function OrderDetailsStep({ spId, initialData, onNext, onCancel }: Props)
       )}
 
       {/* Delivery Details */}
-      {customer && (
+      {(customer || isCustomerCreating) && (
         <div className="space-y-4 p-4 rounded-lg border" style={{ borderColor: COLORS.border.light, backgroundColor: COLORS.bg.surface }}>
           <h3 className="font-semibold" style={{ color: COLORS.text.primary }}>
-            Delivery Details
+            {isCustomerCreating ? 'Order Preferences' : 'Delivery Details'}
           </h3>
 
-          <div>
-            <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>
-              Delivery Address
-            </label>
-            <textarea
-              value={deliveryAddress}
-              onChange={e => setDeliveryAddress(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border focus:outline-none text-sm"
-              rows={3}
-              style={{
-                borderColor: COLORS.border.light,
-                backgroundColor: COLORS.bg.primary,
-                color: COLORS.text.primary,
-              }}
-            />
-          </div>
+          {!isCustomerCreating && (
+            <>
+              <div>
+                <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>
+                  Delivery Address
+                </label>
+                <textarea
+                  value={deliveryAddress}
+                  onChange={e => setDeliveryAddress(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border focus:outline-none text-sm"
+                  rows={3}
+                  style={{
+                    borderColor: COLORS.border.light,
+                    backgroundColor: COLORS.bg.primary,
+                    color: COLORS.text.primary,
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>
+                  Delivery Date/Time (Optional)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={deliveryDateTime}
+                  onChange={e => setDeliveryDateTime(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border focus:outline-none text-sm"
+                  style={{
+                    borderColor: COLORS.border.light,
+                    backgroundColor: COLORS.bg.primary,
+                    color: COLORS.text.primary,
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>
+                  Special Instructions (Optional)
+                </label>
+                <textarea
+                  value={specialInstructions}
+                  onChange={e => setSpecialInstructions(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border focus:outline-none text-sm"
+                  rows={2}
+                  style={{
+                    borderColor: COLORS.border.light,
+                    backgroundColor: COLORS.bg.primary,
+                    color: COLORS.text.primary,
+                  }}
+                />
+              </div>
+            </>
+          )}
+
+          {isCustomerCreating && (
+            <div>
+              <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>
+                Instructions for Service Provider (Optional)
+              </label>
+              <textarea
+                value={specialInstructions}
+                onChange={e => setSpecialInstructions(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border focus:outline-none text-sm"
+                rows={2}
+                style={{
+                  borderColor: COLORS.border.light,
+                  backgroundColor: COLORS.bg.primary,
+                  color: COLORS.text.primary,
+                }}
+              />
+            </div>
+          )}
 
           <div>
-            <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>
-              Delivery Date/Time (Optional)
+            <label className="text-sm font-semibold block mb-2" style={{ color: COLORS.text.secondary }}>
+              Delivery Type
             </label>
-            <input
-              type="datetime-local"
-              value={deliveryDateTime}
-              onChange={e => setDeliveryDateTime(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border focus:outline-none text-sm"
-              style={{
-                borderColor: COLORS.border.light,
-                backgroundColor: COLORS.bg.primary,
-                color: COLORS.text.primary,
-              }}
-            />
+            <div className="flex gap-4">
+              {(['DROP', 'PICKUP'] as const).map(type => (
+                <label key={type} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="deliveryType"
+                    value={type}
+                    checked={deliveryType === type}
+                    onChange={e => setDeliveryType(e.target.value as 'DROP' | 'PICKUP')}
+                  />
+                  <span style={{ color: COLORS.text.primary }}>{type === 'DROP' ? 'Delivery (Drop)' : 'Pickup'}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
-          <div>
-            <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>
-              Special Instructions (Optional)
-            </label>
-            <textarea
-              value={specialInstructions}
-              onChange={e => setSpecialInstructions(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border focus:outline-none text-sm"
-              rows={2}
-              style={{
-                borderColor: COLORS.border.light,
-                backgroundColor: COLORS.bg.primary,
-                color: COLORS.text.primary,
-              }}
-            />
-          </div>
+          {deliveryType === 'PICKUP' && !isCustomerCreating && (
+            <div>
+              <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>
+                Select Coworker for Pickup
+              </label>
+              {isLoadingCoworkers ? (
+                <div className="w-full px-3 py-2 rounded-lg border text-sm" style={{
+                  borderColor: COLORS.border.light,
+                  backgroundColor: COLORS.bg.primary,
+                  color: COLORS.text.secondary,
+                }}>
+                  Loading coworkers...
+                </div>
+              ) : (
+                <select
+                  value={selectedCoworker}
+                  onChange={e => setSelectedCoworker(e.target.value)}
+                  disabled={coworkers.length === 0}
+                  className="w-full px-3 py-2 rounded-lg border focus:outline-none text-sm disabled:opacity-50"
+                  style={{
+                    borderColor: COLORS.border.light,
+                    backgroundColor: COLORS.bg.primary,
+                    color: COLORS.text.primary,
+                  }}
+                >
+                  <option value="">
+                    {coworkers.length === 0 ? '-- No coworkers available --' : '-- Select Coworker --'}
+                  </option>
+                  {coworkers.map(coworker => (
+                    <option key={coworker.uid} value={coworker.name}>
+                      {coworker.uid === (firebaseUser?.uid || spId)
+                        ? `Self - ${coworker.name}${coworker.phone ? ` (${coworker.phone})` : ''}`
+                        : `${coworker.name}${coworker.phone ? ` (${coworker.phone})` : ''}`}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="text-sm font-semibold block mb-2" style={{ color: COLORS.text.secondary }}>
@@ -380,31 +624,35 @@ export function OrderDetailsStep({ spId, initialData, onNext, onCancel }: Props)
               ))}
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Action Buttons */}
-      {customer && orderItems.filter(i => i.qty > 0).length > 0 && (
-        <div className="flex gap-3 sticky bottom-0">
-          <button
-            onClick={handleCancel}
-            className="flex-1 px-4 py-2 rounded-lg font-semibold transition"
-            style={{
-              backgroundColor: COLORS.bg.surface,
-              color: COLORS.text.primary,
-              border: `1px solid ${COLORS.border.light}`,
-            }}
-          >
-            Cancel
-          </button>
+          <div className="pt-2">
+            <div className="flex gap-3">
+              {!isCustomerCreating && (
+                <button
+                  onClick={handleCancel}
+                  className="flex-1 px-4 py-2 rounded-lg font-semibold transition"
+                  style={{
+                    backgroundColor: COLORS.bg.surface,
+                    color: COLORS.text.primary,
+                    border: `1px solid ${COLORS.border.light}`,
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
 
-          <button
-            onClick={handleReview}
-            className="flex-1 px-4 py-2 rounded-lg font-semibold text-white transition"
-            style={{ backgroundColor: COLORS.semantic.info }}
-          >
-            Review Order
-          </button>
+              <button
+                onClick={handleReview}
+                disabled={isReviewDisabled}
+                className="flex-1 px-4 py-2 rounded-lg font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: COLORS.semantic.info,
+                }}
+              >
+                {isCustomerCreating && !customer ? 'Loading profile...' : 'Review Order'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

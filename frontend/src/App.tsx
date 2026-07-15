@@ -50,6 +50,8 @@ function RoleBasedDashboard() {
       return <AMDashboard />;
     case USER_ROLES.SERVICE_PROVIDER:
       return <SPDashboard />;
+    case USER_ROLES.COWORKER:
+      return <SPDashboard />;
     case USER_ROLES.CUSTOMER:
       return <CustomerDashboard />;
     default:

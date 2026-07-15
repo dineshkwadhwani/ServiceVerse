@@ -10,6 +10,7 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_MEASUREMENT_ID?: string;
   readonly VITE_FIREBASE_VAPID_KEY?: string;
   readonly VITE_RAZORPAY_KEY_ID: string;
+  readonly VITE_USE_SERVER_RAZORPAY?: string;
   readonly VITE_API_URL: string;
   readonly VITE_APP_NAME: string;
   readonly VITE_APP_URL: string;
