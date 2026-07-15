@@ -249,6 +249,7 @@ export function SPProfileEditModal({
               data={basicInfo}
               onChange={setBasicInfo}
               phoneNumber={spPhone}
+              spId={spId}
             />
           )}
 

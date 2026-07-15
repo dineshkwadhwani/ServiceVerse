@@ -1,4 +1,7 @@
-import { Mail, Phone, User, MapPin } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Mail, Phone, User, MapPin, Upload, ImageIcon } from 'lucide-react';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '@/utils/firebase-config';
 import { COLORS } from '@/utils/theme';
 import type { BasicInfoData } from '@/types';
 
@@ -6,14 +9,33 @@ interface Props {
   data: BasicInfoData;
   onChange: (data: BasicInfoData) => void;
   phoneNumber?: string;
+  spId?: string;
 }
 
-export function BasicInfoForm({ data, onChange, phoneNumber }: Props) {
+export function BasicInfoForm({ data, onChange, phoneNumber, spId }: Props) {
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleChange = (field: keyof BasicInfoData, value: string) => {
     onChange({
       ...data,
       [field]: value,
     });
+  };
+
+  const handleLogoUpload = async (file: File) => {
+    setIsUploading(true);
+    try {
+      const path = `sp-logos/${spId || 'unknown'}/logo`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      onChange({ ...data, logoUrl: url });
+    } catch {
+      // Upload failed silently — logo remains optional
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const validateEmail = (email: string) => {
@@ -36,6 +58,58 @@ export function BasicInfoForm({ data, onChange, phoneNumber }: Props) {
       </div>
 
       <form className="space-y-6">
+        {/* Business Logo (Optional) */}
+        <div>
+          <label className="flex items-center gap-2 font-semibold mb-3" style={{ color: COLORS.text.primary }}>
+            <ImageIcon className="w-4 h-4" />
+            Business Logo <span className="text-xs font-normal ml-1" style={{ color: COLORS.text.secondary }}>(optional)</span>
+          </label>
+          <div className="flex items-center gap-4">
+            <div
+              className="w-20 h-20 rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer"
+              style={{ borderColor: COLORS.border.light, backgroundColor: COLORS.bg.hover }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {data.logoUrl ? (
+                <img src={data.logoUrl} alt="Business logo" className="w-full h-full object-cover" />
+              ) : (
+                <ImageIcon className="w-8 h-8" style={{ color: COLORS.text.tertiary }} />
+              )}
+            </div>
+            <div className="flex-1">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition"
+                style={{
+                  borderColor: COLORS.border.light,
+                  color: COLORS.text.primary,
+                  backgroundColor: COLORS.bg.primary,
+                  opacity: isUploading ? 0.6 : 1,
+                }}
+              >
+                <Upload className="w-4 h-4" />
+                {isUploading ? 'Uploading...' : data.logoUrl ? 'Change Logo' : 'Upload Logo'}
+              </button>
+              <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
+                JPG, PNG or GIF · Max 2MB
+              </p>
+            </div>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleLogoUpload(file);
+              e.target.value = '';
+            }}
+          />
+        </div>
+
         {/* Phone (Non-Editable) */}
         <div>
           <label

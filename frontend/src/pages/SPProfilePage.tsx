@@ -163,7 +163,7 @@ export function SPProfilePage() {
           }}
         >
           {activeStep === 'basic' && (
-            <BasicInfoForm data={basicInfo} onChange={setBasicInfo} phoneNumber={user.phone} />
+            <BasicInfoForm data={basicInfo} onChange={setBasicInfo} phoneNumber={user.phone} spId={user.uid} />
           )}
 
           {activeStep === 'operations' && (

@@ -177,6 +177,7 @@ export interface BasicInfoData {
   area: string;
   city: string;
   pinCode: string;
+  logoUrl?: string;
 }
 
 export interface OperationsData {

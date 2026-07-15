@@ -341,6 +341,7 @@ export function SPOnboardingStepper({
               data={basicInfo}
               onChange={setBasicInfo}
               phoneNumber={spPhone}
+              spId={spId}
             />
           )}
 

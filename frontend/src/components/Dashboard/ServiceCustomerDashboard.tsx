@@ -215,31 +215,35 @@ export function ServiceCustomerDashboard() {
           </h1>
         </div>
 
-        {/* Service Providers Grid */}
-        <div className="mb-8">
+        {/* Service Providers List */}
+        <div className="mb-8 space-y-3">
           {spsInPinCode.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-              {spsInPinCode.map((sp) => (
-                <div
-                  key={sp.spId}
-                  className="flex flex-col items-center text-center"
-                >
-                  {/* Logo/Icon */}
+            spsInPinCode.map((sp) => (
+              <div
+                key={sp.spId}
+                className="p-4 rounded-lg border flex items-center gap-4 justify-between"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  borderColor: COLORS.border.light,
+                }}
+              >
+                {/* Logo */}
+                <div className="flex-shrink-0">
                   {sp.logo ? (
                     <img
                       src={sp.logo}
                       alt={sp.businessName}
-                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover mb-3 shadow-md"
+                      className="w-16 h-16 rounded-lg object-cover"
                     />
                   ) : service?.logo ? (
                     <img
                       src={service.logo}
                       alt={service.name}
-                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover mb-3 shadow-md"
+                      className="w-16 h-16 rounded-lg object-cover"
                     />
                   ) : (
                     <div
-                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl flex items-center justify-center font-bold text-white text-3xl mb-3 shadow-md"
+                      className="w-16 h-16 rounded-lg flex items-center justify-center font-bold text-white text-2xl"
                       style={{
                         backgroundColor: service?.colorTheme?.primary || COLORS.semantic.info,
                       }}
@@ -247,27 +251,29 @@ export function ServiceCustomerDashboard() {
                       {sp.businessName.charAt(0)}
                     </div>
                   )}
+                </div>
 
-                  {/* Business Name */}
+                {/* Business Name */}
+                <div className="flex-1 min-w-0">
                   <h3
-                    className="font-semibold text-sm line-clamp-2 mb-3"
+                    className="font-semibold text-base"
                     style={{ color: COLORS.text.primary }}
                   >
                     {sp.businessName}
                   </h3>
-
-                  {/* Order Button */}
-                  <button
-                    onClick={() => handleStartOrder(sp)}
-                    className="px-4 py-2 rounded-lg font-semibold text-white text-sm transition hover:opacity-90 flex items-center gap-1"
-                    style={{ backgroundColor: COLORS.semantic.info }}
-                  >
-                    <Plus className="w-3 h-3" />
-                    Order
-                  </button>
                 </div>
-              ))}
-            </div>
+
+                {/* Order Button */}
+                <button
+                  onClick={() => handleStartOrder(sp)}
+                  className="flex-shrink-0 px-4 py-2 rounded-lg font-semibold text-white transition hover:opacity-90 flex items-center gap-1"
+                  style={{ backgroundColor: COLORS.semantic.info }}
+                >
+                  <Plus className="w-4 h-4" />
+                  Order
+                </button>
+              </div>
+            ))
           ) : (
             <EmptyState message="No service providers available in your area for this service" />
           )}
@@ -322,70 +328,73 @@ export function ServiceCustomerDashboard() {
 
           {/* Orders Tab */}
           {activeTab === 'orders' && (
-            <div className="p-4 md:p-6 space-y-6">
+            <div className="p-4 md:p-6">
               {/* Create New Order Section */}
-              <div
-                className="p-6 rounded-lg border"
-                style={{
-                  backgroundColor: COLORS.bg.surface,
-                  borderColor: COLORS.border.light,
-                }}
-              >
+              <div className="mb-6">
                 <h3
-                  className="font-semibold mb-6"
+                  className="font-semibold text-lg mb-4"
                   style={{ color: COLORS.text.primary }}
                 >
-                  Create New Order - Select Service Provider
+                  Create New Order
                 </h3>
 
                 {spsInPinCode.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  <div className="space-y-3">
                     {spsInPinCode.map((sp) => (
-                      <button
+                      <div
                         key={sp.spId}
-                        onClick={() => handleStartOrder(sp)}
-                        className="flex flex-col items-center text-center transition hover:opacity-80"
+                        className="p-4 rounded-lg border flex items-center gap-4 justify-between"
+                        style={{
+                          backgroundColor: COLORS.bg.surface,
+                          borderColor: COLORS.border.light,
+                        }}
                       >
-                        {/* Logo/Icon */}
-                        {sp.logo ? (
-                          <img
-                            src={sp.logo}
-                            alt={sp.businessName}
-                            className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover mb-2"
-                          />
-                        ) : service?.logo ? (
-                          <img
-                            src={service.logo}
-                            alt={service.name}
-                            className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover mb-2"
-                          />
-                        ) : (
-                          <div
-                            className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl flex items-center justify-center font-bold text-white text-2xl mb-2"
-                            style={{
-                              backgroundColor: service?.colorTheme?.primary || COLORS.semantic.info,
-                            }}
-                          >
-                            {sp.businessName.charAt(0)}
-                          </div>
-                        )}
+                        {/* Logo */}
+                        <div className="flex-shrink-0">
+                          {sp.logo ? (
+                            <img
+                              src={sp.logo}
+                              alt={sp.businessName}
+                              className="w-16 h-16 rounded-lg object-cover"
+                            />
+                          ) : service?.logo ? (
+                            <img
+                              src={service.logo}
+                              alt={service.name}
+                              className="w-16 h-16 rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div
+                              className="w-16 h-16 rounded-lg flex items-center justify-center font-bold text-white text-2xl"
+                              style={{
+                                backgroundColor: service?.colorTheme?.primary || COLORS.semantic.info,
+                              }}
+                            >
+                              {sp.businessName.charAt(0)}
+                            </div>
+                          )}
+                        </div>
 
                         {/* Business Name */}
-                        <p
-                          className="font-semibold text-xs line-clamp-2 mb-2"
-                          style={{ color: COLORS.text.primary }}
-                        >
-                          {sp.businessName}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <h3
+                            className="font-semibold text-base"
+                            style={{ color: COLORS.text.primary }}
+                          >
+                            {sp.businessName}
+                          </h3>
+                        </div>
 
                         {/* Order Button */}
-                        <span
-                          className="px-3 py-1 rounded-lg font-semibold text-white text-xs"
+                        <button
+                          onClick={() => handleStartOrder(sp)}
+                          className="flex-shrink-0 px-4 py-2 rounded-lg font-semibold text-white transition hover:opacity-90 flex items-center gap-1"
                           style={{ backgroundColor: COLORS.semantic.info }}
                         >
+                          <Plus className="w-4 h-4" />
                           Order
-                        </span>
-                      </button>
+                        </button>
+                      </div>
                     ))}
                   </div>
                 ) : (
