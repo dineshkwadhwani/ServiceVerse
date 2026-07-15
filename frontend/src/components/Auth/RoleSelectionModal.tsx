@@ -15,13 +15,14 @@ export function RoleSelectionModal({ isOpen, onClose, serviceId }: RoleSelection
   if (!isOpen) return null;
 
   const handleRoleSelect = (role: 'CUSTOMER' | 'SERVICE_PROVIDER') => {
-    // Store serviceId in sessionStorage instead of URL to prevent exposure in:
+    // Store both serviceId and role in sessionStorage to prevent exposure in:
     // - Browser history, server logs, analytics, CDN caches, referrer headers
-    if (serviceId) {
-      setRegistrationContext({ serviceId });
-    }
-    // Keep only role in URL for routing (non-sensitive)
-    navigate(`/register?role=${role}`);
+    setRegistrationContext({
+      serviceId,
+      role,
+    });
+    // Navigate with clean URL - no sensitive data in params
+    navigate(`/register`);
   };
 
   return (

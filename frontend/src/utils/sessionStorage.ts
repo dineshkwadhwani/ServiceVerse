@@ -11,6 +11,7 @@ const REGISTRATION_SESSION_KEY = 'serviceverse_registration_context';
 
 interface RegistrationContext {
   serviceId?: string;
+  role?: 'SERVICE_PROVIDER' | 'CUSTOMER';
   timestamp: number;
 }
 
@@ -61,6 +62,14 @@ export function getRegistrationContext(): RegistrationContext | null {
 export function getRegistrationServiceId(): string | null {
   const context = getRegistrationContext();
   return context?.serviceId || null;
+}
+
+/**
+ * Get role from session storage
+ */
+export function getRegistrationRole(): 'SERVICE_PROVIDER' | 'CUSTOMER' | null {
+  const context = getRegistrationContext();
+  return context?.role || null;
 }
 
 /**

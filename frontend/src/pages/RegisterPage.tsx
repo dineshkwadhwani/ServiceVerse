@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Briefcase, Loader2 } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
 import { Navbar } from '@/components/Shared/Navbar';
@@ -7,16 +7,15 @@ import { RegisterSPForm } from '@/components/Auth/RegisterSPForm';
 import { RegisterCustomerForm } from '@/components/Auth/RegisterCustomerForm';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
-import { getRegistrationServiceId } from '@/utils/sessionStorage';
+import { getRegistrationServiceId, getRegistrationRole } from '@/utils/sessionStorage';
 import type { Service } from '@/types';
 
 export function RegisterPage() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
 
   const [role, setRole] = useState<'SERVICE_PROVIDER' | 'CUSTOMER' | null>(
-    (searchParams.get('role') as 'SERVICE_PROVIDER' | 'CUSTOMER') || null
+    getRegistrationRole() || null
   );
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [services, setServices] = useState<Service[]>([]);
