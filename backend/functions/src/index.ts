@@ -35,9 +35,43 @@ const logger = new Logger('CloudFunctions');
 // Initialize Express app
 const app = express();
 
+const defaultAllowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://serviceverse.vercel.app',
+  'https://serviceverse-stage.vercel.app',
+];
+
+const configuredAllowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = new Set([
+  ...defaultAllowedOrigins,
+  ...configuredAllowedOrigins,
+]);
+
+const isServiceVerseVercelPreviewOrigin = (origin: string) =>
+  /^https:\/\/serviceverse(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
+
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'https://serviceverse.vercel.app'],
+  origin: (origin, callback) => {
+    // Allow server-to-server and local tool requests with no Origin header.
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    if (allowedOrigins.has(origin) || isServiceVerseVercelPreviewOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    logger.warn('CORS blocked request', { origin });
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -97,6 +131,10 @@ app.post('/auth/complete-registration', verifyToken, async (req, res) => {
 
 // Auth middleware for all other routes
 app.use(verifyToken);
+
+app.post('/auth/register-push-token', async (req, res) => {
+  authHandlers.registerPushToken(req, res);
+});
 
 // ============================================================================
 // CUSTOMER DASHBOARD

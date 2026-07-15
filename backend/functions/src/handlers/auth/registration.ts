@@ -1,7 +1,8 @@
 import * as functions from 'firebase-functions';
-import { db, auth } from '@/utils/firebase';
+import admin, { db, auth } from '@/utils/firebase';
 import { Logger } from '@/utils/logger';
 import { ValidationError, sendError, sendSuccess } from '@/middleware/errorHandler';
+import { sendNotificationByEvent } from '@/utils/notificationCenter';
 import type { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 const Resend = require('resend').Resend;
@@ -12,10 +13,21 @@ const logger = new Logger('AuthHandlers');
 let resend: any = null;
 
 function getResend() {
-  if (!resend && process.env.RESEND_API_KEY) {
-    resend = new Resend(process.env.RESEND_API_KEY);
+  if (!resend) {
+    const apiKey = process.env.RESEND_API_KEY || functions.config().resend?.api_key;
+    if (apiKey) {
+      resend = new Resend(apiKey);
+    }
   }
   return resend;
+}
+
+function getFromEmail() {
+  return (
+    process.env.FROM_EMAIL_ADDRESS ||
+    functions.config().email?.from_address ||
+    'onboarding@resend.dev'
+  );
 }
 
 /**
@@ -151,6 +163,13 @@ export async function registerCustomer(req: any, res: Response) {
       .set(association);
 
     logger.info('Service association created', { userId: authUser.uid, serviceId });
+
+    await sendNotificationByEvent('ACCOUNT_CREATED', {
+      userId: authUser.uid,
+      name,
+      email,
+      role: 'CUSTOMER',
+    });
 
     return sendSuccess(res, {
       uid: authUser.uid,
@@ -306,6 +325,19 @@ export async function registerServiceProvider(req: any, res: Response) {
       .set(association);
 
     logger.info('Service association created', { userId: authUser.uid, serviceId });
+
+    await sendNotificationByEvent('ACCOUNT_CREATED', {
+      userId: authUser.uid,
+      name: ownerName,
+      email,
+      role: 'SERVICE_PROVIDER',
+    });
+
+    await sendNotificationByEvent('SP_REGISTERED', {
+      spId: authUser.uid,
+      businessName,
+      email,
+    });
 
     return sendSuccess(res, {
       uid: authUser.uid,
@@ -500,6 +532,21 @@ export async function completeRegistration(req: any, res: Response) {
     await auth.setCustomUserClaims(userId, { role });
     console.log('Custom claims set', { userId, role });
 
+    await sendNotificationByEvent('ACCOUNT_CREATED', {
+      userId,
+      name,
+      email,
+      role,
+    });
+
+    if (role === 'SERVICE_PROVIDER') {
+      await sendNotificationByEvent('SP_REGISTERED', {
+        spId: userId,
+        businessName: (req.body as any).businessName || name,
+        email,
+      });
+    }
+
     return sendSuccess(res, {
       uid: userId,
       email,
@@ -554,7 +601,7 @@ export async function sendEmailOTP(req: any, res: Response) {
     if (emailService) {
       try {
         await emailService.emails.send({
-          from: 'noreply@serviceverse.app',
+          from: getFromEmail(),
           to: email,
           subject: 'Your ServiceVerse Verification Code',
           html: `
@@ -729,6 +776,37 @@ export async function verifyPhoneOTP(req: any, res: Response) {
     });
   } catch (error: any) {
     logger.error('Failed to verify phone OTP', error);
+    return sendError(res, error);
+  }
+}
+
+/**
+ * Register push token for authenticated user
+ */
+export async function registerPushToken(req: any, res: Response) {
+  try {
+    const user = req.user;
+    const { token } = req.body || {};
+
+    if (!user?.uid) {
+      return sendError(res, new ValidationError('User not authenticated'));
+    }
+
+    if (!token || typeof token !== 'string') {
+      return sendError(res, new ValidationError('Valid push token is required'));
+    }
+
+    await db.collection('users').doc(user.uid).set(
+      {
+        fcmTokens: admin.firestore.FieldValue.arrayUnion(token),
+        updatedAt: new Date(),
+      },
+      { merge: true }
+    );
+
+    return sendSuccess(res, { message: 'Push token registered successfully' });
+  } catch (error: any) {
+    logger.error('Failed to register push token', error);
     return sendError(res, error);
   }
 }

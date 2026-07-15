@@ -1,6 +1,7 @@
 import { db } from '@/utils/firebase';
 import { Logger } from '@/utils/logger';
 import { ValidationError, sendError, sendSuccess } from '@/middleware/errorHandler';
+import { sendNotificationByEvent } from '@/utils/notificationCenter';
 import type { AuthRequest } from '@/middleware/auth';
 import { Response } from 'express';
 
@@ -61,6 +62,13 @@ export async function updateSPActivationStatus(req: AuthRequest, res: Response) 
       status: newStatus,
       updatedAt: new Date(),
     });
+
+    if (activate) {
+      await sendNotificationByEvent('SP_ACTIVATION_COMPLETE', {
+        spId,
+        spName: spData.businessName || spData.name || spId,
+      });
+    }
 
     logger.info('SP activation status updated', { spId, newStatus });
 

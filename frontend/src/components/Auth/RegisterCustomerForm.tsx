@@ -7,6 +7,7 @@ import { auth } from '@/utils/firebase-config';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 import { useAuthStore } from '@/store/authStore';
+import { clearRegistrationContext } from '@/utils/sessionStorage';
 import { OTPVerificationStep } from './OTPVerificationStep';
 
 interface FormData {
@@ -138,6 +139,7 @@ export function RegisterCustomerForm({ serviceId, serviceName }: Props) {
       }
 
       toast.success('Registration successful!');
+      clearRegistrationContext(); // Clear sensitive data from sessionStorage
       navigate(`/dashboard`);
     } catch (error: any) {
       console.error('[RegisterCustomer] 🔴 Registration ERROR:', {

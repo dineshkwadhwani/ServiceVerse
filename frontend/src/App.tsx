@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { auth } from '@/utils/firebase-config';
+import { auth, initFCM } from '@/utils/firebase-config';
 import { useAuthStore } from '@/store/authStore';
 import { useNotificationStore } from '@/store/notificationStore';
 import { USER_ROLES } from '@/utils/constants';
+import { apiClient } from '@/services/apiClient';
 
 import { LandingPage } from '@/pages/LandingPage';
 import { ServiceDetailPage } from '@/pages/ServiceDetailPage';
@@ -60,7 +61,7 @@ function RoleBasedDashboard() {
 }
 
 export function App() {
-  const { setFirebaseUser, loadUserProfile, setUser, isAuthReady } = useAuthStore();
+  const { setFirebaseUser, loadUserProfile, setUser, isAuthReady, firebaseUser } = useAuthStore();
   const { toasts } = useNotificationStore();
 
   useEffect(() => {
@@ -77,6 +78,28 @@ export function App() {
 
     return () => unsubscribe();
   }, [setFirebaseUser, loadUserProfile, setUser]);
+
+  useEffect(() => {
+    if (!isAuthReady || !firebaseUser) return;
+
+    let cancelled = false;
+
+    const registerDeviceToken = async () => {
+      try {
+        const token = await initFCM();
+        if (!token || cancelled) return;
+        await apiClient.registerPushToken(token);
+      } catch {
+        // Push registration is best effort and should not block app flow.
+      }
+    };
+
+    registerDeviceToken();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthReady, firebaseUser?.uid]);
 
   if (!isAuthReady) {
     return <AuthLoadingScreen />;

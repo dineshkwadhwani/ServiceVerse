@@ -9,6 +9,7 @@ import { StatsGrid } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
 import { CreateOrderModal } from '@/components/Orders/CreateOrderModal';
 import { OrderLifecycleModal } from '@/components/Orders/OrderLifecycleModal';
+import { InvoiceModal } from '@/components/Orders/InvoiceModal';
 import { COLORS } from '@/utils/theme';
 import { getDoc, doc } from 'firebase/firestore';
 import { db } from '@/utils/firebase-config';
@@ -17,7 +18,8 @@ import type { Service } from '@/types';
 interface Order {
   orderId: string;
   spId?: string;
-  status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED' | 'NEW';
+  customerName?: string;
+  status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED' | 'NEW' | 'COMPLETED' | 'PAID';
   totalAmount: number;
   createdAt: Date;
   items: Array<{ name: string; quantity?: number; price?: number; qty?: number; customPrice?: number }>;
@@ -49,6 +51,7 @@ export function ServiceCustomerDashboard() {
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [currentSpId, setCurrentSpId] = useState<string>('');
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     if (serviceId && firebaseUser?.uid) {
@@ -69,6 +72,7 @@ export function ServiceCustomerDashboard() {
         const loadedOrders = (ordersResponse?.data?.orders || []).map((order: any) => ({
           orderId: order.orderId || '',
           spId: order.spId || '',
+          customerName: order.customerName || '',
           status: order.status || 'NEW',
           totalAmount: order.total || 0,
           createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
@@ -140,6 +144,11 @@ export function ServiceCustomerDashboard() {
       default:
         return <Clock className="w-5 h-5" />;
     }
+  };
+
+  const canViewInvoice = (status: string) => {
+    const normalized = String(status || '').toUpperCase();
+    return normalized === 'COMPLETED' || normalized === 'DELIVERED' || normalized === 'PAID';
   };
 
   const tabs: DashboardTab<ActiveTab>[] = [
@@ -370,6 +379,21 @@ export function ServiceCustomerDashboard() {
                           ${order.totalAmount.toFixed(2)}
                         </span>
                       </div>
+
+                      {canViewInvoice(order.status) && (
+                        <div className="mt-3 pt-3 border-t" style={{ borderColor: COLORS.border.light }}>
+                          <button
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setInvoiceOrder(order);
+                            }}
+                            className="text-sm font-semibold underline"
+                            style={{ color: COLORS.semantic.info }}
+                          >
+                            View Invoice
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -400,6 +424,14 @@ export function ServiceCustomerDashboard() {
           role="CUSTOMER"
           onClose={() => setSelectedOrder(null)}
           onSaved={() => loadData()}
+        />
+      )}
+
+      {invoiceOrder && (
+        <InvoiceModal
+          order={invoiceOrder}
+          businessNameHint={spInfo?.businessName || service.name}
+          onClose={() => setInvoiceOrder(null)}
         />
       )}
     </div>

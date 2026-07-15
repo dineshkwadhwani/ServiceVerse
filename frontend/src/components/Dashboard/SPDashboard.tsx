@@ -8,6 +8,7 @@ import { CreateOrderModal } from '@/components/Orders/CreateOrderModal';
 import { CreateCustomerModal } from '@/components/Orders/CreateCustomerModal';
 import { CreateCoworkerModal } from '@/components/Orders/CreateCoworkerModal';
 import { OrderLifecycleModal } from '@/components/Orders/OrderLifecycleModal';
+import { InvoiceModal } from '@/components/Orders/InvoiceModal';
 import { useDashboardContext } from '@/context/DashboardContext';
 import { apiClient } from '@/services/apiClient';
 import { COLORS } from '@/utils/theme';
@@ -19,8 +20,9 @@ interface Order {
   orderId: string;
   customerId: string;
   customerName: string;
-  status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED';
+  status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED' | 'COMPLETED' | 'PAID' | 'ASSIGNED_FOR_PICKUP' | 'READY_FOR_DELIVERY';
   deliveryType?: 'DROP' | 'PICKUP';
+  spId?: string;
   selectedCoworker?: string;
   totalAmount: number;
   createdAt: Date;
@@ -79,6 +81,7 @@ async function fetchSPDashboardData(uid: string, forceRefresh = false): Promise<
       customerName: order.customerName || 'Unknown',
       status: order.status || 'NEW',
       deliveryType: order.deliveryType || 'DROP',
+      spId: order.spId || uid,
       selectedCoworker: order.selectedCoworker || '',
       totalAmount: order.total || order.totalAmount || 0,
       createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
@@ -175,6 +178,7 @@ export function SPDashboard() {
   const [showCreateCustomer, setShowCreateCustomer] = useState(false);
   const [showCreateCoworker, setShowCreateCoworker] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [orderSearchDate, setOrderSearchDate] = useState('');
   const [loadingMoreOrders, setLoadingMoreOrders] = useState(false);
@@ -239,6 +243,7 @@ export function SPDashboard() {
         customerName: order.customerName || 'Unknown',
         status: order.status || 'NEW',
         deliveryType: order.deliveryType || 'DROP',
+        spId: order.spId || firebaseUser.uid,
         selectedCoworker: order.selectedCoworker || '',
         totalAmount: order.total || order.totalAmount || 0,
         createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
@@ -331,6 +336,11 @@ export function SPDashboard() {
   });
 
   const totalFilteredEarnings = filteredEarnings.reduce((sum, e) => sum + e.amount, 0);
+
+  const canViewInvoice = (status: string) => {
+    const normalized = String(status || '').toUpperCase();
+    return normalized === 'COMPLETED' || normalized === 'DELIVERED' || normalized === 'PAID';
+  };
 
   const normalizeAssigneeName = (value?: string) =>
     (value || '')
@@ -537,6 +547,21 @@ export function SPDashboard() {
                             ₹{order.totalAmount.toFixed(2)}
                           </span>
                         </div>
+
+                        {canViewInvoice(order.status) && (
+                          <div className="mt-3 pt-3 border-t" style={{ borderColor: COLORS.border.light }}>
+                            <button
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setInvoiceOrder(order);
+                              }}
+                              className="text-sm font-semibold underline"
+                              style={{ color: COLORS.semantic.info }}
+                            >
+                              View Invoice
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
 
@@ -881,6 +906,14 @@ export function SPDashboard() {
           coworkers={coworkers.map((c: any) => ({ uid: c.coworkerId, name: c.name }))}
           onClose={() => setSelectedOrder(null)}
           onSaved={() => loadData(true)}
+        />
+      )}
+
+      {invoiceOrder && (
+        <InvoiceModal
+          order={invoiceOrder}
+          businessNameHint={fullUserData?.businessName || (user as any)?.businessName || (user as any)?.name}
+          onClose={() => setInvoiceOrder(null)}
         />
       )}
     </div>

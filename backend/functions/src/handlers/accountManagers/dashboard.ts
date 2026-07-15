@@ -1,6 +1,7 @@
 import { db } from '@/utils/firebase';
 import { Logger } from '@/utils/logger';
 import { ValidationError, sendError, sendSuccess } from '@/middleware/errorHandler';
+import { sendNotificationByEvent } from '@/utils/notificationCenter';
 import type { AuthRequest } from '@/middleware/auth';
 import type { Response } from 'express';
 
@@ -200,6 +201,15 @@ export async function reviewUnorphanRequest(req: AuthRequest, res: Response) {
       await db.collection('users').doc(requestData.customerId).update({
         isOrphaned: true,
         orphanedAt: new Date(),
+      });
+
+      const customerDoc = await db.collection('users').doc(requestData.customerId).get();
+      const customerData = customerDoc.data() || {};
+
+      await sendNotificationByEvent('DEASSOCIATION_APPROVED', {
+        requestId,
+        customerId: requestData.customerId,
+        customerEmail: customerData?.email || '',
       });
 
       logger.info('Customer unorphaned', { customerId: requestData.customerId });

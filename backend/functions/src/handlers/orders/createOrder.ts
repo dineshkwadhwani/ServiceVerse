@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '@/utils/firebase';
 import { Logger } from '@/utils/logger';
+import { sendNotificationByEvent } from '@/utils/notificationCenter';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
@@ -192,6 +193,16 @@ export const createOrder = async (req: Request, res: Response) => {
       total: data.total,
     });
 
+    const creatorRole = createdByRole;
+    const notifyUserIds: string[] =
+      creatorRole === 'CUSTOMER' ? [data.spId] : [data.customerId];
+
+    await sendNotificationByEvent('ORDER_CREATED', {
+      orderId,
+      notifyUserIds,
+      creatorRole,
+    });
+
     return res.status(201).json({
       success: true,
       data: order,
@@ -359,6 +370,21 @@ export const updateOrderLifecycle = async (req: Request, res: Response) => {
     }
 
     await orderRef.update(updateData);
+
+    if (status === 'CONFIRMED') {
+      await sendNotificationByEvent('ORDER_CONFIRMED', {
+        orderId,
+        spId: orderData.spId,
+        customerId: orderData.customerId,
+      });
+    }
+
+    if (status === 'COMPLETED') {
+      await sendNotificationByEvent('ORDER_COMPLETED', {
+        orderId,
+        customerId: orderData.customerId,
+      });
+    }
 
     return res.status(200).json({
       success: true,

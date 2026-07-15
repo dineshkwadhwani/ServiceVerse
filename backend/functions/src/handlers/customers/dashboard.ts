@@ -1,6 +1,7 @@
 import { db } from '@/utils/firebase';
 import { Logger } from '@/utils/logger';
 import { ValidationError, sendError, sendSuccess } from '@/middleware/errorHandler';
+import { sendNotificationByEvent } from '@/utils/notificationCenter';
 import type { AuthRequest } from '@/middleware/auth';
 import type { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -247,12 +248,32 @@ export async function requestUnorphan(req: AuthRequest, res: Response) {
       reason,
     });
 
+    const customerDoc = await db.collection('users').doc(req.user.uid).get();
+    const customerData = customerDoc.data() || {};
+
+    const assocDoc = await db
+      .collection('users')
+      .doc(req.user.uid)
+      .collection('serviceAssociations')
+      .doc(serviceId)
+      .get();
+
+    const currentSPId = assocDoc.exists ? assocDoc.data()?.spId || null : null;
+    let accountManagerId: string | null = null;
+
+    if (currentSPId) {
+      const spDoc = await db.collection('users').doc(currentSPId).get();
+      accountManagerId = spDoc.data()?.accountManager?.userId || null;
+    }
+
     // Create unorphan request
     const requestId = uuidv4();
     const request = {
       requestId,
       customerId: req.user.uid,
       serviceId,
+      currentSPId,
+      accountManagerId,
       reason,
       status: 'PENDING',
       requestedAt: new Date(),
@@ -261,6 +282,15 @@ export async function requestUnorphan(req: AuthRequest, res: Response) {
     };
 
     await db.collection('unorphanRequests').doc(requestId).set(request);
+
+    await sendNotificationByEvent('DEASSOCIATION_REQUESTED', {
+      requestId,
+      customerId: req.user.uid,
+      customerName: customerData?.name || 'Customer',
+      customerEmail: customerData?.email || '',
+      reason,
+      amId: accountManagerId,
+    });
 
     logger.info('Unorphan request created', { requestId });
 

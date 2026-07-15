@@ -1,6 +1,7 @@
 import { X, User, Briefcase } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { COLORS } from '@/utils/theme';
+import { setRegistrationContext } from '@/utils/sessionStorage';
 
 interface RoleSelectionModalProps {
   isOpen: boolean;
@@ -14,10 +15,13 @@ export function RoleSelectionModal({ isOpen, onClose, serviceId }: RoleSelection
   if (!isOpen) return null;
 
   const handleRoleSelect = (role: 'CUSTOMER' | 'SERVICE_PROVIDER') => {
-    const params = new URLSearchParams();
-    params.append('role', role);
-    if (serviceId) params.append('serviceId', serviceId);
-    navigate(`/register?${params.toString()}`);
+    // Store serviceId in sessionStorage instead of URL to prevent exposure in:
+    // - Browser history, server logs, analytics, CDN caches, referrer headers
+    if (serviceId) {
+      setRegistrationContext({ serviceId });
+    }
+    // Keep only role in URL for routing (non-sensitive)
+    navigate(`/register?role=${role}`);
   };
 
   return (

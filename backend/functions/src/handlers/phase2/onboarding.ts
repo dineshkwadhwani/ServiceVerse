@@ -2,6 +2,7 @@ import * as functions from 'firebase-functions';
 import { db, auth } from '@/utils/firebase';
 import { Logger } from '@/utils/logger';
 import { ValidationError, sendError, sendSuccess } from '@/middleware/errorHandler';
+import { sendNotificationByEvent } from '@/utils/notificationCenter';
 import type { AuthRequest } from '@/middleware/auth';
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -65,6 +66,13 @@ export async function createAccountManager(req: AuthRequest, res: Response) {
     // Set custom claims
     await auth.setCustomUserClaims(authUser.uid, { role: 'ACCOUNT_MANAGER' });
     logger.info('Set custom claims for AM', { uid: authUser.uid });
+
+    await sendNotificationByEvent('ACCOUNT_CREATED', {
+      userId: authUser.uid,
+      name,
+      email,
+      role: 'ACCOUNT_MANAGER',
+    });
 
     return sendSuccess(
       res,
@@ -162,6 +170,13 @@ export async function assignAccountManager(req: AuthRequest, res: Response) {
       },
       status: 'ASSIGNED',
       updatedAt: new Date(),
+    });
+
+    await sendNotificationByEvent('SP_ASSIGNED_TO_AM', {
+      spId,
+      amId: accountManagerId,
+      spName: spDoc.data()?.businessName || spDoc.data()?.name || spId,
+      amName: amData.name || accountManagerId,
     });
 
     logger.info('Account manager assigned successfully', { spId });
@@ -279,6 +294,11 @@ export async function onboardServiceProvider(req: AuthRequest, res: Response) {
         }
       }
     }
+
+    await sendNotificationByEvent('SP_ACTIVATION_COMPLETE', {
+      spId,
+      spName: businessName || ownerName || spId,
+    });
 
     logger.info('Service provider onboarded successfully', { spId });
 
@@ -494,6 +514,13 @@ export async function assignAccountManagerToSP(req: AuthRequest, res: Response) 
       },
       status: 'ASSIGNED',
       updatedAt: new Date(),
+    });
+
+    await sendNotificationByEvent('SP_ASSIGNED_TO_AM', {
+      spId: userId,
+      amId: accountManagerId,
+      spName: spDoc.data()?.businessName || spDoc.data()?.name || userId,
+      amName: amData.name || accountManagerId,
     });
 
     logger.info('Account manager assigned to SP (users collection only)', { requestId, accountManagerId, userId });

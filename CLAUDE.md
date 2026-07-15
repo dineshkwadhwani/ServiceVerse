@@ -526,6 +526,7 @@ Latest work (as of July 13, 2026):
 - Backend menu selection API endpoints deployed and tested
 - Frontend SPOnboardingStepper component with 4 steps (Commission, Working Hours, Documents, Menu)
 - Dashboard refactoring completed with shared components (DashboardTabs, StatsGrid, EmptyState)
+- Invoice modal support on completed order tiles (Customer + SP dashboards) with itemized billing, print dialog, and downloadable PDF export
 
 ---
 
@@ -545,7 +546,7 @@ Latest work (as of July 13, 2026):
 
 **Phase Status**: Phase 12 Complete - ServiceProvider Menu Selection During Onboarding  
 **Milestone**: Milestone 1 ✅ - All Logins Working (5 roles fully authenticated and assigned)  
-**Current Work**: Testing menu selection with real data and preparing for order management phase  
+**Current Work**: Testing menu selection with real data and preparing for order management phase; invoice generation UX added for completed orders  
 **Blockers**: None  
 **Dependencies**: Razorpay integration for payments, Firebase data validation rules  
 **Next Phase**: Order Management (Phase 13) - order creation, tracking, and status updates  
@@ -559,5 +560,5 @@ Latest work (as of July 13, 2026):
 
 ---
 
-**Last Updated**: July 13, 2026  
+**Last Updated**: July 15, 2026  
 **Next Review**: After order management implementation

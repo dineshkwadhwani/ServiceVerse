@@ -7,6 +7,7 @@ import { RegisterSPForm } from '@/components/Auth/RegisterSPForm';
 import { RegisterCustomerForm } from '@/components/Auth/RegisterCustomerForm';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
+import { getRegistrationServiceId } from '@/utils/sessionStorage';
 import type { Service } from '@/types';
 
 export function RegisterPage() {
@@ -21,7 +22,8 @@ export function RegisterPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(true);
 
-  const serviceId = searchParams.get('serviceId');
+  // Read serviceId from sessionStorage instead of URL (security: prevents exposure in history/logs)
+  const serviceId = getRegistrationServiceId();
 
   useEffect(() => {
     loadServices();

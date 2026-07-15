@@ -2,6 +2,7 @@ import * as functions from 'firebase-functions';
 import { db } from '@/utils/firebase';
 import { Logger } from '@/utils/logger';
 import { ValidationError, sendError, sendSuccess } from '@/middleware/errorHandler';
+import { sendNotificationByEvent } from '@/utils/notificationCenter';
 import type { AuthRequest } from '@/middleware/auth';
 import { Response } from 'express';
 
@@ -136,6 +137,17 @@ export async function completeOnboarding(req: AuthRequest, res: Response) {
     }
 
     logger.info('SP onboarding completed successfully', { spId });
+
+    if (activation?.activateImmediately === true) {
+      await sendNotificationByEvent('SP_ACTIVATION_COMPLETE', {
+        spId,
+        spName: basicInfo?.name || spData?.businessName || spId,
+      });
+    } else {
+      await sendNotificationByEvent('SP_ONBOARDING_COMPLETE', {
+        spId,
+      });
+    }
 
     return sendSuccess(res, {
       spId,
