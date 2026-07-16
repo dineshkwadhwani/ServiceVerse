@@ -15,10 +15,15 @@ import { COLORS } from '@/utils/theme';
 import { EditUserModal } from './EditUserModal';
 import { CreateServiceModal } from '@/components/SuperAdmin/CreateServiceModal';
 import { ApprovalsTab } from '@/components/SuperAdmin/ApprovalsTab';
+import { SuperAdminProfileEditModal } from '@/components/Dashboard/SuperAdminProfileEditModal';
+import { useDashboardContext } from '@/context/DashboardContext';
+import { useAuthStore } from '@/store/authStore';
 import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
 import { StatsGrid } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
 import { CheckCircle2 } from 'lucide-react';
+import { getDoc, doc } from 'firebase/firestore';
+import { db } from '@/utils/firebase-config';
 
 interface SystemStats {
   totalUsers: number;
@@ -149,6 +154,8 @@ type ActiveTab = 'overview' | 'users' | 'services' | 'managers' | 'approvals';
 export function SuperAdminDashboard() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { firebaseUser } = useAuthStore();
+  const { showProfileModal, setShowProfileModal } = useDashboardContext();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [isLoading, setIsLoading] = useState(true);
@@ -166,10 +173,27 @@ export function SuperAdminDashboard() {
     serviceId: '', // For Account Managers
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saData, setSAData] = useState<any>(null);
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+    if (firebaseUser?.uid) {
+      loadSAProfile();
+    }
+  }, [firebaseUser?.uid]);
+
+  const loadSAProfile = async () => {
+    if (!firebaseUser?.uid) return;
+    try {
+      const docRef = doc(db, 'users', firebaseUser.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setSAData(docSnap.data());
+      }
+    } catch (error) {
+      console.error('Error loading SuperAdmin profile:', error);
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'users' || activeTab === 'managers') {
@@ -587,6 +611,17 @@ export function SuperAdminDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Profile Edit Modal */}
+      {showProfileModal && firebaseUser?.uid && saData && (
+        <SuperAdminProfileEditModal
+          userId={firebaseUser.uid}
+          name={saData?.name}
+          email={saData?.email}
+          onClose={() => setShowProfileModal(false)}
+          onComplete={() => loadSAProfile()}
+        />
       )}
     </div>
   );

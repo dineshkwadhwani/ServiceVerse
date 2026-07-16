@@ -5,7 +5,12 @@ import { apiClient } from '@/services/apiClient';
 import { Loader2 } from 'lucide-react';
 import { ServiceCard } from '@/components/Landing/ServiceCard';
 import { EmptyState } from '@/components/Shared/EmptyState';
+import { CustomerProfileEditModal } from '@/components/Dashboard/CustomerProfileEditModal';
+import { useDashboardContext } from '@/context/DashboardContext';
+import { useAuthStore } from '@/store/authStore';
 import { COLORS } from '@/utils/theme';
+import { getDoc, doc } from 'firebase/firestore';
+import { db } from '@/utils/firebase-config';
 import type { Service } from '@/types';
 
 interface ProviderInfo {
@@ -28,14 +33,33 @@ interface CustomerService {
 export function CustomerDashboard() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { firebaseUser } = useAuthStore();
+  const { showProfileModal, setShowProfileModal } = useDashboardContext();
 
   const [allServices, setAllServices] = useState<Service[]>([]);
   const [myServices, setMyServices] = useState<CustomerService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [customerData, setCustomerData] = useState<any>(null);
 
   useEffect(() => {
     loadData();
-  }, []);
+    if (firebaseUser?.uid) {
+      loadCustomerProfile();
+    }
+  }, [firebaseUser?.uid]);
+
+  const loadCustomerProfile = async () => {
+    if (!firebaseUser?.uid) return;
+    try {
+      const docRef = doc(db, 'users', firebaseUser.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setCustomerData(docSnap.data());
+      }
+    } catch (error) {
+      console.error('Error loading customer profile:', error);
+    }
+  };
 
   const loadData = async () => {
     setIsLoading(true);
@@ -171,6 +195,22 @@ export function CustomerDashboard() {
           )}
         </section>
       </main>
+
+      {/* Profile Edit Modal */}
+      {showProfileModal && firebaseUser?.uid && customerData && (
+        <CustomerProfileEditModal
+          userId={firebaseUser.uid}
+          phone={customerData?.phone || ''}
+          name={customerData?.name}
+          email={customerData?.email}
+          address={customerData?.address}
+          area={customerData?.area}
+          city={customerData?.city}
+          pin={customerData?.pin}
+          onClose={() => setShowProfileModal(false)}
+          onComplete={() => loadCustomerProfile()}
+        />
+      )}
     </div>
   );
 }

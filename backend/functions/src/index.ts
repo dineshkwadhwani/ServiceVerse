@@ -12,12 +12,15 @@ import * as phase3Handlers from '@/handlers/phase3/orders';
 import * as authHandlers from '@/handlers/auth/registration';
 import * as phoneSignInHandlers from '@/handlers/auth/phoneSignIn';
 import * as customerHandlers from '@/handlers/customers/dashboard';
+import * as customerProfileHandlers from '@/handlers/customers/profile';
 import * as spDashboardHandlers from '@/handlers/serviceProviders/dashboard';
 import * as createCustomerHandlers from '@/handlers/serviceProviders/createCustomer';
 import * as spProfileHandlers from '@/handlers/serviceProviders/getSPProfile';
 import * as spProfileUpdateHandlers from '@/handlers/serviceProviders/profileUpdate';
 import * as amDashboardHandlers from '@/handlers/accountManagers/dashboard';
+import * as amProfileHandlers from '@/handlers/accountManagers/profile';
 import * as superAdminHandlers from '@/handlers/superAdmin/dashboard';
+import * as superAdminProfileHandlers from '@/handlers/superAdmin/profile';
 import * as diagnosticsHandlers from '@/handlers/debug/diagnostics';
 import * as spMenuHandlers from '@/handlers/onboarding/spMenuSelection';
 import * as spActivationHandlers from '@/handlers/onboarding/spActivation';
@@ -28,6 +31,7 @@ import * as ordersHandlers from '@/handlers/orders/createOrder';
 import * as ordersListHandlers from '@/handlers/orders/getSPOrders';
 import * as orderMenuHandlers from '@/handlers/orders/getSPMenu';
 import * as coworkerHandlers from '@/handlers/coworkers/manage';
+import * as coworkerProfileHandlers from '@/handlers/coworkers/profile';
 
 import { getSeedAdminConfig, seedSuperAdminUser } from '@/handlers/admin/seedAdmin';
 
@@ -170,6 +174,10 @@ app.get('/customers/:customerId/orders', requireRole('CUSTOMER', 'ACCOUNT_MANAGE
   ordersListHandlers.getCustomerOrders(req as any, res);
 });
 
+app.patch('/customers/:userId/profile', requireRole('CUSTOMER'), async (req, res) => {
+  customerProfileHandlers.updateCustomerProfile(req as any, res);
+});
+
 // ============================================================================
 // ORDERS
 // ============================================================================
@@ -248,6 +256,10 @@ app.patch('/service-providers/:spId/coworkers/:coworkerId', requireRole('SERVICE
   coworkerHandlers.updateCoworkerStatus(req as any, res);
 });
 
+app.patch('/coworkers/:userId/profile', requireRole('COWORKER'), async (req, res) => {
+  coworkerProfileHandlers.updateCoworkerProfile(req as any, res);
+});
+
 // SP Menu Management
 app.get('/service-providers/menu/:serviceId', requireRole('SERVICE_PROVIDER'), async (req, res) => {
   menuHandlers.getSPMenu(req as any, res);
@@ -298,6 +310,10 @@ app.patch('/account-managers/unorphan-requests/:requestId', requireRole('ACCOUNT
   amDashboardHandlers.reviewUnorphanRequest(req as any, res);
 });
 
+app.patch('/account-managers/:userId/profile', requireRole('ACCOUNT_MANAGER'), async (req, res) => {
+  amProfileHandlers.updateAMProfile(req as any, res);
+});
+
 // ============================================================================
 // SUPERADMIN DASHBOARD
 // ============================================================================
@@ -316,6 +332,10 @@ app.post('/superadmin/users', requireRole('SUPERADMIN'), async (req, res) => {
 
 app.put('/superadmin/users/:userId', requireRole('SUPERADMIN'), async (req, res) => {
   superAdminHandlers.updateUser(req as any, res);
+});
+
+app.patch('/superadmin/:userId/profile', requireRole('SUPERADMIN'), async (req, res) => {
+  superAdminProfileHandlers.updateSuperAdminProfile(req as any, res);
 });
 
 // ============================================================================

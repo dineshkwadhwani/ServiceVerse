@@ -494,6 +494,26 @@ class ApiClient {
   }
 
   // ============================================================================
+  // PROFILE MANAGEMENT
+  // ============================================================================
+
+  async updateCustomerProfile(userId: string, data: any) {
+    return this.axiosInstance.patch(`/customers/${userId}/profile`, data);
+  }
+
+  async updateAMProfile(userId: string, data: any) {
+    return this.axiosInstance.patch(`/account-managers/${userId}/profile`, data);
+  }
+
+  async updateCoworkerProfile(userId: string, data: any) {
+    return this.axiosInstance.patch(`/coworkers/${userId}/profile`, data);
+  }
+
+  async updateSuperAdminProfile(userId: string, data: any) {
+    return this.axiosInstance.patch(`/superadmin/${userId}/profile`, data);
+  }
+
+  // ============================================================================
   // ANALYTICS
   // ============================================================================
 

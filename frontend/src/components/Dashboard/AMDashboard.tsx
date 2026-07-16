@@ -6,7 +6,12 @@ import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
 import { StatsGrid } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
 import { SPOnboardingStepper } from '@/components/Onboarding/SPOnboardingStepper';
+import { AMProfileEditModal } from '@/components/Dashboard/AMProfileEditModal';
+import { useDashboardContext } from '@/context/DashboardContext';
+import { useAuthStore } from '@/store/authStore';
 import { COLORS } from '@/utils/theme';
+import { getDoc, doc } from 'firebase/firestore';
+import { db } from '@/utils/firebase-config';
 
 interface SP {
   uid: string;
@@ -75,6 +80,8 @@ type ActiveTab = 'overview' | 'sps' | 'approvals';
 
 export function AMDashboard() {
   const toast = useToast();
+  const { firebaseUser } = useAuthStore();
+  const { showProfileModal, setShowProfileModal } = useDashboardContext();
 
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
@@ -82,10 +89,27 @@ export function AMDashboard() {
   const [sps, setSPs] = useState<SP[]>([]);
   const [onboardingSP, setOnboardingSP] = useState<SP | null>(null);
   const [isLoadingSPProfile, setIsLoadingSPProfile] = useState(false);
+  const [amData, setAMData] = useState<any>(null);
 
   useEffect(() => {
     loadData();
-  }, []);
+    if (firebaseUser?.uid) {
+      loadAMProfile();
+    }
+  }, [firebaseUser?.uid]);
+
+  const loadAMProfile = async () => {
+    if (!firebaseUser?.uid) return;
+    try {
+      const docRef = doc(db, 'users', firebaseUser.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setAMData(docSnap.data());
+      }
+    } catch (error) {
+      console.error('Error loading AM profile:', error);
+    }
+  };
 
   const loadData = async (forceRefresh = false) => {
     try {
@@ -378,6 +402,17 @@ export function AMDashboard() {
           />
         );
       })()}
+
+      {/* Profile Edit Modal */}
+      {showProfileModal && firebaseUser?.uid && amData && (
+        <AMProfileEditModal
+          userId={firebaseUser.uid}
+          name={amData?.name}
+          email={amData?.email}
+          onClose={() => setShowProfileModal(false)}
+          onComplete={() => loadAMProfile()}
+        />
+      )}
     </div>
   );
 }
