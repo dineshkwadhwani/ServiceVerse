@@ -75,6 +75,11 @@ export function CustomerDashboard() {
       const customerServicesResponse = await apiClient.getCustomerServices();
       const customerServices = (customerServicesResponse.data?.services || []) as CustomerService[];
       setMyServices(customerServices);
+
+      // Also load customer profile
+      if (firebaseUser?.uid) {
+        loadCustomerProfile();
+      }
     } catch (error: any) {
       toast.error('Failed to load services');
       console.error('Error loading services:', error);
@@ -197,16 +202,16 @@ export function CustomerDashboard() {
       </main>
 
       {/* Profile Edit Modal */}
-      {showProfileModal && firebaseUser?.uid && customerData && (
+      {showProfileModal && firebaseUser?.uid && (
         <CustomerProfileEditModal
           userId={firebaseUser.uid}
           phone={customerData?.phone || ''}
-          name={customerData?.name}
-          email={customerData?.email}
-          address={customerData?.address}
-          area={customerData?.area}
-          city={customerData?.city}
-          pin={customerData?.pin}
+          name={customerData?.name || ''}
+          email={customerData?.email || ''}
+          address={customerData?.address || ''}
+          area={customerData?.area || ''}
+          city={customerData?.city || ''}
+          pin={customerData?.pin || ''}
           onClose={() => setShowProfileModal(false)}
           onComplete={() => loadCustomerProfile()}
         />

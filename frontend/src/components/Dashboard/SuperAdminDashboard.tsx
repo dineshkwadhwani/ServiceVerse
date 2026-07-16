@@ -208,6 +208,11 @@ export function SuperAdminDashboard() {
     try {
       const data = await fetchSAStats(forceRefresh);
       setStats(data);
+
+      // Load SA profile data
+      if (firebaseUser?.uid) {
+        loadSAProfile();
+      }
     } catch (error: any) {
       toast.error('Failed to load dashboard stats');
     } finally {
@@ -614,11 +619,11 @@ export function SuperAdminDashboard() {
       )}
 
       {/* Profile Edit Modal */}
-      {showProfileModal && firebaseUser?.uid && saData && (
+      {showProfileModal && firebaseUser?.uid && (
         <SuperAdminProfileEditModal
           userId={firebaseUser.uid}
-          name={saData?.name}
-          email={saData?.email}
+          name={saData?.name || ''}
+          email={saData?.email || ''}
           onClose={() => setShowProfileModal(false)}
           onComplete={() => loadSAProfile()}
         />

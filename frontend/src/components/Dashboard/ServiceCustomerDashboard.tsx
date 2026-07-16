@@ -4,12 +4,14 @@ import { ArrowLeft, Loader2, Clock, CheckCircle2, XCircle, BarChart3, ShoppingBa
 import { useToast } from '@/store/notificationStore';
 import { apiClient } from '@/services/apiClient';
 import { useAuthStore } from '@/store/authStore';
+import { useDashboardContext } from '@/context/DashboardContext';
 import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
 import { StatsGrid } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
 import { CreateOrderModal } from '@/components/Orders/CreateOrderModal';
 import { OrderLifecycleModal } from '@/components/Orders/OrderLifecycleModal';
 import { InvoiceModal } from '@/components/Orders/InvoiceModal';
+import { CustomerProfileEditModal } from '@/components/Dashboard/CustomerProfileEditModal';
 import { COLORS } from '@/utils/theme';
 import { getDoc, doc } from 'firebase/firestore';
 import { db } from '@/utils/firebase-config';
@@ -42,12 +44,14 @@ type ActiveTab = 'overview' | 'orders';
 export function ServiceCustomerDashboard() {
   const { serviceId } = useParams<{ serviceId: string }>();
   const { firebaseUser } = useAuthStore();
+  const { showProfileModal, setShowProfileModal } = useDashboardContext();
   const navigate = useNavigate();
   const toast = useToast();
 
   const [service, setService] = useState<Service | null>(null);
   const [spsInPinCode, setSPsInPinCode] = useState<SPInfo[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [customerData, setCustomerData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [showCreateOrder, setShowCreateOrder] = useState(false);
@@ -75,8 +79,9 @@ export function ServiceCustomerDashboard() {
           const customerDocRef = doc(db, 'users', firebaseUser.uid);
           const customerDoc = await getDoc(customerDocRef);
           if (customerDoc.exists()) {
-            const customerData = customerDoc.data();
-            const pinCode = customerData?.pin || '';
+            const customerDocData = customerDoc.data();
+            setCustomerData(customerDocData);
+            const pinCode = customerDocData?.pin || '';
 
             // Fetch all SPs with same PIN code who provide this service
             if (pinCode && serviceId) {
@@ -456,6 +461,25 @@ export function ServiceCustomerDashboard() {
           order={invoiceOrder}
           businessNameHint={selectedSPForOrder?.businessName || service.name}
           onClose={() => setInvoiceOrder(null)}
+        />
+      )}
+
+      {/* Profile Edit Modal */}
+      {showProfileModal && firebaseUser?.uid && (
+        <CustomerProfileEditModal
+          userId={firebaseUser.uid}
+          phone={customerData?.phone || ''}
+          name={customerData?.name || ''}
+          email={customerData?.email || ''}
+          address={customerData?.address || ''}
+          area={customerData?.area || ''}
+          city={customerData?.city || ''}
+          pin={customerData?.pin || ''}
+          onClose={() => setShowProfileModal(false)}
+          onComplete={() => {
+            // Reload data to refresh profile
+            loadData();
+          }}
         />
       )}
     </div>

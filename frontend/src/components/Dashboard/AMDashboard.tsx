@@ -116,6 +116,11 @@ export function AMDashboard() {
       const data = await fetchAMDashboardData(forceRefresh);
       setStats(data.stats || {});
       setSPs(data.sps || []);
+
+      // Load AM profile data
+      if (firebaseUser?.uid) {
+        loadAMProfile();
+      }
     } catch (error: any) {
       toast.error('Failed to load dashboard data');
     } finally {
@@ -404,11 +409,11 @@ export function AMDashboard() {
       })()}
 
       {/* Profile Edit Modal */}
-      {showProfileModal && firebaseUser?.uid && amData && (
+      {showProfileModal && firebaseUser?.uid && (
         <AMProfileEditModal
           userId={firebaseUser.uid}
-          name={amData?.name}
-          email={amData?.email}
+          name={amData?.name || ''}
+          email={amData?.email || ''}
           onClose={() => setShowProfileModal(false)}
           onComplete={() => loadAMProfile()}
         />
