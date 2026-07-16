@@ -20,20 +20,22 @@ interface OrderItem {
 
 interface Props {
   spId: string;
+  spBusinessName?: string;
   serviceId?: string;
   isCustomerCreating?: boolean;
   onClose: () => void;
   onOrderCreated?: () => void;
 }
 
-export function CreateOrderModal({ spId, serviceId, isCustomerCreating, onClose, onOrderCreated }: Props) {
+export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCreating, onClose, onOrderCreated }: Props) {
   const { firebaseUser } = useAuthStore();
   const [currentStep, setCurrentStep] = useState<Step>(isCustomerCreating ? 'details' : 'details');
   const [spGstPercent, setSpGstPercent] = useState(0);
   const [spGstMandatory, setSpGstMandatory] = useState(false);
-  const [selectedSpId, setSelectedSpId] = useState(isCustomerCreating ? '' : (spId || ''));
+  const [selectedSpId, setSelectedSpId] = useState(spId || '');
   const [availableSPs, setAvailableSPs] = useState<Array<{ spId: string; businessName: string }>>([]);
   const [associatedSpId, setAssociatedSpId] = useState('');
+  const [initialSpName] = useState(isCustomerCreating ? (spBusinessName || '') : '');
 
   // Order data
   const [orderData, setOrderData] = useState<{
@@ -231,6 +233,7 @@ export function CreateOrderModal({ spId, serviceId, isCustomerCreating, onClose,
               selectedSpId={selectedSpId}
               onSPChange={setSelectedSpId}
               associatedSpId={associatedSpId}
+              initialSpName={initialSpName}
               initialData={orderData || undefined}
               onNext={handleDetailsNext}
               onCancel={handleCancel}

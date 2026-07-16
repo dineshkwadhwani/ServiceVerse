@@ -24,6 +24,7 @@ interface Props {
   selectedSpId?: string;
   onSPChange?: (spId: string) => void;
   associatedSpId?: string;
+  initialSpName?: string;
   initialData?: {
     customer: any;
     items: OrderItem[];
@@ -54,6 +55,7 @@ export function OrderDetailsStep({
   selectedSpId,
   onSPChange,
   associatedSpId,
+  initialSpName,
   initialData,
   onNext,
   onCancel,
@@ -86,7 +88,7 @@ export function OrderDetailsStep({
   // SP search state (customer flow)
   const [spSearchText, setSpSearchText] = useState('');
   const [spSearchResults, setSpSearchResults] = useState<Array<{ spId: string; businessName: string }> | null>(null);
-  const [selectedSPName, setSelectedSPName] = useState('');
+  const [selectedSPName, setSelectedSPName] = useState(initialSpName || '');
 
   // Coworkers
   const [coworkers, setCoworkers] = useState<any[]>([]);

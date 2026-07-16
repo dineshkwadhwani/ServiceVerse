@@ -332,7 +332,7 @@ export function ServiceCustomerDashboard() {
               {/* Create New Order Button */}
               <div className="mb-6">
                 <button
-                  onClick={() => spsInPinCode[0] && handleStartOrder(spsInPinCode[0])}
+                  onClick={() => { setSelectedSPForOrder(null); setShowCreateOrder(true); }}
                   disabled={spsInPinCode.length === 0}
                   className="flex items-center gap-2 px-5 py-3 rounded-lg font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
                   style={{ backgroundColor: COLORS.semantic.info }}
@@ -428,9 +428,10 @@ export function ServiceCustomerDashboard() {
       </main>
 
       {/* Create Order Modal */}
-      {showCreateOrder && selectedSPForOrder && (
+      {showCreateOrder && (
         <CreateOrderModal
-          spId={selectedSPForOrder.spId}
+          spId={selectedSPForOrder?.spId || ''}
+          spBusinessName={selectedSPForOrder?.businessName}
           serviceId={serviceId}
           isCustomerCreating={true}
           onClose={() => setShowCreateOrder(false)}
