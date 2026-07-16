@@ -104,9 +104,11 @@ export function AMDashboard() {
     setIsLoadingSPProfile(true);
     try {
       const profileResponse = await apiClient.getSPProfile(sp.uid);
+      // API wraps response as { success, data } so actual profile is at .data.data
+      const profileData = profileResponse.data?.data || profileResponse.data;
       const completeProfile = {
         ...sp,
-        ...profileResponse.data,
+        ...profileData,
       };
       setOnboardingSP(completeProfile);
     } catch (error: any) {
@@ -363,6 +365,7 @@ export function AMDashboard() {
             spCity={(onboardingSP as any).city}
             spPin={(onboardingSP as any).pin}
             serviceId={serviceId}
+            existingLogoUrl={(onboardingSP as any).basicInfo?.logoUrl || (onboardingSP as any).businessLogo || ''}
             existingOperations={(onboardingSP as any).operations}
             existingDocumentation={(onboardingSP as any).documentation}
             existingCommission={(onboardingSP as any).commission}

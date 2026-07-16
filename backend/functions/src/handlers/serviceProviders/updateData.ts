@@ -72,6 +72,11 @@ export async function updateSPData(req: AuthRequest, res: Response) {
       updateData.area = basicInfo.area;
       updateData.city = basicInfo.city;
       updateData.pin = basicInfo.pinCode;
+      updateData.businessLogo = basicInfo.logoUrl || null;
+      updateData.basicInfo = {
+        ...basicInfo,
+        logoUrl: basicInfo.logoUrl || '',
+      };
     }
 
     // Operations fields

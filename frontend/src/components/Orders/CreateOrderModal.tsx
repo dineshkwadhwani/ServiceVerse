@@ -31,8 +31,9 @@ export function CreateOrderModal({ spId, serviceId, isCustomerCreating, onClose,
   const [currentStep, setCurrentStep] = useState<Step>(isCustomerCreating ? 'details' : 'details');
   const [spGstPercent, setSpGstPercent] = useState(0);
   const [spGstMandatory, setSpGstMandatory] = useState(false);
-  const [selectedSpId, setSelectedSpId] = useState(spId || '');
+  const [selectedSpId, setSelectedSpId] = useState(isCustomerCreating ? '' : (spId || ''));
   const [availableSPs, setAvailableSPs] = useState<Array<{ spId: string; businessName: string }>>([]);
+  const [associatedSpId, setAssociatedSpId] = useState('');
 
   // Order data
   const [orderData, setOrderData] = useState<{
@@ -87,11 +88,10 @@ export function CreateOrderModal({ spId, serviceId, isCustomerCreating, onClose,
       const providers = response?.data?.providers || [];
       setAvailableSPs(providers);
 
-      const associatedSpId = response?.data?.associatedSpId || '';
-      if (associatedSpId) {
-        setSelectedSpId(associatedSpId);
-      } else if (providers.length > 0 && !selectedSpId) {
-        setSelectedSpId(providers[0].spId);
+      const assocId = response?.data?.associatedSpId || '';
+      setAssociatedSpId(assocId);
+      if (assocId) {
+        setSelectedSpId(assocId);
       }
     } catch (error) {
       setAvailableSPs([]);
@@ -230,6 +230,7 @@ export function CreateOrderModal({ spId, serviceId, isCustomerCreating, onClose,
               availableSPs={availableSPs}
               selectedSpId={selectedSpId}
               onSPChange={setSelectedSpId}
+              associatedSpId={associatedSpId}
               initialData={orderData || undefined}
               onNext={handleDetailsNext}
               onCancel={handleCancel}

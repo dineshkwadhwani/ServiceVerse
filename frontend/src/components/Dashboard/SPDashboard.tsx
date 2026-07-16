@@ -856,7 +856,10 @@ export function SPDashboard() {
           spArea={fullUserData?.area}
           spCity={fullUserData?.city}
           spPin={fullUserData?.pin}
-          existingBasicInfo={(user as any)?.basicInfo}
+          existingBasicInfo={fullUserData?.basicInfo ? {
+            ...fullUserData.basicInfo,
+            logoUrl: fullUserData.basicInfo.logoUrl || fullUserData.businessLogo || '',
+          } : undefined}
           existingOperations={fullUserData?.operations}
           onComplete={() => {
             setShowProfileModal(false);

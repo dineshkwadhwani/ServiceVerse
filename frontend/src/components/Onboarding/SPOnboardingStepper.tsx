@@ -28,6 +28,7 @@ interface Props {
   spPin?: string;
   serviceId: string;
   // Existing onboarding data (for edit mode)
+  existingLogoUrl?: string;
   existingOperations?: any;
   existingDocumentation?: any;
   existingCommission?: any;
@@ -57,6 +58,7 @@ export function SPOnboardingStepper({
   spCity,
   spPin,
   serviceId,
+  existingLogoUrl,
   existingOperations,
   existingDocumentation,
   existingCommission,
@@ -91,6 +93,7 @@ export function SPOnboardingStepper({
     area: spArea || '',
     city: spCity || '',
     pinCode: spPin || '',
+    logoUrl: existingLogoUrl || '',
   });
 
   const [operations, setOperations] = useState<OperationsData>(

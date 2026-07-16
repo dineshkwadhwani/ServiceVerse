@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Minus, Loader2 } from 'lucide-react';
+import { Search, Plus, Minus, Loader2, CheckCircle2 } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
@@ -23,6 +23,7 @@ interface Props {
   availableSPs?: Array<{ spId: string; businessName: string }>;
   selectedSpId?: string;
   onSPChange?: (spId: string) => void;
+  associatedSpId?: string;
   initialData?: {
     customer: any;
     items: OrderItem[];
@@ -52,6 +53,7 @@ export function OrderDetailsStep({
   availableSPs,
   selectedSpId,
   onSPChange,
+  associatedSpId,
   initialData,
   onNext,
   onCancel,
@@ -80,6 +82,11 @@ export function OrderDetailsStep({
     initialData?.deliveryType || (isCustomerCreating ? 'PICKUP' : 'DROP')
   );
   const [selectedCoworker, setSelectedCoworker] = useState('');
+
+  // SP search state (customer flow)
+  const [spSearchText, setSpSearchText] = useState('');
+  const [spSearchResults, setSpSearchResults] = useState<Array<{ spId: string; businessName: string }> | null>(null);
+  const [selectedSPName, setSelectedSPName] = useState('');
 
   // Coworkers
   const [coworkers, setCoworkers] = useState<any[]>([]);
@@ -198,6 +205,32 @@ export function OrderDetailsStep({
     }
   };
 
+  // Auto-select associated SP (or only SP) when customer opens order flow
+  useEffect(() => {
+    if (!isCustomerCreating || !availableSPs?.length || selectedSPName) return;
+    const targetId = associatedSpId; // only auto-select when explicitly associated
+    if (!targetId) return;
+    const sp = availableSPs.find(s => s.spId === targetId);
+    if (sp) {
+      setSelectedSPName(sp.businessName);
+      onSPChange?.(sp.spId);
+    }
+  }, [associatedSpId, availableSPs, isCustomerCreating]);
+
+  const handleSPSearch = () => {
+    const query = spSearchText.trim().toLowerCase();
+    const results = !query
+      ? (availableSPs || [])
+      : (availableSPs || []).filter(sp => sp.businessName.toLowerCase().includes(query));
+    setSpSearchResults(results);
+  };
+
+  const handleSelectSP = (sp: { spId: string; businessName: string }) => {
+    onSPChange?.(sp.spId);
+    setSelectedSPName(sp.businessName);
+    setSpSearchResults(null);
+  };
+
   const handleSearchCustomer = async () => {
     if (!customerPhone.trim()) {
       toast.error('Please enter a phone number');
@@ -236,7 +269,7 @@ export function OrderDetailsStep({
 
   const handleReview = () => {
     if (!customer) {
-      toast.error('Please search for a customer');
+      toast.error(isCustomerCreating ? 'Profile is loading, please wait' : 'Please search for a customer');
       return;
     }
 
@@ -340,41 +373,78 @@ export function OrderDetailsStep({
       ) : (
       <div className="p-4 rounded-lg border" style={{ borderColor: COLORS.border.light, backgroundColor: COLORS.bg.surface }}>
         <h3 className="font-semibold mb-3" style={{ color: COLORS.text.primary }}>
-          Your Information
+          Service Provider
         </h3>
-        <div className="mb-3">
-          <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>
-            Service Provider
-          </label>
-          <select
-            value={selectedSpId || ''}
-            onChange={(e) => onSPChange?.(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border focus:outline-none text-sm"
-            style={{
-              borderColor: COLORS.border.light,
-              backgroundColor: COLORS.bg.primary,
-              color: COLORS.text.primary,
-            }}
+
+        {/* Selected SP chip */}
+        {selectedSPName && (
+          <div
+            className="mb-3 p-3 rounded-lg flex items-center justify-between"
+            style={{ backgroundColor: `${COLORS.semantic.success}15`, border: `1px solid ${COLORS.semantic.success}40` }}
           >
-            <option value="">-- Select Service Provider --</option>
-            {(availableSPs || []).map((sp) => (
-              <option key={sp.spId} value={sp.spId}>
-                {sp.businessName}
-              </option>
-            ))}
-          </select>
+            <div>
+              <p className="text-xs mb-0.5" style={{ color: COLORS.text.secondary }}>Selected</p>
+              <p className="font-semibold" style={{ color: COLORS.text.primary }}>{selectedSPName}</p>
+              {selectedSpId === associatedSpId && associatedSpId && (
+                <p className="text-xs mt-0.5" style={{ color: COLORS.semantic.success }}>Your Provider</p>
+              )}
+            </div>
+            <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: COLORS.semantic.success }} />
+          </div>
+        )}
+
+        {/* Search row */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Search by name..."
+            value={spSearchText}
+            onChange={e => setSpSearchText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSPSearch()}
+            className="flex-1 px-3 py-2 rounded-lg border focus:outline-none text-sm"
+            style={{ borderColor: COLORS.border.light, backgroundColor: COLORS.bg.primary, color: COLORS.text.primary }}
+          />
+          <button
+            onClick={handleSPSearch}
+            className="px-3 py-2 rounded-lg font-medium text-white flex items-center gap-1 text-sm transition hover:opacity-90 flex-shrink-0"
+            style={{ backgroundColor: COLORS.semantic.info }}
+          >
+            <Search className="w-3.5 h-3.5" />
+            Search
+          </button>
         </div>
-        {customer && (
-          <div className="space-y-2">
-            <p style={{ color: COLORS.text.secondary }}>
-              <span className="font-medium">Name:</span> {customer.name}
-            </p>
-            <p style={{ color: COLORS.text.secondary }}>
-              <span className="font-medium">Phone:</span> {customer.phone}
-            </p>
-            <p style={{ color: COLORS.text.secondary }}>
-              <span className="font-medium">Email:</span> {customer.email}
-            </p>
+
+        {/* Results popup */}
+        {spSearchResults !== null && (
+          <div className="mt-2 rounded-lg border overflow-hidden" style={{ borderColor: COLORS.border.light }}>
+            {spSearchResults.length === 0 ? (
+              <p className="p-3 text-sm text-center" style={{ color: COLORS.text.secondary }}>
+                No providers found matching your search
+              </p>
+            ) : (
+              spSearchResults.map(sp => (
+                <button
+                  key={sp.spId}
+                  onClick={() => handleSelectSP(sp)}
+                  className="w-full text-left px-4 py-3 text-sm hover:opacity-80 transition flex items-center justify-between border-b last:border-b-0"
+                  style={{
+                    backgroundColor: sp.spId === selectedSpId ? `${COLORS.semantic.info}10` : COLORS.bg.primary,
+                    borderColor: COLORS.border.light,
+                    color: COLORS.text.primary,
+                  }}
+                >
+                  <span className="font-medium">{sp.businessName}</span>
+                  {sp.spId === associatedSpId && associatedSpId && (
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full ml-2 flex-shrink-0"
+                      style={{ backgroundColor: `${COLORS.semantic.success}20`, color: COLORS.semantic.success }}
+                    >
+                      Your Provider
+                    </span>
+                  )}
+                </button>
+              ))
+            )}
           </div>
         )}
       </div>
@@ -652,7 +722,7 @@ export function OrderDetailsStep({
                   backgroundColor: COLORS.semantic.info,
                 }}
               >
-                {isCustomerCreating && !customer ? 'Loading profile...' : 'Review Order'}
+                {isCustomerCreating && !selectedSpId ? 'Select a provider first' : isCustomerCreating && !customer ? 'Loading profile...' : 'Review Order'}
               </button>
             </div>
           </div>

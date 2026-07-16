@@ -329,77 +329,17 @@ export function ServiceCustomerDashboard() {
           {/* Orders Tab */}
           {activeTab === 'orders' && (
             <div className="p-4 md:p-6">
-              {/* Create New Order Section */}
+              {/* Create New Order Button */}
               <div className="mb-6">
-                <h3
-                  className="font-semibold text-lg mb-4"
-                  style={{ color: COLORS.text.primary }}
+                <button
+                  onClick={() => spsInPinCode[0] && handleStartOrder(spsInPinCode[0])}
+                  disabled={spsInPinCode.length === 0}
+                  className="flex items-center gap-2 px-5 py-3 rounded-lg font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: COLORS.semantic.info }}
                 >
+                  <Plus className="w-4 h-4" />
                   Create New Order
-                </h3>
-
-                {spsInPinCode.length > 0 ? (
-                  <div className="space-y-3">
-                    {spsInPinCode.map((sp) => (
-                      <div
-                        key={sp.spId}
-                        className="p-4 rounded-lg border flex items-center gap-4 justify-between"
-                        style={{
-                          backgroundColor: COLORS.bg.surface,
-                          borderColor: COLORS.border.light,
-                        }}
-                      >
-                        {/* Logo */}
-                        <div className="flex-shrink-0">
-                          {sp.logo ? (
-                            <img
-                              src={sp.logo}
-                              alt={sp.businessName}
-                              className="w-16 h-16 rounded-lg object-cover"
-                            />
-                          ) : service?.logo ? (
-                            <img
-                              src={service.logo}
-                              alt={service.name}
-                              className="w-16 h-16 rounded-lg object-cover"
-                            />
-                          ) : (
-                            <div
-                              className="w-16 h-16 rounded-lg flex items-center justify-center font-bold text-white text-2xl"
-                              style={{
-                                backgroundColor: service?.colorTheme?.primary || COLORS.semantic.info,
-                              }}
-                            >
-                              {sp.businessName.charAt(0)}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Business Name */}
-                        <div className="flex-1 min-w-0">
-                          <h3
-                            className="font-semibold text-base"
-                            style={{ color: COLORS.text.primary }}
-                          >
-                            {sp.businessName}
-                          </h3>
-                        </div>
-
-                        {/* Order Button */}
-                        <button
-                          onClick={() => handleStartOrder(sp)}
-                          className="flex-shrink-0 px-4 py-2 rounded-lg font-semibold text-white transition hover:opacity-90 flex items-center gap-1"
-                          style={{ backgroundColor: COLORS.semantic.info }}
-                        >
-                          <Plus className="w-4 h-4" />
-                          Order
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState message="No service providers available in your area" />
-                )}
+                </button>
               </div>
               {orders.length > 0 ? (
                 <div className="space-y-4">

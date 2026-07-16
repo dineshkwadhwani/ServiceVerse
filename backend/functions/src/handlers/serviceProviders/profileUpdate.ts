@@ -47,6 +47,11 @@ export async function updateSPProfile(req: AuthRequest, res: Response) {
       area: basicInfo.area,
       city: basicInfo.city,
       pin: basicInfo.pinCode,
+      businessLogo: basicInfo.logoUrl || null,
+      basicInfo: {
+        ...basicInfo,
+        logoUrl: basicInfo.logoUrl || '',
+      },
       operations,
       updatedAt: new Date(),
     };

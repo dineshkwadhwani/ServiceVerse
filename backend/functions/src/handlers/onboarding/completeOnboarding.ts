@@ -101,7 +101,11 @@ export async function completeOnboarding(req: AuthRequest, res: Response) {
 
     // Update SP user document with all onboarding data
     const updateData = {
-      basicInfo,
+      basicInfo: {
+        ...basicInfo,
+        logoUrl: basicInfo.logoUrl || '',
+      },
+      businessLogo: basicInfo.logoUrl || null,
       operations,
       documentation,
       commission,

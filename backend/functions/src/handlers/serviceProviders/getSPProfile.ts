@@ -73,14 +73,15 @@ export async function getSPProfile(req: AuthRequest, res: Response) {
       city: spData.city || '',
       pin: spData.pin || '',
       // Onboarding fields
-      basicInfo: spData.basicInfo || {
-        email: spData.email || '',
-        name: spData.businessName || '',
-        ownerName: spData.ownerName || '',
-        address: spData.address || '',
-        area: spData.area || '',
-        city: spData.city || '',
-        pinCode: spData.pin || '',
+      basicInfo: {
+        email: spData.basicInfo?.email || spData.email || '',
+        name: spData.basicInfo?.name || spData.businessName || '',
+        ownerName: spData.basicInfo?.ownerName || spData.ownerName || '',
+        address: spData.basicInfo?.address || spData.address || '',
+        area: spData.basicInfo?.area || spData.area || '',
+        city: spData.basicInfo?.city || spData.city || '',
+        pinCode: spData.basicInfo?.pinCode || spData.pin || '',
+        logoUrl: spData.basicInfo?.logoUrl || spData.businessLogo || '',
       },
       operations: spData.operations || {
         workingHours: {
