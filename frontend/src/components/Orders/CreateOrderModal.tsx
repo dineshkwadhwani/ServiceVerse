@@ -72,7 +72,9 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
 
   // Sync selectedSpId from orderData when order data is set (for customer SP selection)
   useEffect(() => {
+    console.log('[CreateOrderModal] useEffect triggered. orderData?.spId:', orderData?.spId, 'selectedSpId:', selectedSpId);
     if (orderData?.spId && !selectedSpId) {
+      console.log('[CreateOrderModal] Setting selectedSpId from orderData:', orderData.spId);
       setSelectedSpId(orderData.spId);
     }
   }, [orderData?.spId]);
@@ -142,6 +144,7 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
   };
 
   const handleDetailsNext = (data: any) => {
+    console.log('[CreateOrderModal] handleDetailsNext received data:', { spId: data?.spId, customerId: data?.customer?.customerId, itemsCount: data?.items?.length });
     setOrderData(data);
     setCurrentStep('review');
   };

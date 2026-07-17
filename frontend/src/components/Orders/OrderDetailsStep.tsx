@@ -271,12 +271,15 @@ export function OrderDetailsStep({
   };
 
   const handleReview = () => {
+    console.log('[OrderDetailsStep] handleReview called. spId:', spId, 'customer:', customer?.customerId);
+
     if (!customer) {
       toast.error(isCustomerCreating ? 'Profile is loading, please wait' : 'Please search for a customer');
       return;
     }
 
     if (!spId) {
+      console.error('[OrderDetailsStep] spId is empty!');
       toast.error('Please select a service provider');
       return;
     }
@@ -292,7 +295,7 @@ export function OrderDetailsStep({
       return;
     }
 
-    onNext({
+    const orderPayload = {
       customer,
       items: selectedItems,
       deliveryAddress,
@@ -302,7 +305,9 @@ export function OrderDetailsStep({
       deliveryType,
       selectedCoworker,
       spId,
-    });
+    };
+    console.log('[OrderDetailsStep] Sending to onNext:', { spId, customerId: customer?.customerId, itemsCount: selectedItems.length });
+    onNext(orderPayload);
   };
 
   const subtotal = orderItems.reduce((sum, item) => sum + item.itemTotal, 0);

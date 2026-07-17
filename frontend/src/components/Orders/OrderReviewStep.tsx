@@ -59,6 +59,7 @@ export function OrderReviewStep({
   const total = subtotal + gstAmount;
 
   const handleConfirm = async () => {
+    console.log('[OrderReviewStep] handleConfirm called. spId:', spId, 'customerId:', customer?.customerId);
     setIsCreating(true);
     try {
       const orderData = {
@@ -86,10 +87,13 @@ export function OrderReviewStep({
         applyGST,
       };
 
+      console.log('[OrderReviewStep] About to send order to API:', { spId: orderData.spId, customerId: orderData.customerId, customerPhone: orderData.customerPhone, itemsCount: orderData.items.length });
+
       const response = await apiClient.createOrder(orderData);
       toast.success('Order created successfully!');
       onComplete(response?.data?.orderId);
     } catch (error: any) {
+      console.error('[OrderReviewStep] Order creation failed:', error);
       toast.error(error?.message || 'Failed to create order');
     } finally {
       setIsCreating(false);
