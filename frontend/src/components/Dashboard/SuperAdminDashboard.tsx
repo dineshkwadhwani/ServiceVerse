@@ -16,10 +16,11 @@ import { EditUserModal } from './EditUserModal';
 import { CreateServiceModal } from '@/components/SuperAdmin/CreateServiceModal';
 import { ApprovalsTab } from '@/components/SuperAdmin/ApprovalsTab';
 import { SuperAdminProfileEditModal } from '@/components/Dashboard/SuperAdminProfileEditModal';
+import { SuperAdminReportPage } from '@/components/Reports/SuperAdminReports';
 import { useDashboardContext } from '@/context/DashboardContext';
 import { useAuthStore } from '@/store/authStore';
 import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
-import { StatsGrid } from '@/components/Shared/StatsGrid';
+import { StatsGrid, StatCard } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
 import { CheckCircle2 } from 'lucide-react';
 import { getDoc, doc } from 'firebase/firestore';
@@ -150,6 +151,7 @@ async function fetchSAServices(forceRefresh = false): Promise<ServiceListItem[]>
 }
 
 type ActiveTab = 'overview' | 'users' | 'services' | 'managers' | 'approvals';
+type ReportType = 'users' | 'services' | 'providers' | 'customers' | 'managers' | null;
 
 export function SuperAdminDashboard() {
   const navigate = useNavigate();
@@ -174,12 +176,16 @@ export function SuperAdminDashboard() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saData, setSAData] = useState<any>(null);
+  const [openReport, setOpenReport] = useState<ReportType>(null);
 
   useEffect(() => {
     loadDashboardData();
     if (firebaseUser?.uid) {
       loadSAProfile();
     }
+    // Load users and services for reports on overview tab
+    loadUsers();
+    loadServices();
   }, [firebaseUser?.uid]);
 
   const loadSAProfile = async () => {
@@ -284,6 +290,19 @@ export function SuperAdminDashboard() {
     }
   };
 
+  // Show report page if one is selected
+  if (openReport) {
+    return (
+      <SuperAdminReportPage
+        reportType={openReport}
+        users={users}
+        services={services}
+        stats={stats || {}}
+        onBack={() => setOpenReport(null)}
+      />
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -301,6 +320,14 @@ export function SuperAdminDashboard() {
       return user.status === 'ACTIVE' ? 'Active' : (user.status === 'PENDING' ? 'Pending' : 'Inactive');
     }
     return user.verified ? 'Active' : 'Pending';
+  };
+
+  const handleStatClick = (stat: StatCard) => {
+    if (stat.id === 'users') setOpenReport('users');
+    else if (stat.id === 'services') setOpenReport('services');
+    else if (stat.id === 'providers') setOpenReport('providers');
+    else if (stat.id === 'customers') setOpenReport('customers');
+    else if (stat.id === 'managers') setOpenReport('managers');
   };
 
   const tabs: DashboardTab<ActiveTab>[] = [
@@ -321,12 +348,13 @@ export function SuperAdminDashboard() {
         {activeTab === 'overview' && stats && (
           <StatsGrid
             columns="grid-cols-2 lg:grid-cols-5"
+            onStatClick={handleStatClick}
             stats={[
-              { label: 'Users', value: stats.totalUsers, icon: Users, color: COLORS.semantic.info },
-              { label: 'Services', value: stats.totalServices, icon: Briefcase, color: COLORS.semantic.success },
-              { label: 'Providers', value: stats.totalServiceProviders, icon: Users, color: COLORS.semantic.warning },
-              { label: 'Customers', value: stats.totalCustomers, icon: Users, color: COLORS.semantic.error },
-              { label: 'Managers', value: stats.totalAccountManagers, icon: Settings, color: COLORS.semantic.info },
+              { id: 'users', label: 'Users', value: stats.totalUsers, icon: Users, color: COLORS.semantic.info },
+              { id: 'services', label: 'Services', value: stats.totalServices, icon: Briefcase, color: COLORS.semantic.success },
+              { id: 'providers', label: 'Providers', value: stats.totalServiceProviders, icon: Users, color: COLORS.semantic.warning },
+              { id: 'customers', label: 'Customers', value: stats.totalCustomers, icon: Users, color: COLORS.semantic.error },
+              { id: 'managers', label: 'Managers', value: stats.totalAccountManagers, icon: Settings, color: COLORS.semantic.info },
             ]}
           />
         )}

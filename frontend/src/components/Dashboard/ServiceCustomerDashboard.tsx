@@ -297,7 +297,7 @@ export function ServiceCustomerDashboard() {
                     { label: 'Total Orders', value: orders.length, icon: ShoppingBag, color: COLORS.semantic.info },
                     {
                       label: 'Total Spent',
-                      value: `$${orders.reduce((sum, o) => sum + o.totalAmount, 0).toFixed(2)}`,
+                      value: `₹${orders.reduce((sum, o) => sum + o.totalAmount, 0).toFixed(2)}`,
                       icon: ShoppingBag,
                       color: COLORS.semantic.info,
                     },
@@ -395,7 +395,7 @@ export function ServiceCustomerDashboard() {
                               <span>
                                 {qty}x {item.name}
                               </span>
-                              <span>${price.toFixed(2)}</span>
+                              <span>₹{price.toFixed(2)}</span>
                             </div>
                           );
                         })}
@@ -404,7 +404,7 @@ export function ServiceCustomerDashboard() {
                       <div className="flex justify-between font-bold">
                         <span style={{ color: COLORS.text.primary }}>Total</span>
                         <span style={{ color: COLORS.semantic.info }}>
-                          ${order.totalAmount.toFixed(2)}
+                          ₹{order.totalAmount.toFixed(2)}
                         </span>
                       </div>
 

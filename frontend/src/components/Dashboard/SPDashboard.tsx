@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Loader2, TrendingUp, Package, Star, BarChart3, ShoppingBag, DollarSign, AlertCircle, Users, Plus } from 'lucide-react';
 import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
-import { StatsGrid } from '@/components/Shared/StatsGrid';
+import { StatsGrid, StatCard } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
 import { SPProfileEditModal } from '@/components/Onboarding/SPProfileEditModal';
 import { CreateOrderModal } from '@/components/Orders/CreateOrderModal';
@@ -9,6 +9,7 @@ import { CreateCustomerModal } from '@/components/Orders/CreateCustomerModal';
 import { CreateCoworkerModal } from '@/components/Orders/CreateCoworkerModal';
 import { OrderLifecycleModal } from '@/components/Orders/OrderLifecycleModal';
 import { InvoiceModal } from '@/components/Orders/InvoiceModal';
+import { SPReportPage } from '@/components/Reports/SPReports';
 import { useDashboardContext } from '@/context/DashboardContext';
 import { apiClient } from '@/services/apiClient';
 import { COLORS } from '@/utils/theme';
@@ -155,6 +156,7 @@ async function fetchSPUserDoc(uid: string, forceRefresh = false): Promise<any> {
 }
 
 type ActiveTab = 'overview' | 'orders' | 'pickup' | 'earnings' | 'customers' | 'coworkers';
+type ReportType = 'orders' | 'revenue' | 'customers' | null;
 
 export function SPDashboard() {
   const { user, firebaseUser } = useAuthStore();
@@ -183,6 +185,7 @@ export function SPDashboard() {
   const [orderSearchDate, setOrderSearchDate] = useState('');
   const [loadingMoreOrders, setLoadingMoreOrders] = useState(false);
   const [hasMoreOrders, setHasMoreOrders] = useState(true);
+  const [openReport, setOpenReport] = useState<ReportType>(null);
 
   useEffect(() => {
     loadData();
@@ -270,6 +273,19 @@ export function SPDashboard() {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()); // Sort by date, newest first
   };
 
+  // Show report page if one is selected
+  if (openReport) {
+    return (
+      <SPReportPage
+        reportType={openReport}
+        orders={orders}
+        customers={customers}
+        stats={stats}
+        onBack={() => setOpenReport(null)}
+      />
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -342,6 +358,12 @@ export function SPDashboard() {
     return normalized === 'COMPLETED' || normalized === 'DELIVERED' || normalized === 'PAID';
   };
 
+  const handleStatClick = (stat: StatCard) => {
+    if (stat.id === 'orders') setOpenReport('orders');
+    else if (stat.id === 'revenue') setOpenReport('revenue');
+    else if (stat.id === 'customers') setOpenReport('customers');
+  };
+
   const normalizeAssigneeName = (value?: string) =>
     (value || '')
       .trim()
@@ -395,11 +417,12 @@ export function SPDashboard() {
           <div className="mb-8">
             <StatsGrid
               columns="grid-cols-2 lg:grid-cols-4"
+              onStatClick={handleStatClick}
               stats={[
-                { label: 'Total Orders', value: stats.totalOrders, icon: Package, color: COLORS.semantic.info },
-                { label: 'Total Revenue', value: `$${stats.totalRevenue.toFixed(2)}`, icon: TrendingUp, color: COLORS.semantic.success },
+                { id: 'orders', label: 'Total Orders', value: stats.totalOrders, icon: Package, color: COLORS.semantic.info },
+                { id: 'revenue', label: 'Total Revenue', value: `₹${stats.totalRevenue.toFixed(2)}`, icon: TrendingUp, color: COLORS.semantic.success },
                 { label: 'Rating', value: stats.averageRating, icon: Star, color: COLORS.semantic.warning },
-                { label: 'Customers', value: stats.totalCustomers, icon: Package, color: COLORS.semantic.info },
+                { id: 'customers', label: 'Customers', value: stats.totalCustomers, icon: Package, color: COLORS.semantic.info },
               ]}
             />
           </div>
@@ -437,7 +460,7 @@ export function SPDashboard() {
                           {order.customerName}
                         </p>
                         <p style={{ color: COLORS.text.secondary }}>
-                          Order #{order.orderId} • ${order.totalAmount.toFixed(2)}
+                          Order #{order.orderId} • ₹{order.totalAmount.toFixed(2)}
                         </p>
                       </div>
                         <div
@@ -811,7 +834,7 @@ export function SPDashboard() {
               >
                 <p style={{ color: COLORS.text.secondary }}>Total Earnings (filtered)</p>
                 <p className="text-4xl font-bold mt-2" style={{ color: COLORS.semantic.success }}>
-                  ${totalFilteredEarnings.toFixed(2)}
+                  ₹{totalFilteredEarnings.toFixed(2)}
                 </p>
               </div>
 
@@ -835,7 +858,7 @@ export function SPDashboard() {
                       </p>
                     </div>
                     <p className="font-bold text-lg" style={{ color: COLORS.semantic.success }}>
-                      ${earning.amount.toFixed(2)}
+                      ₹{earning.amount.toFixed(2)}
                     </p>
                   </div>
                 ))}

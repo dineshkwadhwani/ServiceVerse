@@ -244,7 +244,7 @@ export function ServiceDetailPage() {
                           className="font-bold"
                           style={{ color: COLORS.semantic.info }}
                         >
-                          ${item.basePrice}
+                          ₹{item.basePrice}
                         </p>
                       </div>
                     ))}

@@ -3,10 +3,11 @@ import { useToast } from '@/store/notificationStore';
 import { apiClient } from '@/services/apiClient';
 import { Loader2, Edit2, Users, CheckCircle2, Clock, BarChart3 } from 'lucide-react';
 import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
-import { StatsGrid } from '@/components/Shared/StatsGrid';
+import { StatsGrid, StatCard } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
 import { SPOnboardingStepper } from '@/components/Onboarding/SPOnboardingStepper';
 import { AMProfileEditModal } from '@/components/Dashboard/AMProfileEditModal';
+import { AMReportPage } from '@/components/Reports/AMReports';
 import { useDashboardContext } from '@/context/DashboardContext';
 import { useAuthStore } from '@/store/authStore';
 import { COLORS } from '@/utils/theme';
@@ -77,6 +78,7 @@ async function fetchAMDashboardData(forceRefresh = false): Promise<AMDashboardDa
 }
 
 type ActiveTab = 'overview' | 'sps' | 'approvals';
+type ReportType = 'assigned' | 'active' | 'pending' | null;
 
 export function AMDashboard() {
   const toast = useToast();
@@ -90,6 +92,7 @@ export function AMDashboard() {
   const [onboardingSP, setOnboardingSP] = useState<SP | null>(null);
   const [isLoadingSPProfile, setIsLoadingSPProfile] = useState(false);
   const [amData, setAMData] = useState<any>(null);
+  const [openReport, setOpenReport] = useState<ReportType>(null);
 
   useEffect(() => {
     loadData();
@@ -158,6 +161,25 @@ export function AMDashboard() {
     }
   };
 
+  const handleStatClick = (stat: StatCard) => {
+    if (stat.id === 'assigned') setOpenReport('assigned');
+    else if (stat.id === 'active') setOpenReport('active');
+    else if (stat.id === 'pending') setOpenReport('pending');
+  };
+
+  // Show report page if one is selected
+  if (openReport) {
+    return (
+      <AMReportPage
+        reportType={openReport}
+        sps={sps}
+        stats={stats || {}}
+        onBack={() => setOpenReport(null)}
+        onRowClick={handleEditSP}
+      />
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -182,10 +204,11 @@ export function AMDashboard() {
           <div className="mb-8">
             <StatsGrid
               columns="grid-cols-2 lg:grid-cols-3"
+              onStatClick={handleStatClick}
               stats={[
-                { label: 'Assigned SPs', value: stats.totalSPs, icon: Users, color: COLORS.semantic.info },
-                { label: 'Active SPs', value: stats.activeSPs, icon: CheckCircle2, color: COLORS.semantic.success },
-                { label: 'Pending Approvals', value: stats.pendingApprovals, icon: Clock, color: COLORS.semantic.warning },
+                { id: 'assigned', label: 'Assigned SPs', value: stats.totalSPs, icon: Users, color: COLORS.semantic.info },
+                { id: 'active', label: 'Active SPs', value: stats.activeSPs, icon: CheckCircle2, color: COLORS.semantic.success },
+                { id: 'pending', label: 'Pending Approvals', value: stats.pendingApprovals, icon: Clock, color: COLORS.semantic.warning },
               ]}
             />
           </div>

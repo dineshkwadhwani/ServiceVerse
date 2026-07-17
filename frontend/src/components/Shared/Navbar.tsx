@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/store/notificationStore';
-import { LogOut, Bell, User, Settings } from 'lucide-react';
+import { LogOut, Bell, User } from 'lucide-react';
 import { useState } from 'react';
 import { COLORS } from '@/utils/theme';
 
@@ -15,6 +15,12 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
   const { user, firebaseUser, signOut } = useAuthStore();
   const toast = useToast();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  const handleDashboardClick = () => {
+    setShowProfileMenu(false);
+    // Force reload to dashboard to close any open reports
+    window.location.href = '/dashboard';
+  };
 
   const handleLogout = async () => {
     try {
@@ -114,6 +120,16 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
                   >
                     <div className="p-2 space-y-1">
                       <button
+                        onClick={handleDashboardClick}
+                        className="w-full text-left px-4 py-2 text-sm rounded flex items-center gap-2 transition hover:bg-opacity-50"
+                        style={{
+                          color: COLORS.text.primary,
+                        }}
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Dashboard
+                      </button>
+                      <button
                         onClick={() => {
                           setShowProfileMenu(false);
                           onProfileClick?.();
@@ -125,15 +141,6 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
                       >
                         <User className="w-4 h-4" />
                         Profile
-                      </button>
-                      <button
-                        className="w-full text-left px-4 py-2 text-sm rounded flex items-center gap-2 transition"
-                        style={{
-                          color: COLORS.text.primary,
-                        }}
-                      >
-                        <Settings className="w-4 h-4" />
-                        Settings
                       </button>
                       <hr style={{ borderColor: COLORS.border.light }} />
                       <button
