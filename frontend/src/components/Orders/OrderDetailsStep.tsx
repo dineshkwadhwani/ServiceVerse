@@ -292,8 +292,10 @@ export function OrderDetailsStep({
       return;
     }
 
+    // Items aren't required when the customer creates the order, or when it's a pickup -
+    // the coworker/SP adds items once the goods are actually picked up.
     const selectedItems = orderItems.filter(item => item.qty > 0);
-    if (!isCustomerCreating && selectedItems.length === 0) {
+    if (!isCustomerCreating && deliveryType !== 'PICKUP' && selectedItems.length === 0) {
       toast.error('Please select at least one item');
       return;
     }
@@ -323,7 +325,7 @@ export function OrderDetailsStep({
   const isReviewDisabled =
     !customer ||
     !spId ||
-    (!isCustomerCreating && selectedItemsCount === 0) ||
+    (!isCustomerCreating && deliveryType !== 'PICKUP' && selectedItemsCount === 0) ||
     (!isCustomerCreating && deliveryType === 'PICKUP' && !selectedCoworker);
 
   const handleCancel = () => {

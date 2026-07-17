@@ -66,7 +66,10 @@ export const createOrder = async (req: Request, res: Response) => {
     const createdByUserId = authUser?.uid || '';
 
     // Validation
-    if (!data.spId || !data.customerId || !data.customerPhone || !data.items || data.items.length === 0) {
+    // Items aren't required when the customer creates the order, or when it's a pickup -
+    // the coworker/SP adds items once the goods are actually picked up.
+    const itemsRequired = createdByRole !== 'CUSTOMER' && data.deliveryType !== 'PICKUP';
+    if (!data.spId || !data.customerId || !data.customerPhone || !data.items || (itemsRequired && data.items.length === 0)) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields: spId, customerId, customerPhone, items',
