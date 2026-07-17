@@ -44,6 +44,7 @@ interface Props {
     paymentMethod: 'ONLINE' | 'DIRECT';
     deliveryType: 'DROP' | 'PICKUP';
     selectedCoworker: string;
+    spId: string;
   }) => void;
   onCancel: () => void; // eslint-disable-line @typescript-eslint/no-unused-vars
 }
@@ -300,6 +301,7 @@ export function OrderDetailsStep({
       paymentMethod,
       deliveryType,
       selectedCoworker,
+      spId,
     });
   };
 

@@ -133,6 +133,10 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
   };
 
   const handleDetailsNext = (data: any) => {
+    // Update selectedSpId from order data if it comes from customer SP selection
+    if (data.spId && !selectedSpId) {
+      setSelectedSpId(data.spId);
+    }
     setOrderData(data);
     setCurrentStep('review');
   };
