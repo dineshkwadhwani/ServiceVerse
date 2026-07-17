@@ -87,7 +87,7 @@ export function OrderReviewStep({
         applyGST,
       };
 
-      console.log('[OrderReviewStep] About to send order to API:', { spId: orderData.spId, customerId: orderData.customerId, customerPhone: orderData.customerPhone, itemsCount: orderData.items.length });
+      console.log('[OrderReviewStep] About to send order to API:', { spId: orderData.spId, customerId: orderData.customerId, customerPhone: orderData.customerPhone, itemsCount: orderData.items.length, paymentMethod: orderData.paymentMethod });
 
       const response = await apiClient.createOrder(orderData);
       toast.success('Order created successfully!');

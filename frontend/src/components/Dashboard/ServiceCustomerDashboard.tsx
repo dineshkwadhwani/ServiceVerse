@@ -194,6 +194,11 @@ export function ServiceCustomerDashboard() {
     setShowCreateOrder(true);
   };
 
+  const handleTabChange = (tab: ActiveTab) => {
+    setActiveTab(tab);
+    loadData();
+  };
+
   const tabs: DashboardTab<ActiveTab>[] = [
     { id: 'overview', icon: BarChart3, label: 'Overview' },
     { id: 'orders', icon: ShoppingBag, label: 'My Orders' },
@@ -285,7 +290,7 @@ export function ServiceCustomerDashboard() {
         </div>
 
         {/* Tabs */}
-        <DashboardTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+        <DashboardTabs tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
 
           {/* Overview Tab */}
           {activeTab === 'overview' && (

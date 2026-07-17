@@ -233,6 +233,11 @@ export function SPDashboard() {
     }
   };
 
+  const handleTabChange = (tab: ActiveTab) => {
+    setActiveTab(tab);
+    loadData(true);
+  };
+
   const loadMoreOrders = async () => {
     if (!firebaseUser?.uid || loadingMoreOrders || !hasMoreOrders) return;
 
@@ -409,7 +414,7 @@ export function SPDashboard() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: COLORS.bg.primary }}>
-      <DashboardTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      <DashboardTabs tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
 
       <main className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6">
         {/* Stats Cards */}

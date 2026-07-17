@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/store/notificationStore';
 import { apiClient } from '@/services/apiClient';
@@ -201,11 +201,18 @@ export function SuperAdminDashboard() {
     }
   };
 
+  const hasMountedTabEffect = useRef(false);
   useEffect(() => {
-    if (activeTab === 'users' || activeTab === 'managers') {
-      loadUsers();
+    if (!hasMountedTabEffect.current) {
+      hasMountedTabEffect.current = true;
+      return;
+    }
+    if (activeTab === 'overview') {
+      loadDashboardData(true);
+    } else if (activeTab === 'users' || activeTab === 'managers') {
+      loadUsers(true);
     } else if (activeTab === 'services') {
-      loadServices();
+      loadServices(true);
     }
   }, [activeTab]);
 

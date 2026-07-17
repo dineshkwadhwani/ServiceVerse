@@ -148,6 +148,14 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   const canCustomerConfirm = role === 'CUSTOMER' && isPreConfirmStatus && !createdByCustomer;
   const canCustomerPay = role === 'CUSTOMER' && currentStatus === 'DELIVERED';
   const currentPaymentMethod = paymentMethod || orderDetails?.paymentMethod || order?.paymentMethod || 'DIRECT';
+  console.log('[OrderLifecycleModal] payment method resolution:', {
+    paymentMethodState: paymentMethod,
+    orderDetailsPaymentMethod: orderDetails?.paymentMethod,
+    orderPropPaymentMethod: order?.paymentMethod,
+    currentPaymentMethod,
+    currentStatus,
+    canCustomerPay,
+  });
   const isFullEditMode =
     (role === 'SERVICE_PROVIDER' || role === 'COWORKER') &&
     !orderDetails?.isFrozen &&
@@ -201,6 +209,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   };
 
   const saveDetails = async () => {
+    console.log('[OrderLifecycleModal] saveDetails sending paymentMethod:', paymentMethod);
     setIsSaving(true);
     try {
       await apiClient.updateOrderDetails(order.orderId, {
@@ -226,6 +235,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
       return;
     }
 
+    console.log('[OrderLifecycleModal] confirmFromEditMode sending paymentMethod:', paymentMethod);
     setIsSaving(true);
     try {
       // Persist current items/details first - the order may have been created with 0 items
@@ -283,6 +293,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   };
 
   const handleOnlinePayNow = async () => {
+    console.log('[OrderLifecycleModal] handleOnlinePayNow invoked. currentPaymentMethod:', currentPaymentMethod);
     try {
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
@@ -383,6 +394,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   };
 
   const handleDirectPayNow = () => {
+    console.log('[OrderLifecycleModal] handleDirectPayNow invoked. currentPaymentMethod:', currentPaymentMethod, 'spQrCodeUrl:', spQrCodeUrl, 'spUpiId:', spUpiId);
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
     const upiIntent = buildUpiIntent();
 
@@ -391,16 +403,13 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
       return;
     }
 
-    if (isMobile && spQrCodeUrl) {
-      window.open(spQrCodeUrl, '_blank');
-      return;
-    }
-
     if (!spQrCodeUrl) {
       toast.error('SP QR code is not configured yet');
       return;
     }
 
+    // Show the QR inline instead of window.open - an invalid/relative spQrCodeUrl
+    // can cause the browser to open a blank tab.
     setShowDirectPayPopup(true);
   };
 
