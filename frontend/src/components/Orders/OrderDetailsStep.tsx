@@ -281,7 +281,7 @@ export function OrderDetailsStep({
     }
 
     const selectedItems = orderItems.filter(item => item.qty > 0);
-    if (selectedItems.length === 0) {
+    if (!isCustomerCreating && selectedItems.length === 0) {
       toast.error('Please select at least one item');
       return;
     }
@@ -308,7 +308,7 @@ export function OrderDetailsStep({
   const isReviewDisabled =
     !customer ||
     !spId ||
-    selectedItemsCount === 0 ||
+    (!isCustomerCreating && selectedItemsCount === 0) ||
     (!isCustomerCreating && deliveryType === 'PICKUP' && !selectedCoworker);
 
   const handleCancel = () => {
