@@ -322,6 +322,13 @@ export const updateOrderLifecycle = async (req: Request, res: Response) => {
       }
     }
 
+    if (status === 'CONFIRMED') {
+      const itemCount = Array.isArray(orderData.items) ? orderData.items.length : 0;
+      if (itemCount === 0) {
+        return res.status(400).json({ success: false, error: 'Order must contain at least one item before it can be confirmed' });
+      }
+    }
+
     if (status === 'ASSIGNED_FOR_PICKUP' && !selectedCoworker) {
       return res.status(400).json({ success: false, error: 'selectedCoworker is required for ASSIGNED_FOR_PICKUP' });
     }
@@ -446,6 +453,8 @@ export const updateOrderDetails = async (req: Request, res: Response) => {
     };
 
     if (Array.isArray(items)) {
+      // Intermediate saves (edit-in-progress) may leave the order at 0 items - the SP/Coworker
+      // is still assembling it. The at-least-one-item rule is enforced at confirm time instead.
       const normalizedItems = items
         .map((item: any) => ({
           menuItemId: item.menuItemId,
@@ -454,10 +463,6 @@ export const updateOrderDetails = async (req: Request, res: Response) => {
           qty: Math.max(0, Number(item.qty || item.quantity || 0)),
         }))
         .filter((item: any) => item.qty > 0);
-
-      if (normalizedItems.length === 0) {
-        return res.status(400).json({ success: false, error: 'Order must contain at least one item' });
-      }
 
       const normalizedWithTotal = normalizedItems.map((item: any) => ({
         ...item,
