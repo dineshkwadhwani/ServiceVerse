@@ -49,6 +49,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   const [deliveryType, setDeliveryType] = useState<'DROP' | 'PICKUP'>((order.deliveryType as 'DROP' | 'PICKUP') || 'DROP');
   const [specialInstructions, setSpecialInstructions] = useState(order.specialInstructions || '');
   const [editableItems, setEditableItems] = useState<Array<any>>(order.items || []);
+  const [isLoadingMenu, setIsLoadingMenu] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
   const [showPaidPopup, setShowPaidPopup] = useState(false);
@@ -91,6 +92,34 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
           } catch {
             setSpQrCodeUrl('');
             setSpUpiId('');
+          }
+
+          // Load SP's full configured menu so items can be added, not just adjusted.
+          // Needed when a customer creates an order with 0 items for SP/Coworker to fill in.
+          if (role === 'SERVICE_PROVIDER' || role === 'COWORKER') {
+            setIsLoadingMenu(true);
+            try {
+              const menuResponse: any = await apiClient.getSPConfiguredMenu(spId);
+              const menuItems = (menuResponse?.menuItems || menuResponse?.data?.menuItems || []) as Array<any>;
+              const existingItems = fullOrder?.items || [];
+
+              const merged = menuItems.map((menuItem: any) => {
+                const existing = existingItems.find((i: any) => i.menuItemId === menuItem.menuItemId);
+                return {
+                  menuItemId: menuItem.menuItemId,
+                  name: menuItem.name,
+                  customPrice: menuItem.customPrice,
+                  qty: existing?.qty || existing?.quantity || 0,
+                  itemTotal: existing?.itemTotal || 0,
+                };
+              });
+
+              setEditableItems(merged);
+            } catch {
+              // Menu load failed - fall back to items already on the order
+            } finally {
+              setIsLoadingMenu(false);
+            }
           }
         }
       } catch (error: any) {
@@ -192,8 +221,22 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   };
 
   const confirmFromEditMode = async () => {
+    if (editableItems.filter((item) => Number(item.qty || item.quantity || 0) > 0).length === 0) {
+      toast.error('Please select at least one item before confirming');
+      return;
+    }
+
     setIsSaving(true);
     try {
+      // Persist current items/details first - the order may have been created with 0 items
+      // (customer flow) and items only exist in local edit state until saved.
+      await apiClient.updateOrderDetails(order.orderId, {
+        items: editableItems,
+        specialInstructions,
+        deliveryType,
+        selectedCoworker,
+        paymentMethod,
+      });
       await apiClient.updateOrderLifecycle(order.orderId, { status: 'CONFIRMED' });
       toast.success('Order confirmed');
       onSaved();
@@ -429,6 +472,13 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
             <>
               <div>
                 <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>Order Items (Editable until confirmed)</label>
+                {isLoadingMenu ? (
+                  <div className="flex items-center justify-center p-6">
+                    <Loader2 className="w-5 h-5 animate-spin" style={{ color: COLORS.semantic.info }} />
+                  </div>
+                ) : editableItems.length === 0 ? (
+                  <p className="text-sm p-3" style={{ color: COLORS.text.secondary }}>No menu items configured for this service provider yet.</p>
+                ) : (
                 <div className="space-y-2 max-h-56 overflow-y-auto">
                   {editableItems.map((item: any, idx: number) => (
                     <div key={idx} className="p-3 rounded-lg border flex items-center justify-between" style={{ borderColor: COLORS.border.light, backgroundColor: COLORS.bg.surface }}>
@@ -456,6 +506,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
                     </div>
                   ))}
                 </div>
+                )}
                 <p className="text-sm mt-2" style={{ color: COLORS.text.secondary }}>Subtotal: ₹{subtotal.toFixed(2)}</p>
               </div>
 
@@ -517,7 +568,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
 
               <button
                 onClick={saveDetails}
-                disabled={isSaving}
+                disabled={isSaving || isLoadingMenu}
                 className="w-full px-4 py-2 rounded-lg font-semibold text-white disabled:opacity-60"
                 style={{ backgroundColor: COLORS.semantic.success }}
               >
@@ -527,7 +578,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
               {(role === 'SERVICE_PROVIDER' || role === 'COWORKER') && (
                 <button
                   onClick={confirmFromEditMode}
-                  disabled={isSaving}
+                  disabled={isSaving || isLoadingMenu}
                   className="w-full px-4 py-2 rounded-lg font-semibold text-white disabled:opacity-60"
                   style={{ backgroundColor: COLORS.semantic.info }}
                 >
