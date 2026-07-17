@@ -47,6 +47,7 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
     paymentMethod: 'ONLINE' | 'DIRECT';
     deliveryType: 'DROP' | 'PICKUP';
     selectedCoworker: string;
+    spId: string;
   } | null>(null);
 
   // Load SP's GST settings and customer data (if customer creating order)
@@ -68,6 +69,13 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
       loadCustomerServiceProviders();
     }
   }, [isCustomerCreating, firebaseUser?.uid, serviceId]);
+
+  // Sync selectedSpId from orderData when order data is set (for customer SP selection)
+  useEffect(() => {
+    if (orderData?.spId && !selectedSpId) {
+      setSelectedSpId(orderData.spId);
+    }
+  }, [orderData?.spId]);
 
   const loadSPGSTSettings = async (targetSpId: string) => {
     try {
@@ -125,6 +133,7 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
           paymentMethod: 'DIRECT',
           deliveryType: 'DROP',
           selectedCoworker: '',
+          spId: '',
         });
       }
     } catch (error) {
@@ -133,10 +142,6 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
   };
 
   const handleDetailsNext = (data: any) => {
-    // Update selectedSpId from order data if it comes from customer SP selection
-    if (data.spId && !selectedSpId) {
-      setSelectedSpId(data.spId);
-    }
     setOrderData(data);
     setCurrentStep('review');
   };
