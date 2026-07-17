@@ -95,6 +95,9 @@ export function OrderDetailsStep({
   const [coworkers, setCoworkers] = useState<any[]>([]);
   const [isLoadingCoworkers, setIsLoadingCoworkers] = useState(false);
 
+  // Track locally selected SP (for customer flow when searching)
+  const [localSelectedSpId, setLocalSelectedSpId] = useState<string>('');
+
   const spSelfName =
     (user as any)?.name ||
     (user as any)?.ownerName ||
@@ -229,6 +232,8 @@ export function OrderDetailsStep({
   };
 
   const handleSelectSP = (sp: { spId: string; businessName: string }) => {
+    console.log('[OrderDetailsStep] SP selected:', sp.spId, sp.businessName);
+    setLocalSelectedSpId(sp.spId);
     onSPChange?.(sp.spId);
     setSelectedSPName(sp.businessName);
     setSpSearchResults(null);
@@ -271,15 +276,18 @@ export function OrderDetailsStep({
   };
 
   const handleReview = () => {
-    console.log('[OrderDetailsStep] handleReview called. spId:', spId, 'customer:', customer?.customerId);
+    // Use localSelectedSpId if available (customer selected SP via search), otherwise use prop spId
+    const effectiveSpId = localSelectedSpId || spId;
+
+    console.log('[OrderDetailsStep] handleReview called. effectiveSpId:', effectiveSpId, 'localSelectedSpId:', localSelectedSpId, 'spId prop:', spId, 'customer:', customer?.customerId);
 
     if (!customer) {
       toast.error(isCustomerCreating ? 'Profile is loading, please wait' : 'Please search for a customer');
       return;
     }
 
-    if (!spId) {
-      console.error('[OrderDetailsStep] spId is empty!');
+    if (!effectiveSpId) {
+      console.error('[OrderDetailsStep] effectiveSpId is empty! localSelectedSpId:', localSelectedSpId, 'spId:', spId);
       toast.error('Please select a service provider');
       return;
     }
@@ -304,9 +312,9 @@ export function OrderDetailsStep({
       paymentMethod,
       deliveryType,
       selectedCoworker,
-      spId,
+      spId: effectiveSpId,
     };
-    console.log('[OrderDetailsStep] Sending to onNext:', { spId, customerId: customer?.customerId, itemsCount: selectedItems.length });
+    console.log('[OrderDetailsStep] Sending to onNext:', { spId: effectiveSpId, customerId: customer?.customerId, itemsCount: selectedItems.length });
     onNext(orderPayload);
   };
 
