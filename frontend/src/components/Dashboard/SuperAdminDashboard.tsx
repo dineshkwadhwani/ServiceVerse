@@ -393,17 +393,25 @@ export function SuperAdminDashboard() {
                       <p className="font-semibold text-sm truncate" style={{ color: COLORS.text.primary }}>
                         {u.name}
                       </p>
-                      <p
-                        className="text-xs mt-1"
-                        style={{
-                          color:
-                            u.role === 'SUPERADMIN' || getUserStatus(u) === 'Active'
-                              ? COLORS.semantic.success
-                              : COLORS.semantic.warning,
-                        }}
-                      >
-                        {getUserStatus(u)}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-semibold text-white"
+                          style={{ backgroundColor: COLORS.semantic.info }}
+                        >
+                          {u.role.replace('_', ' ')}
+                        </span>
+                        <p
+                          className="text-xs"
+                          style={{
+                            color:
+                              u.role === 'SUPERADMIN' || getUserStatus(u) === 'Active'
+                                ? COLORS.semantic.success
+                                : COLORS.semantic.warning,
+                          }}
+                        >
+                          {getUserStatus(u)}
+                        </p>
+                      </div>
                     </div>
                     <button
                       onClick={() => setEditingUser(u)}
