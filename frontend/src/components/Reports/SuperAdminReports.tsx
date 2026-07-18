@@ -458,27 +458,47 @@ export function SuperAdminReportPage({
               </div>
             ))}
 
-            {dataType === 'earnings' && filteredData.map((row: SAEarningRow) => (
-              <div
-                key={row.orderId}
-                className="p-4 rounded-lg border"
-                style={{
-                  backgroundColor: COLORS.bg.surface,
-                  borderColor: COLORS.border.light,
-                }}
-              >
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-sm">
-                  <p style={{ color: COLORS.text.primary }}>{new Date(row.date).toLocaleDateString()}</p>
-                  <p style={{ color: COLORS.text.primary }}>{row.customerName}</p>
-                  <p style={{ color: COLORS.text.primary }}>₹{row.orderAmount.toFixed(2)}</p>
-                  <p style={{ color: COLORS.semantic.warning }}>₹{row.commissionAmount.toFixed(2)}</p>
-                  <p style={{ color: COLORS.text.secondary }}>{row.serviceProviderName}</p>
+            {dataType === 'earnings' && (
+              <>
+                <div
+                  className="p-3 rounded-lg border"
+                  style={{
+                    backgroundColor: COLORS.bg.surface,
+                    borderColor: COLORS.border.light,
+                  }}
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.text.secondary }}>Date</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.text.secondary }}>Customer Name</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.text.secondary }}>Order Amount</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.text.secondary }}>Commission Amount</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.text.secondary }}>Service Provider</p>
+                  </div>
                 </div>
-                <p className="text-xs mt-2" style={{ color: COLORS.text.secondary }}>
-                  Order #{row.orderId} {row.city ? `| ${row.city}` : ''}
-                </p>
-              </div>
-            ))}
+
+                {filteredData.map((row: SAEarningRow) => (
+                  <div
+                    key={row.orderId}
+                    className="p-4 rounded-lg border"
+                    style={{
+                      backgroundColor: COLORS.bg.surface,
+                      borderColor: COLORS.border.light,
+                    }}
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-sm">
+                      <p style={{ color: COLORS.text.primary }}>{new Date(row.date).toLocaleDateString()}</p>
+                      <p style={{ color: COLORS.text.primary }}>{row.customerName}</p>
+                      <p style={{ color: COLORS.text.primary }}>₹{row.orderAmount.toFixed(2)}</p>
+                      <p style={{ color: COLORS.semantic.warning }}>₹{row.commissionAmount.toFixed(2)}</p>
+                      <p style={{ color: COLORS.text.secondary }}>{row.serviceProviderName}</p>
+                    </div>
+                    <p className="text-xs mt-2" style={{ color: COLORS.text.secondary }}>
+                      Order #{row.orderId} {row.city ? `| ${row.city}` : ''}
+                    </p>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         ) : (
           <div className="flex items-center justify-center py-16">

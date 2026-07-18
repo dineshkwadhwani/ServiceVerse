@@ -339,34 +339,53 @@ export function SPReportPage({ reportType, orders, earnings, customers, stats, o
               </div>
             ))}
 
-            {dataType === 'earnings' && filteredData.map((earning: any) => (
-              <div
-                key={earning.orderId}
-                className="p-4 rounded-lg border"
-                style={{
-                  backgroundColor: COLORS.bg.surface,
-                  borderColor: COLORS.border.light,
-                }}
-              >
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <p className="text-sm" style={{ color: COLORS.text.primary }}>
-                    {new Date(earning.date).toLocaleDateString()}
-                  </p>
-                  <p className="text-sm" style={{ color: COLORS.text.primary }}>
-                    {earning.customerName}
-                  </p>
-                  <p className="text-sm" style={{ color: COLORS.text.primary }}>
-                    ₹{Number(earning.orderAmount || 0).toFixed(2)}
-                  </p>
-                  <p className="text-sm font-semibold" style={{ color: COLORS.semantic.warning }}>
-                    ₹{Number(earning.commissionAmount || 0).toFixed(2)}
-                  </p>
+            {dataType === 'earnings' && (
+              <>
+                <div
+                  className="p-3 rounded-lg border"
+                  style={{
+                    backgroundColor: COLORS.bg.surface,
+                    borderColor: COLORS.border.light,
+                  }}
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.text.secondary }}>Date</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.text.secondary }}>Customer Name</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.text.secondary }}>Order Amount</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: COLORS.text.secondary }}>Commission Amount</p>
+                  </div>
                 </div>
-                <div className="mt-2 text-xs" style={{ color: COLORS.text.secondary }}>
-                  Order #{earning.orderId}
-                </div>
-              </div>
-            ))}
+
+                {filteredData.map((earning: any) => (
+                  <div
+                    key={earning.orderId}
+                    className="p-4 rounded-lg border"
+                    style={{
+                      backgroundColor: COLORS.bg.surface,
+                      borderColor: COLORS.border.light,
+                    }}
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <p className="text-sm" style={{ color: COLORS.text.primary }}>
+                        {new Date(earning.date).toLocaleDateString()}
+                      </p>
+                      <p className="text-sm" style={{ color: COLORS.text.primary }}>
+                        {earning.customerName}
+                      </p>
+                      <p className="text-sm" style={{ color: COLORS.text.primary }}>
+                        ₹{Number(earning.orderAmount || 0).toFixed(2)}
+                      </p>
+                      <p className="text-sm font-semibold" style={{ color: COLORS.semantic.warning }}>
+                        ₹{Number(earning.commissionAmount || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="mt-2 text-xs" style={{ color: COLORS.text.secondary }}>
+                      Order #{earning.orderId}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
 
             {dataType === 'customers' && filteredData.map((customer: any) => (
               <div
