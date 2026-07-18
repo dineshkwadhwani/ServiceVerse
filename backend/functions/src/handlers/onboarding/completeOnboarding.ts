@@ -65,8 +65,8 @@ export async function completeOnboarding(req: AuthRequest, res: Response) {
       return sendError(res, new ValidationError('Documentation information is required'));
     }
 
-    if (!documentation.gstNumber) {
-      return sendError(res, new ValidationError('GST number is required'));
+    if (documentation.gstCollectionMandatory && !documentation.gstNumber) {
+      return sendError(res, new ValidationError('GST number is required when GST collection is mandatory'));
     }
 
     if (documentation.directPaymentAllowed && !documentation.qrCodeUrl) {

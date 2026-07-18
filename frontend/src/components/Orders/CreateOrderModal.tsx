@@ -247,6 +247,7 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
               associatedSpId={associatedSpId}
               initialSpName={initialSpName}
               initialData={orderData || undefined}
+              spGstMandatory={spGstMandatory}
               onNext={handleDetailsNext}
               onCancel={handleCancel}
             />

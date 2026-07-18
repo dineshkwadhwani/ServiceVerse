@@ -35,6 +35,7 @@ interface Props {
     deliveryType?: 'DROP' | 'PICKUP';
     selectedCoworker?: string;
   };
+  spGstMandatory?: boolean;
   onNext: (data: {
     customer: any;
     items: OrderItem[];
@@ -58,6 +59,7 @@ export function OrderDetailsStep({
   associatedSpId,
   initialSpName,
   initialData,
+  spGstMandatory = false,
   onNext,
   onCancel,
 }: Props) {
@@ -141,6 +143,13 @@ export function OrderDetailsStep({
     setDeliveryType(initialData.deliveryType || (isCustomerCreating ? 'PICKUP' : 'DROP'));
     setSelectedCoworker(initialData.selectedCoworker || '');
   }, [initialData, isCustomerCreating]);
+
+  // Online payment is allowed only when GST collection is mandatory for the selected SP.
+  useEffect(() => {
+    if (!spGstMandatory && paymentMethod === 'ONLINE') {
+      setPaymentMethod('DIRECT');
+    }
+  }, [spGstMandatory, paymentMethod]);
 
   const loadCoworkers = async () => {
     setIsLoadingCoworkers(true);
@@ -702,7 +711,7 @@ export function OrderDetailsStep({
               Payment Method
             </label>
             <div className="flex gap-4">
-              {(['DIRECT', 'ONLINE'] as const).map(method => (
+              {(['DIRECT', ...(spGstMandatory ? (['ONLINE'] as const) : [])] as const).map(method => (
                 <label key={method} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
@@ -715,6 +724,11 @@ export function OrderDetailsStep({
                 </label>
               ))}
             </div>
+            {!spGstMandatory && (
+              <p className="text-xs mt-2" style={{ color: COLORS.text.secondary }}>
+                Online payment is available only for service providers with GST collection mandatory enabled.
+              </p>
+            )}
           </div>
 
           <div className="pt-2">

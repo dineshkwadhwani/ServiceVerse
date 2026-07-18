@@ -100,6 +100,15 @@ export const createOrder = async (req: Request, res: Response) => {
       });
     }
 
+    const spDocumentation = spDoc.data()?.documentation || {};
+    const isSpGstMandatory = !!spDocumentation.gstCollectionMandatory;
+    if (data.paymentMethod === 'ONLINE' && !isSpGstMandatory) {
+      return res.status(400).json({
+        success: false,
+        error: 'Online payment is available only when GST collection is mandatory for this Service Provider.',
+      });
+    }
+
     // Verify customer exists
     const customerDoc = await db.collection('users').doc(data.customerId).get();
     if (!customerDoc.exists || customerDoc.data()?.role !== 'CUSTOMER') {

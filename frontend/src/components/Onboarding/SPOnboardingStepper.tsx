@@ -156,7 +156,7 @@ export function SPOnboardingStepper({
 
   const isDocumentationValid = () => {
     return (
-      documentation.gstNumber &&
+      (!documentation.gstCollectionMandatory || documentation.gstNumber) &&
       documentation.gstCollectionMandatory !== undefined &&
       documentation.directPaymentAllowed !== undefined &&
       (!documentation.directPaymentAllowed || documentation.qrCodeUrl) &&
