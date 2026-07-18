@@ -10,6 +10,7 @@ import {
   Loader2,
   BarChart3,
   Edit2,
+  DollarSign,
 } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
 import { EditUserModal } from './EditUserModal';
@@ -32,6 +33,7 @@ interface SystemStats {
   totalAccountManagers: number;
   totalServiceProviders: number;
   totalCustomers: number;
+  totalEarnings?: number;
 }
 
 interface User {
@@ -151,7 +153,7 @@ async function fetchSAServices(forceRefresh = false): Promise<ServiceListItem[]>
 }
 
 type ActiveTab = 'overview' | 'users' | 'services' | 'managers' | 'approvals';
-type ReportType = 'users' | 'services' | 'providers' | 'customers' | 'managers' | null;
+type ReportType = 'users' | 'services' | 'providers' | 'customers' | 'managers' | 'earnings' | null;
 
 export function SuperAdminDashboard() {
   const navigate = useNavigate();
@@ -335,6 +337,7 @@ export function SuperAdminDashboard() {
     else if (stat.id === 'providers') setOpenReport('providers');
     else if (stat.id === 'customers') setOpenReport('customers');
     else if (stat.id === 'managers') setOpenReport('managers');
+    else if (stat.id === 'earnings') setOpenReport('earnings');
   };
 
   const tabs: DashboardTab<ActiveTab>[] = [
@@ -354,7 +357,7 @@ export function SuperAdminDashboard() {
         {/* Overview Tab */}
         {activeTab === 'overview' && stats && (
           <StatsGrid
-            columns="grid-cols-2 lg:grid-cols-5"
+            columns="grid-cols-2 lg:grid-cols-6"
             onStatClick={handleStatClick}
             stats={[
               { id: 'users', label: 'Users', value: stats.totalUsers, icon: Users, color: COLORS.semantic.info },
@@ -362,6 +365,7 @@ export function SuperAdminDashboard() {
               { id: 'providers', label: 'Providers', value: stats.totalServiceProviders, icon: Users, color: COLORS.semantic.warning },
               { id: 'customers', label: 'Customers', value: stats.totalCustomers, icon: Users, color: COLORS.semantic.error },
               { id: 'managers', label: 'Managers', value: stats.totalAccountManagers, icon: Settings, color: COLORS.semantic.info },
+              { id: 'earnings', label: 'Earnings', value: `₹${Number(stats.totalEarnings || 0).toFixed(2)}`, icon: DollarSign, color: COLORS.semantic.success },
             ]}
           />
         )}

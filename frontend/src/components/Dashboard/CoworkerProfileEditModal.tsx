@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Loader2, Mail, User } from 'lucide-react';
+import { X, Loader2, Mail, User, Phone } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
@@ -7,6 +7,7 @@ import { useToast } from '@/store/notificationStore';
 interface Props {
   userId: string;
   name?: string;
+  phone?: string;
   email?: string;
   onClose: () => void;
   onComplete?: () => void;
@@ -20,6 +21,7 @@ interface FormData {
 export function CoworkerProfileEditModal({
   userId,
   name = '',
+  phone = '',
   email = '',
   onClose,
   onComplete,
@@ -122,6 +124,25 @@ export function CoworkerProfileEditModal({
               }}
               onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.info)}
               onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
+            />
+          </div>
+
+          {/* Phone (read-only - tied to Firebase Auth login) */}
+          <div>
+            <label className="flex items-center gap-2 font-semibold mb-2" style={{ color: COLORS.text.primary }}>
+              <Phone className="w-4 h-4" />
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              disabled
+              className="w-full px-4 py-3 border rounded-lg opacity-60"
+              style={{
+                backgroundColor: COLORS.bg.primary,
+                borderColor: COLORS.border.light,
+                color: COLORS.text.primary,
+              }}
             />
           </div>
 

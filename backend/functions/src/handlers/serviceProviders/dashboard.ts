@@ -4,8 +4,80 @@ import { ValidationError, sendError, sendSuccess } from '@/middleware/errorHandl
 import type { AuthRequest } from '@/middleware/auth';
 import type { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { resolveSpId } from '@/utils/spContext';
 
 const logger = new Logger('SPDashboardHandlers');
+
+const EARNING_STATUSES = new Set(['DELIVERED', 'COMPLETED', 'PAID']);
+
+function toDate(value: any): Date | null {
+  if (!value) return null;
+  if (typeof value?.toDate === 'function') return value.toDate();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getOrderSubtotal(orderData: any): number {
+  if (typeof orderData?.subtotal === 'number') {
+    return Number(orderData.subtotal) || 0;
+  }
+
+  const items = Array.isArray(orderData?.items) ? orderData.items : [];
+  return items.reduce((sum: number, item: any) => {
+    const qty = Number(item?.qty ?? item?.quantity ?? 0) || 0;
+    const itemTotal = Number(item?.itemTotal);
+    if (!Number.isNaN(itemTotal) && itemTotal > 0) return sum + itemTotal;
+    const price = Number(item?.customPrice ?? item?.price ?? 0) || 0;
+    return sum + qty * price;
+  }, 0);
+}
+
+function getCommissionPerItemMap(spData: any): Record<string, number> {
+  const map: Record<string, number> = {};
+  const customMenus = spData?.customMenus || {};
+  Object.values(customMenus).forEach((menuList: any) => {
+    if (!Array.isArray(menuList)) return;
+    menuList.forEach((item: any) => {
+      if (!item?.menuItemId) return;
+      const perItem = Number(item?.commissionPerItem);
+      if (!Number.isNaN(perItem) && perItem >= 0) {
+        map[item.menuItemId] = perItem;
+      }
+    });
+  });
+  return map;
+}
+
+function getCommissionAmount(orderData: any, spData: any, commissionPerItemMap: Record<string, number>): number {
+  const subtotal = getOrderSubtotal(orderData);
+  const commission = spData?.commission || {};
+
+  if (commission?.type === 'PERCENTAGE') {
+    const value = Number(commission?.value) || 0;
+    if (value <= 0) return 0;
+    return Number(((subtotal * value) / 100).toFixed(2));
+  }
+
+  if (commission?.type === 'FIXED') {
+    const items = Array.isArray(orderData?.items) ? orderData.items : [];
+    const total = items.reduce((sum: number, item: any) => {
+      const qty = Number(item?.qty ?? item?.quantity ?? 0) || 0;
+      const rate = Number(commissionPerItemMap[item?.menuItemId] || 0);
+      return sum + qty * rate;
+    }, 0);
+    return Number(total.toFixed(2));
+  }
+
+  return 0;
+}
+
+function getOrderAmount(orderData: any): number {
+  const total = Number(orderData?.total ?? orderData?.totalAmount ?? 0);
+  if (!Number.isNaN(total) && total > 0) {
+    return total;
+  }
+  return Number(getOrderSubtotal(orderData).toFixed(2));
+}
 
 async function getAssociatedCustomerIds(spId: string): Promise<Set<string>> {
   // 1) Direct link on customer docs (legacy + fast path)
@@ -170,7 +242,10 @@ export async function getSPCustomers(req: AuthRequest, res: Response) {
       return sendError(res, new ValidationError('User not authenticated'));
     }
 
-    const spId = req.user.uid;
+    const spId = resolveSpId(req.user);
+    if (!spId) {
+      return sendError(res, new ValidationError('Service Provider not authenticated'));
+    }
 
     logger.info('Fetching SP customers', { spId });
 
@@ -221,10 +296,28 @@ export async function getSPStats(req: AuthRequest, res: Response) {
     const spData = spDoc.data() || {};
     const associatedCustomerIds = await getAssociatedCustomerIds(spId);
 
+    const ordersSnapshot = await db
+      .collection('orders')
+      .where('spId', '==', spId)
+      .get();
+
+    const commissionPerItemMap = getCommissionPerItemMap(spData);
+    const totalEarnings = ordersSnapshot.docs.reduce((sum, doc) => {
+      const orderData = doc.data() as any;
+      const status = String(orderData?.status || '').toUpperCase();
+      if (!EARNING_STATUSES.has(status)) return sum;
+
+      const orderAmount = getOrderAmount(orderData);
+      const commissionAmount = getCommissionAmount(orderData, spData, commissionPerItemMap);
+      const net = Math.max(0, Number((orderAmount - commissionAmount).toFixed(2)));
+      return sum + net;
+    }, 0);
+
     // Calculate stats
     const stats = {
-      totalOrders: spData.totalOrders || 0,
-      totalRevenue: spData.totalRevenue || 0,
+      totalOrders: spData.totalOrders || ordersSnapshot.size || 0,
+      totalRevenue: Number(totalEarnings.toFixed(2)),
+      totalEarnings: Number(totalEarnings.toFixed(2)),
       averageRating: spData.averageRating || 0,
       totalCustomers: associatedCustomerIds.size,
     };
@@ -246,12 +339,73 @@ export async function getSPEarnings(req: AuthRequest, res: Response) {
       return sendError(res, new ValidationError('Service Provider ID is required'));
     }
 
-    logger.info('Fetching SP earnings', { spId });
+    const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+    logger.info('Fetching SP earnings', { spId, startDate, endDate });
 
-    // For now, return empty earnings array (can be expanded to aggregate orders by date)
-    const earnings: any[] = [];
+    const spDoc = await db.collection('users').doc(spId).get();
+    if (!spDoc.exists) {
+      return sendError(res, new ValidationError('Service Provider not found'));
+    }
 
-    return sendSuccess(res, { earnings });
+    const spData = spDoc.data() || {};
+    const commissionPerItemMap = getCommissionPerItemMap(spData);
+
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    if (start && Number.isNaN(start.getTime())) {
+      return sendError(res, new ValidationError('Invalid startDate'));
+    }
+    if (end && Number.isNaN(end.getTime())) {
+      return sendError(res, new ValidationError('Invalid endDate'));
+    }
+
+    const ordersSnapshot = await db
+      .collection('orders')
+      .where('spId', '==', spId)
+      .get();
+
+    const earnings = ordersSnapshot.docs
+      .map((doc) => {
+        const orderData = doc.data() as any;
+        const status = String(orderData?.status || '').toUpperCase();
+        if (!EARNING_STATUSES.has(status)) return null;
+
+        const createdAt = toDate(orderData?.createdAt);
+        if (!createdAt) return null;
+        if (start && createdAt < start) return null;
+        if (end) {
+          const inclusiveEnd = new Date(end);
+          inclusiveEnd.setHours(23, 59, 59, 999);
+          if (createdAt > inclusiveEnd) return null;
+        }
+
+        const orderAmount = Number(getOrderAmount(orderData).toFixed(2));
+        const commissionAmount = Number(
+          getCommissionAmount(orderData, spData, commissionPerItemMap).toFixed(2)
+        );
+        const earningAmount = Number(Math.max(0, orderAmount - commissionAmount).toFixed(2));
+
+        return {
+          orderId: orderData?.orderId || doc.id,
+          date: createdAt.toISOString(),
+          customerName: orderData?.customerName || 'Unknown',
+          orderAmount,
+          commissionAmount,
+          earningAmount,
+          status,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const totalEarnings = Number(
+      earnings.reduce((sum: number, row: any) => sum + Number(row.earningAmount || 0), 0).toFixed(2)
+    );
+
+    return sendSuccess(res, {
+      earnings,
+      totalEarnings,
+    });
   } catch (error: any) {
     logger.error('Failed to fetch SP earnings', error);
     return sendError(res, error);

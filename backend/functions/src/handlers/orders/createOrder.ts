@@ -83,6 +83,14 @@ export const createOrder = async (req: Request, res: Response) => {
       });
     }
 
+    // Coworker can create orders only for their own associated SP
+    if (authUser?.role === 'COWORKER' && authUser?.spId !== data.spId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Coworker can create orders only for their assigned service provider',
+      });
+    }
+
     // Customer can create only for themselves
     if (authUser?.role === 'CUSTOMER' && authUser?.uid !== data.customerId) {
       return res.status(403).json({

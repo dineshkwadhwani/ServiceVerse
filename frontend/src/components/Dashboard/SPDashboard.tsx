@@ -4,6 +4,7 @@ import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
 import { StatsGrid, StatCard } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
 import { SPProfileEditModal } from '@/components/Onboarding/SPProfileEditModal';
+import { CoworkerProfileEditModal } from '@/components/Dashboard/CoworkerProfileEditModal';
 import { CreateOrderModal } from '@/components/Orders/CreateOrderModal';
 import { CreateCustomerModal } from '@/components/Orders/CreateCustomerModal';
 import { CreateCoworkerModal } from '@/components/Orders/CreateCoworkerModal';
@@ -33,14 +34,24 @@ interface Order {
 interface SPStats {
   totalOrders: number;
   totalRevenue: number;
+  totalEarnings?: number;
   averageRating: number;
   totalCustomers: number;
+}
+
+interface SPEarningRow {
+  orderId: string;
+  date: string;
+  customerName: string;
+  orderAmount: number;
+  commissionAmount: number;
+  earningAmount: number;
 }
 
 interface SPDashboardData {
   stats: SPStats;
   orders: Order[];
-  earnings: any[];
+  earnings: SPEarningRow[];
   customers: any[];
   hasMoreOrders: boolean;
 }
@@ -90,9 +101,12 @@ async function fetchSPDashboardData(uid: string, forceRefresh = false): Promise<
     }));
 
     const loadedEarnings = (earningsResponse?.data?.earnings || []).map((earning: any) => ({
+      orderId: earning.orderId || '',
       date: earning.date || '',
-      amount: earning.amount || 0,
-      orders: earning.orders || 0,
+      customerName: earning.customerName || 'Unknown',
+      orderAmount: Number(earning.orderAmount || 0),
+      commissionAmount: Number(earning.commissionAmount || 0),
+      earningAmount: Number(earning.earningAmount || 0),
     }));
 
     const loadedCustomers = (customersResponse?.data?.customers || []);
@@ -101,6 +115,7 @@ async function fetchSPDashboardData(uid: string, forceRefresh = false): Promise<
       stats: {
         totalOrders: statsResponse?.data?.totalOrders || 0,
         totalRevenue: statsResponse?.data?.totalRevenue || 0,
+        totalEarnings: statsResponse?.data?.totalEarnings || statsResponse?.data?.totalRevenue || 0,
         averageRating: statsResponse?.data?.averageRating || 0,
         totalCustomers: statsResponse?.data?.totalCustomers || 0,
       },
@@ -156,7 +171,7 @@ async function fetchSPUserDoc(uid: string, forceRefresh = false): Promise<any> {
 }
 
 type ActiveTab = 'overview' | 'orders' | 'pickup' | 'earnings' | 'customers' | 'coworkers';
-type ReportType = 'orders' | 'revenue' | 'customers' | null;
+type ReportType = 'orders' | 'earnings' | 'customers' | null;
 
 export function SPDashboard() {
   const { user, firebaseUser } = useAuthStore();
@@ -171,7 +186,7 @@ export function SPDashboard() {
     totalCustomers: 0,
   });
   const [orders, setOrders] = useState<Order[]>([]);
-  const [earnings, setEarnings] = useState<any[]>([]);
+  const [earnings, setEarnings] = useState<SPEarningRow[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [coworkers, setCoworkers] = useState<any[]>([]);
   const [filterFromDate, setFilterFromDate] = useState('');
@@ -187,10 +202,21 @@ export function SPDashboard() {
   const [hasMoreOrders, setHasMoreOrders] = useState(true);
   const [openReport, setOpenReport] = useState<ReportType>(null);
 
+  // Coworkers authenticate as themselves, not as the SP - every SP-scoped
+  // fetch/action below must target the SP they're associated with, not their own uid.
+  const isCoworker = (user as any)?.role === 'COWORKER';
+  const effectiveSpId = isCoworker ? (fullUserData?.spId || '') : (firebaseUser?.uid || '');
+
   useEffect(() => {
-    loadData();
     loadFullUserData();
   }, [firebaseUser?.uid]);
+
+  useEffect(() => {
+    if (!firebaseUser?.uid) return;
+    // Coworkers: wait for their own profile doc to resolve the associated SP id first.
+    if (isCoworker && !fullUserData) return;
+    loadData();
+  }, [firebaseUser?.uid, isCoworker, fullUserData?.spId]);
 
   const loadFullUserData = async (forceRefresh = false) => {
     if (!firebaseUser?.uid) return;
@@ -204,15 +230,15 @@ export function SPDashboard() {
   };
 
   const loadData = async (forceRefresh = false) => {
-    if (!firebaseUser?.uid) {
+    if (!effectiveSpId) {
       setIsLoading(false);
       return;
     }
 
     try {
       const [data, coworkersResponse] = await Promise.all([
-        fetchSPDashboardData(firebaseUser.uid, forceRefresh),
-        apiClient.getSPCoworkers(firebaseUser.uid),
+        fetchSPDashboardData(effectiveSpId, forceRefresh),
+        apiClient.getSPCoworkers(effectiveSpId),
       ]);
       setStats(data.stats);
       setOrders(data.orders);
@@ -239,19 +265,19 @@ export function SPDashboard() {
   };
 
   const loadMoreOrders = async () => {
-    if (!firebaseUser?.uid || loadingMoreOrders || !hasMoreOrders) return;
+    if (!effectiveSpId || loadingMoreOrders || !hasMoreOrders) return;
 
     setLoadingMoreOrders(true);
     try {
       const lastOrderId = orders[orders.length - 1]?.orderId;
-      const response = await apiClient.getSPOrdersList(firebaseUser.uid, 10, lastOrderId);
+      const response = await apiClient.getSPOrdersList(effectiveSpId, 10, lastOrderId);
       const newOrders = (response?.data?.orders || []).map((order: any) => ({
         orderId: order.orderId || '',
         customerId: order.customerId || '',
         customerName: order.customerName || 'Unknown',
         status: order.status || 'NEW',
         deliveryType: order.deliveryType || 'DROP',
-        spId: order.spId || firebaseUser.uid,
+        spId: order.spId || effectiveSpId,
         selectedCoworker: order.selectedCoworker || '',
         totalAmount: order.total || order.totalAmount || 0,
         createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
@@ -284,6 +310,7 @@ export function SPDashboard() {
       <SPReportPage
         reportType={openReport}
         orders={orders}
+        earnings={earnings}
         customers={customers}
         stats={stats}
         onBack={() => setOpenReport(null)}
@@ -351,12 +378,17 @@ export function SPDashboard() {
   };
 
   const filteredEarnings = earnings.filter((e) => {
-    if (filterFromDate && new Date(e.date) < new Date(filterFromDate)) return false;
-    if (filterToDate && new Date(e.date) > new Date(filterToDate)) return false;
+    const earningDate = new Date(e.date);
+    if (filterFromDate && earningDate < new Date(filterFromDate)) return false;
+    if (filterToDate) {
+      const inclusiveEnd = new Date(filterToDate);
+      inclusiveEnd.setHours(23, 59, 59, 999);
+      if (earningDate > inclusiveEnd) return false;
+    }
     return true;
   });
 
-  const totalFilteredEarnings = filteredEarnings.reduce((sum, e) => sum + e.amount, 0);
+  const totalFilteredEarnings = filteredEarnings.reduce((sum, e) => sum + e.earningAmount, 0);
 
   const canViewInvoice = (status: string) => {
     const normalized = String(status || '').toUpperCase();
@@ -365,7 +397,7 @@ export function SPDashboard() {
 
   const handleStatClick = (stat: StatCard) => {
     if (stat.id === 'orders') setOpenReport('orders');
-    else if (stat.id === 'revenue') setOpenReport('revenue');
+    else if (stat.id === 'earnings') setOpenReport('earnings');
     else if (stat.id === 'customers') setOpenReport('customers');
   };
 
@@ -408,7 +440,8 @@ export function SPDashboard() {
     { id: 'orders', icon: ShoppingBag, label: 'Orders' },
     { id: 'pickup', icon: Package, label: 'Pickup' },
     { id: 'customers', icon: Users, label: 'Customers' },
-    { id: 'coworkers', icon: Users, label: 'Coworkers' },
+    // Coworkers can't create other coworkers, so they don't get this tab.
+    ...(isCoworker ? [] : [{ id: 'coworkers' as const, icon: Users, label: 'Coworkers' }]),
     { id: 'earnings', icon: DollarSign, label: 'Earnings' },
   ];
 
@@ -425,7 +458,7 @@ export function SPDashboard() {
               onStatClick={handleStatClick}
               stats={[
                 { id: 'orders', label: 'Total Orders', value: stats.totalOrders, icon: Package, color: COLORS.semantic.info },
-                { id: 'revenue', label: 'Total Revenue', value: `₹${stats.totalRevenue.toFixed(2)}`, icon: TrendingUp, color: COLORS.semantic.success },
+                { id: 'earnings', label: 'Total Earnings', value: `₹${(stats.totalEarnings ?? stats.totalRevenue).toFixed(2)}`, icon: TrendingUp, color: COLORS.semantic.success },
                 { label: 'Rating', value: stats.averageRating, icon: Star, color: COLORS.semantic.warning },
                 { id: 'customers', label: 'Customers', value: stats.totalCustomers, icon: Package, color: COLORS.semantic.info },
               ]}
@@ -856,7 +889,7 @@ export function SPDashboard() {
               <div className="space-y-3">
                 {filteredEarnings.map((earning, idx) => (
                   <div
-                    key={idx}
+                    key={earning.orderId || idx}
                     className="p-4 rounded-lg border flex items-center justify-between"
                     style={{
                       backgroundColor: COLORS.bg.surface,
@@ -868,11 +901,14 @@ export function SPDashboard() {
                         {new Date(earning.date).toLocaleDateString()}
                       </p>
                       <p className="text-sm" style={{ color: COLORS.text.secondary }}>
-                        {earning.orders} orders
+                        {earning.customerName}
+                      </p>
+                      <p className="text-xs" style={{ color: COLORS.text.secondary }}>
+                        Order: ₹{earning.orderAmount.toFixed(2)} | Commission: ₹{earning.commissionAmount.toFixed(2)}
                       </p>
                     </div>
                     <p className="font-bold text-lg" style={{ color: COLORS.semantic.success }}>
-                      ₹{earning.amount.toFixed(2)}
+                      ₹{earning.earningAmount.toFixed(2)}
                     </p>
                   </div>
                 ))}
@@ -881,35 +917,49 @@ export function SPDashboard() {
           )}
       </main>
 
-      {/* Profile Edit Modal */}
+      {/* Profile Edit Modal - coworkers see/edit their own contact info, not the master SP profile */}
       {showProfileModal && firebaseUser?.uid && (
-        <SPProfileEditModal
-          spId={firebaseUser.uid}
-          spPhone={fullUserData?.phone || (user as any)?.phone || ''}
-          spEmail={fullUserData?.email || (user as any)?.email}
-          spBusinessName={fullUserData?.businessName}
-          spOwnerName={fullUserData?.ownerName}
-          spAddress={fullUserData?.address}
-          spArea={fullUserData?.area}
-          spCity={fullUserData?.city}
-          spPin={fullUserData?.pin}
-          existingBasicInfo={fullUserData?.basicInfo ? {
-            ...fullUserData.basicInfo,
-            logoUrl: fullUserData.basicInfo.logoUrl || fullUserData.businessLogo || '',
-          } : undefined}
-          existingOperations={fullUserData?.operations}
-          onComplete={() => {
-            setShowProfileModal(false);
-            loadFullUserData();
-          }}
-          onCancel={() => setShowProfileModal(false)}
-        />
+        isCoworker ? (
+          <CoworkerProfileEditModal
+            userId={firebaseUser.uid}
+            name={fullUserData?.name || (user as any)?.name || ''}
+            phone={fullUserData?.phone || (user as any)?.phone || ''}
+            email={fullUserData?.email || (user as any)?.email || ''}
+            onClose={() => setShowProfileModal(false)}
+            onComplete={() => {
+              setShowProfileModal(false);
+              loadFullUserData(true);
+            }}
+          />
+        ) : (
+          <SPProfileEditModal
+            spId={firebaseUser.uid}
+            spPhone={fullUserData?.phone || (user as any)?.phone || ''}
+            spEmail={fullUserData?.email || (user as any)?.email}
+            spBusinessName={fullUserData?.businessName}
+            spOwnerName={fullUserData?.ownerName}
+            spAddress={fullUserData?.address}
+            spArea={fullUserData?.area}
+            spCity={fullUserData?.city}
+            spPin={fullUserData?.pin}
+            existingBasicInfo={fullUserData?.basicInfo ? {
+              ...fullUserData.basicInfo,
+              logoUrl: fullUserData.basicInfo.logoUrl || fullUserData.businessLogo || '',
+            } : undefined}
+            existingOperations={fullUserData?.operations}
+            onComplete={() => {
+              setShowProfileModal(false);
+              loadFullUserData();
+            }}
+            onCancel={() => setShowProfileModal(false)}
+          />
+        )
       )}
 
       {/* Create Order Modal */}
-      {showCreateOrder && firebaseUser?.uid && (
+      {showCreateOrder && effectiveSpId && (
         <CreateOrderModal
-          spId={firebaseUser.uid}
+          spId={effectiveSpId}
           onClose={() => setShowCreateOrder(false)}
           onOrderCreated={() => {
             // Reload orders data to show new order
@@ -928,10 +978,10 @@ export function SPDashboard() {
         />
       )}
 
-      {/* Create Coworker Modal */}
-      {showCreateCoworker && firebaseUser?.uid && (
+      {/* Create Coworker Modal - SP only, coworkers can't create other coworkers */}
+      {showCreateCoworker && !isCoworker && effectiveSpId && (
         <CreateCoworkerModal
-          spId={firebaseUser.uid}
+          spId={effectiveSpId}
           onClose={() => setShowCreateCoworker(false)}
           onCoworkerCreated={() => {
             loadData(true);

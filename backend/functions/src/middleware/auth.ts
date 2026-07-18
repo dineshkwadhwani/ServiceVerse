@@ -7,6 +7,7 @@ export interface AuthRequest extends Request {
     uid: string;
     email?: string;
     role?: string;
+    spId?: string;
     service?: {
       serviceId: string;
     };

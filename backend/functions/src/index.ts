@@ -206,7 +206,7 @@ app.post('/orders/:orderId/verify-payment', requireRole('CUSTOMER'), async (req,
   ordersHandlers.verifyOnlinePayment(req as any, res);
 });
 
-app.get('/service-providers/:spId/orders', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), async (req, res) => {
+app.get('/service-providers/:spId/orders', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER', 'COWORKER'), async (req, res) => {
   ordersListHandlers.getSPOrders(req as any, res);
 });
 
@@ -214,41 +214,41 @@ app.get('/service-providers/:spId/orders', requireRole('SERVICE_PROVIDER', 'ACCO
 // SERVICE PROVIDER DASHBOARD
 // ============================================================================
 
-app.post('/service-providers/customers/search-phone', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+app.post('/service-providers/customers/search-phone', requireRole('SERVICE_PROVIDER', 'COWORKER'), async (req, res) => {
   createCustomerHandlers.searchCustomerByPhone(req as any, res);
 });
 
-app.post('/service-providers/customers/create-new', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+app.post('/service-providers/customers/create-new', requireRole('SERVICE_PROVIDER', 'COWORKER'), async (req, res) => {
   createCustomerHandlers.createNewCustomerWithAssociation(req as any, res);
 });
 
-app.post('/service-providers/customers/associate', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+app.post('/service-providers/customers/associate', requireRole('SERVICE_PROVIDER', 'COWORKER'), async (req, res) => {
   createCustomerHandlers.associateExistingCustomer(req as any, res);
 });
 
-app.get('/service-providers/customers', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+app.get('/service-providers/customers', requireRole('SERVICE_PROVIDER', 'COWORKER'), async (req, res) => {
   spDashboardHandlers.getSPCustomers(req as any, res);
 });
 
-// SP Profile Update (SP can update their own profile)
+// SP Profile Update (SP can update their own profile) - coworkers cannot edit the master SP profile
 app.patch('/service-providers/profile', requireRole('SERVICE_PROVIDER'), async (req, res) => {
   spProfileUpdateHandlers.updateSPProfile(req as any, res);
 });
 
-app.get('/service-providers/:spId/stats', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), async (req, res) => {
+app.get('/service-providers/:spId/stats', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER', 'COWORKER'), async (req, res) => {
   spDashboardHandlers.getSPStats(req as any, res);
 });
 
-app.get('/service-providers/:spId/earnings', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), async (req, res) => {
+app.get('/service-providers/:spId/earnings', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER', 'COWORKER'), async (req, res) => {
   spDashboardHandlers.getSPEarnings(req as any, res);
 });
 
-// SP Coworker Management
+// SP Coworker Management - only the SP can create coworkers or change their status
 app.post('/service-providers/:spId/coworkers', requireRole('SERVICE_PROVIDER'), async (req, res) => {
   coworkerHandlers.createCoworker(req as any, res);
 });
 
-app.get('/service-providers/:spId/coworkers', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+app.get('/service-providers/:spId/coworkers', requireRole('SERVICE_PROVIDER', 'COWORKER'), async (req, res) => {
   coworkerHandlers.getSPCoworkers(req as any, res);
 });
 
@@ -320,6 +320,10 @@ app.patch('/account-managers/:userId/profile', requireRole('ACCOUNT_MANAGER'), a
 
 app.get('/superadmin/stats', requireRole('SUPERADMIN'), async (req, res) => {
   superAdminHandlers.getSystemStats(req as any, res);
+});
+
+app.get('/superadmin/earnings', requireRole('SUPERADMIN'), async (req, res) => {
+  superAdminHandlers.getEarningsReport(req as any, res);
 });
 
 app.get('/superadmin/users', requireRole('SUPERADMIN'), async (req, res) => {

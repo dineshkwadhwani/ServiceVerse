@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Search } from 'lucide-react';
+import { ArrowLeft, Search, Loader2 } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
+import { apiClient } from '@/services/apiClient';
 
 interface User {
   id: string;
@@ -22,8 +23,19 @@ interface ServiceListItem {
   createdAt?: Date;
 }
 
+interface SAEarningRow {
+  orderId: string;
+  date: string;
+  customerName: string;
+  orderAmount: number;
+  commissionAmount: number;
+  earningAmount: number;
+  serviceProviderName: string;
+  city: string;
+}
+
 interface SuperAdminReportPageProps {
-  reportType: 'users' | 'services' | 'providers' | 'customers' | 'managers';
+  reportType: 'users' | 'services' | 'providers' | 'customers' | 'managers' | 'earnings';
   users: User[];
   services: ServiceListItem[];
   stats: any;
@@ -40,11 +52,51 @@ export function SuperAdminReportPage({
   const [filteredData, setFilteredData] = useState<any[]>([]);
   const [baseData, setBaseData] = useState<any[]>([]);
   const [title, setTitle] = useState('');
-  const [dataType, setDataType] = useState<'users' | 'services'>('users');
+  const [dataType, setDataType] = useState<'users' | 'services' | 'earnings'>('users');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [serviceStatusFilter, setServiceStatusFilter] = useState<string>('ALL');
+  const [cityFilter, setCityFilter] = useState('');
+  const [serviceProviderFilter, setServiceProviderFilter] = useState('');
+  const [monthFilter, setMonthFilter] = useState('');
+  const [earningsData, setEarningsData] = useState<SAEarningRow[]>([]);
+  const [earningsCities, setEarningsCities] = useState<string[]>([]);
+  const [earningsProviders, setEarningsProviders] = useState<Array<{ spId: string; name: string; city?: string }>>([]);
+  const [isEarningsLoading, setIsEarningsLoading] = useState(false);
+
+  const loadEarningsReport = async () => {
+    setIsEarningsLoading(true);
+    try {
+      const response: any = await apiClient.getSuperAdminEarnings({
+        city: cityFilter || undefined,
+        serviceProviderId: serviceProviderFilter || undefined,
+        month: monthFilter || undefined,
+      });
+
+      const rows = (response?.data?.earnings || []).map((row: any) => ({
+        orderId: row.orderId || '',
+        date: row.date || '',
+        customerName: row.customerName || 'Unknown',
+        orderAmount: Number(row.orderAmount || 0),
+        commissionAmount: Number(row.commissionAmount || 0),
+        earningAmount: Number(row.earningAmount || 0),
+        serviceProviderName: row.serviceProviderName || 'Service Provider',
+        city: row.city || '',
+      }));
+
+      setEarningsData(rows);
+      setEarningsCities(response?.data?.filters?.cities || []);
+      setEarningsProviders(response?.data?.filters?.serviceProviders || []);
+    } finally {
+      setIsEarningsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (reportType !== 'earnings') return;
+    loadEarningsReport();
+  }, [reportType, cityFilter, serviceProviderFilter, monthFilter]);
 
   useEffect(() => {
     let data: any[] = [];
@@ -68,6 +120,10 @@ export function SuperAdminReportPage({
       setTitle(`Account Managers (${stats.totalAccountManagers || 0})`);
       setDataType('users');
       data = users.filter(u => u.role === 'ACCOUNT_MANAGER');
+    } else if (reportType === 'earnings') {
+      setTitle('Earnings Report');
+      setDataType('earnings');
+      data = earningsData;
     }
     setBaseData(data);
     applyFilters(data);
@@ -76,7 +132,12 @@ export function SuperAdminReportPage({
     setStatusFilter('ALL');
     setRoleFilter('ALL');
     setServiceStatusFilter('ALL');
-  }, [reportType, users, services, stats]);
+    if (reportType !== 'earnings') {
+      setCityFilter('');
+      setServiceProviderFilter('');
+      setMonthFilter('');
+    }
+  }, [reportType, users, services, stats, earningsData]);
 
   useEffect(() => {
     if (baseData.length > 0) {
@@ -113,6 +174,14 @@ export function SuperAdminReportPage({
       }
       if (serviceStatusFilter !== 'ALL') {
         filtered = filtered.filter((s: any) => s.status === serviceStatusFilter);
+      }
+    } else if (dataType === 'earnings') {
+      if (searchQuery.trim()) {
+        filtered = filtered.filter((row: any) =>
+          String(row.customerName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          String(row.orderId || '').includes(searchQuery) ||
+          String(row.serviceProviderName || '').toLowerCase().includes(searchQuery.toLowerCase())
+        );
       }
     }
 
@@ -175,7 +244,7 @@ export function SuperAdminReportPage({
               <Search className="w-4 h-4" style={{ color: COLORS.text.secondary }} />
               <input
                 type="text"
-                placeholder={dataType === 'users' ? 'Search by name, email, or phone...' : 'Search by service name...'}
+                placeholder={dataType === 'users' ? 'Search by name, email, or phone...' : dataType === 'services' ? 'Search by service name...' : 'Search by customer, order, or provider...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 bg-transparent outline-none text-sm"
@@ -220,6 +289,61 @@ export function SuperAdminReportPage({
               </select>
             )}
 
+            {dataType === 'earnings' && (
+              <select
+                value={cityFilter}
+                onChange={(e) => {
+                  setCityFilter(e.target.value);
+                  setServiceProviderFilter('');
+                }}
+                className="px-4 py-2 rounded-lg border text-sm font-medium"
+                style={{
+                  borderColor: COLORS.border.light,
+                  backgroundColor: COLORS.bg.surface,
+                  color: COLORS.text.primary,
+                }}
+              >
+                <option value="">All Cities</option>
+                {earningsCities.map((city) => (
+                  <option key={city} value={city}>{city}</option>
+                ))}
+              </select>
+            )}
+
+            {dataType === 'earnings' && (
+              <select
+                value={serviceProviderFilter}
+                onChange={(e) => setServiceProviderFilter(e.target.value)}
+                className="px-4 py-2 rounded-lg border text-sm font-medium"
+                style={{
+                  borderColor: COLORS.border.light,
+                  backgroundColor: COLORS.bg.surface,
+                  color: COLORS.text.primary,
+                }}
+              >
+                <option value="">All Providers</option>
+                {earningsProviders
+                  .filter((p) => !cityFilter || String(p.city || '').toLowerCase() === cityFilter.toLowerCase())
+                  .map((provider) => (
+                    <option key={provider.spId} value={provider.spId}>{provider.name}</option>
+                  ))}
+              </select>
+            )}
+
+            {dataType === 'earnings' && (
+              <input
+                type="month"
+                value={monthFilter}
+                onChange={(e) => setMonthFilter(e.target.value)}
+                className="px-4 py-2 rounded-lg border text-sm font-medium"
+                style={{
+                  borderColor: COLORS.border.light,
+                  backgroundColor: COLORS.bg.surface,
+                  color: COLORS.text.primary,
+                }}
+              />
+            )}
+
             {/* Role Filter - All Users Report */}
             {dataType === 'users' && reportType === 'users' && (
               <select
@@ -251,7 +375,13 @@ export function SuperAdminReportPage({
 
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6 pt-2">
-        {filteredData.length > 0 ? (
+        {dataType === 'earnings' && isEarningsLoading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: COLORS.semantic.info }} />
+          </div>
+        )}
+
+        {!(dataType === 'earnings' && isEarningsLoading) && (filteredData.length > 0 ? (
           <div className="space-y-3">
             {dataType === 'users' && filteredData.map((user) => (
               <div
@@ -327,12 +457,34 @@ export function SuperAdminReportPage({
                 </div>
               </div>
             ))}
+
+            {dataType === 'earnings' && filteredData.map((row: SAEarningRow) => (
+              <div
+                key={row.orderId}
+                className="p-4 rounded-lg border"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  borderColor: COLORS.border.light,
+                }}
+              >
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-sm">
+                  <p style={{ color: COLORS.text.primary }}>{new Date(row.date).toLocaleDateString()}</p>
+                  <p style={{ color: COLORS.text.primary }}>{row.customerName}</p>
+                  <p style={{ color: COLORS.text.primary }}>₹{row.orderAmount.toFixed(2)}</p>
+                  <p style={{ color: COLORS.semantic.warning }}>₹{row.commissionAmount.toFixed(2)}</p>
+                  <p style={{ color: COLORS.text.secondary }}>{row.serviceProviderName}</p>
+                </div>
+                <p className="text-xs mt-2" style={{ color: COLORS.text.secondary }}>
+                  Order #{row.orderId} {row.city ? `| ${row.city}` : ''}
+                </p>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="flex items-center justify-center py-16">
             <p style={{ color: COLORS.text.secondary }}>No data available</p>
           </div>
-        )}
+        ))}
       </main>
     </div>
   );

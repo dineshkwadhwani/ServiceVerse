@@ -295,7 +295,7 @@ export function CustomerProfileEditModal({
             style={{ backgroundColor: COLORS.semantic.info }}
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>

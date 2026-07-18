@@ -301,7 +301,7 @@ export function SPProfileEditModal({
                 }}
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                {isSaving ? 'Saving...' : 'Save Changes'}
+                {isSaving ? 'Saving...' : 'Save'}
               </button>
             ) : (
               <button

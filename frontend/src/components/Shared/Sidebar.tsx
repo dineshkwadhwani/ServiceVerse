@@ -28,6 +28,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         USER_ROLES.SUPERADMIN,
         USER_ROLES.ACCOUNT_MANAGER,
         USER_ROLES.SERVICE_PROVIDER,
+        USER_ROLES.COWORKER,
         USER_ROLES.CUSTOMER,
       ],
     },

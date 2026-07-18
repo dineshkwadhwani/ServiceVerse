@@ -22,24 +22,35 @@ interface Customer {
   addedAt?: Date;
 }
 
+interface SPEarningRow {
+  orderId: string;
+  date: string;
+  customerName: string;
+  orderAmount: number;
+  commissionAmount: number;
+  earningAmount: number;
+}
+
 interface SPReportPageProps {
-  reportType: 'orders' | 'revenue' | 'customers';
+  reportType: 'orders' | 'earnings' | 'customers';
   orders: Order[];
+  earnings: SPEarningRow[];
   customers: Customer[];
   stats: any;
   onBack: () => void;
 }
 
-export function SPReportPage({ reportType, orders, customers, stats, onBack }: SPReportPageProps) {
+export function SPReportPage({ reportType, orders, earnings, customers, stats, onBack }: SPReportPageProps) {
   const [filteredData, setFilteredData] = useState<any[]>([]);
   const [baseData, setBaseData] = useState<any[]>([]);
   const [title, setTitle] = useState('');
-  const [dataType, setDataType] = useState<'orders' | 'customers'>('orders');
+  const [dataType, setDataType] = useState<'orders' | 'earnings' | 'customers'>('orders');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [verifiedFilter, setVerifiedFilter] = useState<string>('ALL');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [earningsWindow, setEarningsWindow] = useState<'ALL_TIME' | 'MONTH' | 'TODAY'>('ALL_TIME');
 
   useEffect(() => {
     let data: any[] = [];
@@ -47,17 +58,10 @@ export function SPReportPage({ reportType, orders, customers, stats, onBack }: S
       setTitle(`All Orders (${stats.totalOrders || 0})`);
       setDataType('orders');
       data = orders;
-    } else if (reportType === 'revenue') {
-      setTitle(`Revenue Breakdown`);
-      setDataType('orders');
-      const grouped = orders.reduce((acc: Record<string, any>, order) => {
-        const date = order.createdAt.toLocaleDateString();
-        if (!acc[date]) acc[date] = { date, total: 0, orderCount: 0 };
-        acc[date].total += order.totalAmount;
-        acc[date].orderCount += 1;
-        return acc;
-      }, {} as Record<string, any>);
-      data = Object.values(grouped).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    } else if (reportType === 'earnings') {
+      setTitle('Earnings Report');
+      setDataType('earnings');
+      data = earnings;
     } else if (reportType === 'customers') {
       setTitle(`Customers (${stats.totalCustomers || 0})`);
       setDataType('customers');
@@ -71,13 +75,14 @@ export function SPReportPage({ reportType, orders, customers, stats, onBack }: S
     setVerifiedFilter('ALL');
     setFromDate('');
     setToDate('');
-  }, [reportType, orders, customers, stats]);
+    setEarningsWindow('ALL_TIME');
+  }, [reportType, orders, earnings, customers, stats]);
 
   useEffect(() => {
     if (baseData.length > 0) {
       applyFilters(baseData);
     }
-  }, [searchQuery, statusFilter, verifiedFilter, fromDate, toDate, baseData]);
+  }, [searchQuery, statusFilter, verifiedFilter, fromDate, toDate, earningsWindow, baseData]);
 
   const applyFilters = (data: any[]) => {
     let filtered = data;
@@ -97,6 +102,26 @@ export function SPReportPage({ reportType, orders, customers, stats, onBack }: S
       }
       if (toDate) {
         filtered = filtered.filter((o: any) => new Date(o.createdAt) <= new Date(toDate));
+      }
+    } else if (dataType === 'earnings') {
+      if (searchQuery.trim()) {
+        filtered = filtered.filter((e: any) =>
+          String(e.customerName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          String(e.orderId || '').includes(searchQuery)
+        );
+      }
+
+      const now = new Date();
+      if (earningsWindow === 'TODAY') {
+        filtered = filtered.filter((e: any) => {
+          const date = new Date(e.date);
+          return date.toDateString() === now.toDateString();
+        });
+      } else if (earningsWindow === 'MONTH') {
+        filtered = filtered.filter((e: any) => {
+          const date = new Date(e.date);
+          return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+        });
       }
     } else if (dataType === 'customers') {
       if (searchQuery.trim()) {
@@ -164,7 +189,7 @@ export function SPReportPage({ reportType, orders, customers, stats, onBack }: S
               <Search className="w-4 h-4" style={{ color: COLORS.text.secondary }} />
               <input
                 type="text"
-                placeholder={dataType === 'orders' ? 'Search by name or order ID...' : 'Search by name, email, or phone...'}
+                placeholder={dataType === 'customers' ? 'Search by name, email, or phone...' : 'Search by name or order ID...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 bg-transparent outline-none text-sm"
@@ -209,6 +234,23 @@ export function SPReportPage({ reportType, orders, customers, stats, onBack }: S
                 <option value="ALL">All Status</option>
                 <option value="VERIFIED">Verified</option>
                 <option value="UNVERIFIED">Unverified</option>
+              </select>
+            )}
+
+            {dataType === 'earnings' && (
+              <select
+                value={earningsWindow}
+                onChange={(e) => setEarningsWindow(e.target.value as 'ALL_TIME' | 'MONTH' | 'TODAY')}
+                className="px-4 py-2 rounded-lg border text-sm font-medium"
+                style={{
+                  borderColor: COLORS.border.light,
+                  backgroundColor: COLORS.bg.surface,
+                  color: COLORS.text.primary,
+                }}
+              >
+                <option value="ALL_TIME">All Time</option>
+                <option value="MONTH">This Month</option>
+                <option value="TODAY">Today</option>
               </select>
             )}
 
@@ -297,26 +339,32 @@ export function SPReportPage({ reportType, orders, customers, stats, onBack }: S
               </div>
             ))}
 
-            {dataType === 'orders' && reportType === 'revenue' && filteredData.map((item: any, idx) => (
+            {dataType === 'earnings' && filteredData.map((earning: any) => (
               <div
-                key={idx}
-                className="p-4 rounded-lg border flex items-center justify-between"
+                key={earning.orderId}
+                className="p-4 rounded-lg border"
                 style={{
                   backgroundColor: COLORS.bg.surface,
                   borderColor: COLORS.border.light,
                 }}
               >
-                <div>
-                  <p className="font-semibold" style={{ color: COLORS.text.primary }}>
-                    {item.date}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <p className="text-sm" style={{ color: COLORS.text.primary }}>
+                    {new Date(earning.date).toLocaleDateString()}
                   </p>
-                  <p className="text-sm mt-1" style={{ color: COLORS.text.secondary }}>
-                    {item.orderCount} order{item.orderCount !== 1 ? 's' : ''}
+                  <p className="text-sm" style={{ color: COLORS.text.primary }}>
+                    {earning.customerName}
+                  </p>
+                  <p className="text-sm" style={{ color: COLORS.text.primary }}>
+                    ₹{Number(earning.orderAmount || 0).toFixed(2)}
+                  </p>
+                  <p className="text-sm font-semibold" style={{ color: COLORS.semantic.warning }}>
+                    ₹{Number(earning.commissionAmount || 0).toFixed(2)}
                   </p>
                 </div>
-                <p className="font-bold text-2xl" style={{ color: COLORS.semantic.success }}>
-                  ₹{item.total.toFixed(2)}
-                </p>
+                <div className="mt-2 text-xs" style={{ color: COLORS.text.secondary }}>
+                  Order #{earning.orderId}
+                </div>
               </div>
             ))}
 

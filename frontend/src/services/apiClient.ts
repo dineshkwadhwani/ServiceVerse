@@ -158,6 +158,10 @@ class ApiClient {
     return this.axiosInstance.get('/superadmin/stats');
   }
 
+  async getSuperAdminEarnings(params?: { city?: string; serviceProviderId?: string; month?: string }) {
+    return this.axiosInstance.get('/superadmin/earnings', { params });
+  }
+
   async getAllUsers() {
     return this.axiosInstance.get('/superadmin/users');
   }

@@ -3,6 +3,7 @@ import { Logger } from '@/utils/logger';
 import { ValidationError, sendError, sendSuccess } from '@/middleware/errorHandler';
 import type { AuthRequest } from '@/middleware/auth';
 import type { Response } from 'express';
+import { resolveSpId } from '@/utils/spContext';
 
 const logger = new Logger('CreateCustomerHandler');
 
@@ -29,7 +30,7 @@ export async function searchCustomerByPhone(req: AuthRequest, res: Response) {
       return sendError(res, new ValidationError('Valid 10-digit phone number is required'));
     }
 
-    const spId = req.user?.uid;
+    const spId = resolveSpId(req.user);
     if (!spId) {
       return sendError(res, new ValidationError('Service Provider not authenticated'));
     }
@@ -133,7 +134,7 @@ export async function createNewCustomerWithAssociation(req: AuthRequest, res: Re
       return sendError(res, new ValidationError('Customer address is required'));
     }
 
-    const spId = req.user?.uid;
+    const spId = resolveSpId(req.user);
     if (!spId) {
       return sendError(res, new ValidationError('Service Provider not authenticated'));
     }
@@ -252,7 +253,7 @@ export async function associateExistingCustomer(req: AuthRequest, res: Response)
       return sendError(res, new ValidationError('Customer ID is required'));
     }
 
-    const spId = req.user?.uid;
+    const spId = resolveSpId(req.user);
     if (!spId) {
       return sendError(res, new ValidationError('Service Provider not authenticated'));
     }
