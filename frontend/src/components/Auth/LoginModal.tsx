@@ -4,6 +4,7 @@ import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '@/utils/firebase-config';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/store/notificationStore';
+import { getAuthErrorMessage } from '@/utils/authErrors';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -47,7 +48,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
       setStep('otp');
       toast.success('OTP sent to your phone');
     } catch (error: any) {
-      toast.error('Failed to send OTP: ' + error.message);
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +90,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
         onClose();
       }
     } catch (error: any) {
-      toast.error('Failed to verify OTP: ' + error.message);
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setIsLoading(false);
     }

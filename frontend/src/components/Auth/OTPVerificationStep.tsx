@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, Loader2, Mail, Phone, CheckCircle2 } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
 import { useToast } from '@/store/notificationStore';
+import { getAuthErrorMessage } from '@/utils/authErrors';
 
 interface OTPVerificationStepProps {
   method: 'email' | 'phone';
@@ -51,7 +52,7 @@ export function OTPVerificationStep({
         toast.error('Email verification is link-based. Please check your email.');
       }
     } catch (error: any) {
-      toast.error('Verification failed: ' + error.message);
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setIsVerifying(false);
     }

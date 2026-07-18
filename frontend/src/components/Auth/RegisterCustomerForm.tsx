@@ -8,6 +8,7 @@ import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 import { useAuthStore } from '@/store/authStore';
 import { clearRegistrationContext } from '@/utils/sessionStorage';
+import { getAuthErrorMessage } from '@/utils/authErrors';
 import { OTPVerificationStep } from './OTPVerificationStep';
 
 interface FormData {
@@ -90,7 +91,7 @@ export function RegisterCustomerForm({ serviceId, serviceName }: Props) {
       setStep('verification');
       toast.success('OTP sent to your phone');
     } catch (error: any) {
-      toast.error('Failed to send phone OTP: ' + error.message);
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
