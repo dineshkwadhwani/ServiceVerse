@@ -4,6 +4,7 @@ import { COLORS } from '@/utils/theme';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 import { CustomerNotFoundModal } from './CustomerNotFoundModal';
+import { CreateCustomerModal } from './CreateCustomerModal';
 import { useAuthStore } from '@/store/authStore';
 
 interface MenuItem {
@@ -71,6 +72,7 @@ export function OrderDetailsStep({
   const [isSearching, setIsSearching] = useState(false);
   const [customer, setCustomer] = useState<any>(initialData?.customer || null);
   const [showCustomerNotFound, setShowCustomerNotFound] = useState(false);
+  const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
 
   // Menu items
   const [orderItems, setOrderItems] = useState<OrderItem[]>(initialData?.items || []);
@@ -314,13 +316,18 @@ export function OrderDetailsStep({
       return;
     }
 
+    // Online payment is only valid when the selected SP has GST collection mandatory.
+    // Guard against a stale 'ONLINE' selection surviving an SP switch (spGstMandatory
+    // updates asynchronously), which would otherwise be rejected by the backend.
+    const effectivePaymentMethod: 'ONLINE' | 'DIRECT' = spGstMandatory ? paymentMethod : 'DIRECT';
+
     const orderPayload = {
       customer,
       items: selectedItems,
       deliveryAddress,
       deliveryDateTime,
       specialInstructions,
-      paymentMethod,
+      paymentMethod: effectivePaymentMethod,
       deliveryType,
       selectedCoworker,
       spId: effectiveSpId,
@@ -769,7 +776,25 @@ export function OrderDetailsStep({
           onCancel={() => setShowCustomerNotFound(false)}
           onCreateNew={() => {
             setShowCustomerNotFound(false);
-            toast.error('TODO: Customer Create flow to be implemented');
+            setShowCreateCustomerModal(true);
+          }}
+        />
+      )}
+
+      {showCreateCustomerModal && (
+        <CreateCustomerModal
+          onClose={() => setShowCreateCustomerModal(false)}
+          onCustomerCreated={async () => {
+            try {
+              const response = await apiClient.searchCustomer(customerPhone);
+              if (response?.data) {
+                setCustomer(response.data);
+                setDeliveryAddress(response.data.address || '');
+              }
+            } catch {
+              // Keep modal flow resilient; user can manually search again if lookup fails.
+            }
+            setShowCreateCustomerModal(false);
           }}
         />
       )}

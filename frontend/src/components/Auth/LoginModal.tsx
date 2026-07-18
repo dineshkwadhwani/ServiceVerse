@@ -20,6 +20,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
 
   // Close modal if logged in
@@ -39,6 +40,11 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
 
     setIsLoading(true);
     try {
+      const recaptchaContainer = document.getElementById('login-recaptcha');
+      if (recaptchaContainer) {
+        recaptchaContainer.innerHTML = '';
+      }
+
       const recaptchaVerifier = new RecaptchaVerifier(auth, 'login-recaptcha', {
         size: 'invisible',
       });
@@ -51,6 +57,29 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
       toast.error(getAuthErrorMessage(error));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    setIsResending(true);
+    try {
+      const recaptchaContainer = document.getElementById('login-recaptcha');
+      if (recaptchaContainer) {
+        recaptchaContainer.innerHTML = '';
+      }
+
+      const recaptchaVerifier = new RecaptchaVerifier(auth, 'login-recaptcha', {
+        size: 'invisible',
+      });
+
+      const result = await signInWithPhoneNumber(auth, `+91${phone}`, recaptchaVerifier);
+      setConfirmationResult(result);
+      setOtp('');
+      toast.success('OTP resent to your phone');
+    } catch (error: any) {
+      toast.error(getAuthErrorMessage(error));
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -165,6 +194,15 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
               >
                 {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                 Verify OTP
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResendOTP}
+                disabled={isResending || isLoading}
+                className="w-full text-blue-600 hover:text-blue-700 font-medium py-1 transition disabled:opacity-50 text-sm"
+              >
+                {isResending ? 'Resending OTP...' : 'Resend OTP'}
               </button>
 
               <button

@@ -58,34 +58,9 @@ export function ServiceDetailPage() {
   const loadSPs = async () => {
     setIsLoading(true);
     try {
-      // Mock data for now - replace with actual API call
-      const mockSPs: SPDetail[] = [
-        {
-          spId: '1',
-          businessName: 'Clean Pro Services',
-          area: 'Downtown',
-          city: 'New York',
-          averageRating: 4.8,
-          totalOrders: 245,
-        },
-        {
-          spId: '2',
-          businessName: 'Quick Service Solutions',
-          area: 'Midtown',
-          city: 'New York',
-          averageRating: 4.6,
-          totalOrders: 189,
-        },
-        {
-          spId: '3',
-          businessName: 'Best Service Provider',
-          area: 'Brooklyn',
-          city: 'Brooklyn',
-          averageRating: 4.9,
-          totalOrders: 312,
-        },
-      ];
-      setSPs(mockSPs);
+      const response = await apiClient.getPublicServiceProviders(serviceId!);
+      const providers = response.data?.providers || [];
+      setSPs(providers);
     } catch (error: any) {
       toast.error('Failed to load service providers');
     } finally {

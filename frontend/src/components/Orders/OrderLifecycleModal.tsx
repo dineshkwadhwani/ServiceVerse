@@ -58,6 +58,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   const [showDirectPayPopup, setShowDirectPayPopup] = useState(false);
   const [spQrCodeUrl, setSpQrCodeUrl] = useState('');
   const [spUpiId, setSpUpiId] = useState('');
+  const [showCustomerConfirmModal, setShowCustomerConfirmModal] = useState(false);
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -669,7 +670,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
 
           {canCustomerConfirm && (
             <button
-              onClick={() => saveStatus('CONFIRMED')}
+              onClick={() => setShowCustomerConfirmModal(true)}
               disabled={isSaving}
               className="w-full px-4 py-2 rounded-lg font-semibold text-white disabled:opacity-60"
               style={{ backgroundColor: COLORS.semantic.info }}
@@ -747,6 +748,45 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
                 style={{ backgroundColor: COLORS.bg.surface, color: COLORS.text.primary, border: `1px solid ${COLORS.border.light}` }}
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCustomerConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[70]">
+          <div
+            className="w-full max-w-md rounded-xl border p-4"
+            style={{ backgroundColor: COLORS.bg.primary, borderColor: COLORS.border.light }}
+          >
+            <h4 className="font-semibold mb-2" style={{ color: COLORS.text.primary }}>
+              Confirm this order?
+            </h4>
+            <p className="text-sm mb-4" style={{ color: COLORS.text.secondary }}>
+              Once confirmed, your service provider will start processing this order.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowCustomerConfirmModal(false)}
+                className="flex-1 px-4 py-2 rounded-lg font-semibold"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  color: COLORS.text.primary,
+                  border: `1px solid ${COLORS.border.light}`,
+                }}
+              >
+                Not Now
+              </button>
+              <button
+                onClick={async () => {
+                  setShowCustomerConfirmModal(false);
+                  await saveStatus('CONFIRMED');
+                }}
+                className="flex-1 px-4 py-2 rounded-lg font-semibold text-white"
+                style={{ backgroundColor: COLORS.semantic.success }}
+              >
+                Confirm
               </button>
             </div>
           </div>

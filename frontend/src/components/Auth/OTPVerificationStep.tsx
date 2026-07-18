@@ -10,6 +10,7 @@ interface OTPVerificationStepProps {
   phone: string;
   onVerified: () => Promise<void>;
   onBack: () => void;
+  onResend?: () => Promise<void>;
   isLoading: boolean;
   confirmationResult?: any; // Firebase phone confirmation result
 }
@@ -20,6 +21,7 @@ export function OTPVerificationStep({
   phone,
   onVerified,
   onBack,
+  onResend,
   isLoading,
   confirmationResult,
 }: OTPVerificationStepProps) {
@@ -27,6 +29,7 @@ export function OTPVerificationStep({
   const [otp, setOtp] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   const displayValue = method === 'email' ? email : `+91 ${phone}`;
 
@@ -55,6 +58,21 @@ export function OTPVerificationStep({
       toast.error(getAuthErrorMessage(error));
     } finally {
       setIsVerifying(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (!onResend) return;
+
+    setIsResending(true);
+    try {
+      await onResend();
+      setOtp('');
+      toast.success('OTP resent successfully');
+    } catch (error: any) {
+      toast.error(getAuthErrorMessage(error));
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -142,7 +160,7 @@ export function OTPVerificationStep({
     <div>
       <button
         onClick={onBack}
-        disabled={isVerifying || isLoading}
+        disabled={isVerifying || isLoading || isResending}
         className="flex items-center gap-2 mb-8 disabled:opacity-50 transition"
         style={{ color: COLORS.text.secondary }}
       >
@@ -194,6 +212,17 @@ export function OTPVerificationStep({
           <p className="text-xs mt-2" style={{ color: COLORS.text.secondary }}>
             Check your SMS for the code
           </p>
+          {onResend && (
+            <button
+              type="button"
+              onClick={handleResendOTP}
+              disabled={isResending || isVerifying || isLoading}
+              className="text-xs mt-2 underline disabled:opacity-50"
+              style={{ color: COLORS.semantic.info }}
+            >
+              {isResending ? 'Resending OTP...' : 'Resend OTP'}
+            </button>
+          )}
         </div>
 
         <button

@@ -11,7 +11,9 @@
       "Bash(pkill -f \"npm run dev\")",
       "Bash(firebase functions:log --limit 50)",
       "Bash(firebase functions:log)",
-      "Bash(grep -E \"\\\\.md$|^d\")"
+      "Bash(grep -E \"\\\\.md$|^d\")",
+      "Bash(python3 -c ' *)",
+      "Bash(mkdir -p /private/tmp/claude-501/-Users-Dinesh-Wadhwani-Library-CloudStorage-OneDrive-NICELtd-Documents-Documents-Personal-TS-Git-ServiceVerse/9d617ae6-2176-4553-a85e-c71c0fef16cf/scratchpad/bugimgs)"
     ]
   }
 }

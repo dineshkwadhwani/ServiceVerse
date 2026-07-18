@@ -101,6 +101,10 @@ app.get('/services/:serviceId', async (req, res) => {
   serviceHandlers.getService(req as any, res);
 });
 
+app.get('/services/:serviceId/providers', async (req, res) => {
+  customerHandlers.getPublicServiceProviders(req as any, res);
+});
+
 // Auth endpoints
 app.post('/auth/send-email-otp', async (req, res) => {
   authHandlers.sendEmailOTP(req, res);

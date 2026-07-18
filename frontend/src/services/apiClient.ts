@@ -192,6 +192,10 @@ class ApiClient {
     return this.axiosInstance.get(`/services/${serviceId}`);
   }
 
+  async getPublicServiceProviders(serviceId: string) {
+    return this.axiosInstance.get(`/services/${serviceId}/providers`);
+  }
+
   async updateService(serviceId: string, data: any) {
     return this.axiosInstance.put(`/services/${serviceId}`, data);
   }

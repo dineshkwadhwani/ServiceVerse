@@ -36,6 +36,7 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
   const [availableSPs, setAvailableSPs] = useState<Array<{ spId: string; businessName: string }>>([]);
   const [associatedSpId, setAssociatedSpId] = useState('');
   const [initialSpName] = useState(isCustomerCreating ? (spBusinessName || '') : '');
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // Order data
   const [orderData, setOrderData] = useState<{
@@ -161,14 +162,10 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
 
   const handleCancel = () => {
     if (currentStep === 'review' && orderData) {
-      const confirm = window.confirm('Are you sure you want to cancel? All order data will be lost.');
-      if (confirm) {
-        setCurrentStep('details');
-        setOrderData(null);
-      }
-    } else {
-      onClose();
+      setShowCancelConfirm(true);
+      return;
     }
+    onClose();
   };
 
   return (
@@ -191,9 +188,8 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
             </h2>
           </div>
           <button
-            onClick={onClose}
-            disabled={currentStep === 'review' && !!orderData}
-            className="p-2 hover:opacity-70 transition disabled:opacity-50"
+            onClick={handleCancel}
+            className="p-2 hover:opacity-70 transition"
           >
             <X className="w-5 h-5" style={{ color: COLORS.text.secondary }} />
           </button>
@@ -290,6 +286,45 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
           </div>
         )}
       </div>
+
+      {showCancelConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[60]">
+          <div
+            className="w-full max-w-md rounded-xl border p-5"
+            style={{ backgroundColor: COLORS.bg.primary, borderColor: COLORS.border.light }}
+          >
+            <h3 className="text-lg font-semibold mb-2" style={{ color: COLORS.text.primary }}>
+              Cancel order creation?
+            </h3>
+            <p className="text-sm mb-4" style={{ color: COLORS.text.secondary }}>
+              Your unsaved order details will be discarded.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                className="flex-1 px-4 py-2 rounded-lg font-semibold"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  color: COLORS.text.primary,
+                  border: `1px solid ${COLORS.border.light}`,
+                }}
+              >
+                Keep Editing
+              </button>
+              <button
+                onClick={() => {
+                  setShowCancelConfirm(false);
+                  onClose();
+                }}
+                className="flex-1 px-4 py-2 rounded-lg font-semibold text-white"
+                style={{ backgroundColor: COLORS.semantic.error }}
+              >
+                Cancel Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

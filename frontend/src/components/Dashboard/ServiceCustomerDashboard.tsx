@@ -195,6 +195,9 @@ export function ServiceCustomerDashboard() {
   };
 
   const handleTabChange = (tab: ActiveTab) => {
+    if (tab === activeTab || isLoading) {
+      return;
+    }
     setActiveTab(tab);
     loadData();
   };

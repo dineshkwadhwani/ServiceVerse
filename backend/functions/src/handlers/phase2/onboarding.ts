@@ -172,11 +172,24 @@ export async function assignAccountManager(req: AuthRequest, res: Response) {
       updatedAt: new Date(),
     });
 
+    let serviceName = '';
+    const serviceAssociations = await db
+      .collection('users')
+      .doc(spId)
+      .collection('serviceAssociations')
+      .limit(1)
+      .get();
+    if (!serviceAssociations.empty) {
+      const serviceDoc = await db.collection('services').doc(serviceAssociations.docs[0].id).get();
+      serviceName = serviceDoc.exists ? (serviceDoc.data() as any)?.name || '' : '';
+    }
+
     await sendNotificationByEvent('SP_ASSIGNED_TO_AM', {
       spId,
       amId: accountManagerId,
       spName: spDoc.data()?.businessName || spDoc.data()?.name || spId,
       amName: amData.name || accountManagerId,
+      serviceName,
     });
 
     logger.info('Account manager assigned successfully', { spId });
@@ -516,11 +529,18 @@ export async function assignAccountManagerToSP(req: AuthRequest, res: Response) 
       updatedAt: new Date(),
     });
 
+    let serviceName = '';
+    if (serviceId) {
+      const serviceDoc = await db.collection('services').doc(serviceId).get();
+      serviceName = serviceDoc.exists ? (serviceDoc.data() as any)?.name || '' : '';
+    }
+
     await sendNotificationByEvent('SP_ASSIGNED_TO_AM', {
       spId: userId,
       amId: accountManagerId,
       spName: spDoc.data()?.businessName || spDoc.data()?.name || userId,
       amName: amData.name || accountManagerId,
+      serviceName,
     });
 
     logger.info('Account manager assigned to SP (users collection only)', { requestId, accountManagerId, userId });

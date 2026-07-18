@@ -97,25 +97,46 @@ export async function searchServiceProviders(req: AuthRequest, res: Response) {
     const spSnapshot = await db
       .collection('users')
       .where('role', '==', 'SERVICE_PROVIDER')
-      .where('status', '==', 'ACTIVE')
       .get();
 
     // Filter by business name matching query
-    const providers = spSnapshot.docs
-      .filter((doc) => {
-        const data = doc.data();
-        return (
+    const providersCheck = await Promise.all(
+      spSnapshot.docs.map(async (spDoc) => {
+        const data = spDoc.data() || {};
+        const normalizedStatus = String(data.status || '').toUpperCase();
+        const isVisibleStatus = normalizedStatus === 'ACTIVE' || normalizedStatus === 'ASSIGNED';
+        if (!isVisibleStatus) {
+          return null;
+        }
+
+        const matchesQuery =
           data.businessName?.toLowerCase().includes((query as string).toLowerCase()) ||
-          data.ownerName?.toLowerCase().includes((query as string).toLowerCase())
-        );
+          data.ownerName?.toLowerCase().includes((query as string).toLowerCase());
+        if (!matchesQuery) {
+          return null;
+        }
+
+        const serviceAssoc = await spDoc.ref.collection('serviceAssociations').doc(serviceId as string).get();
+        if (!serviceAssoc.exists) {
+          return null;
+        }
+
+        const serviceAssocData = serviceAssoc.data() || {};
+        if (serviceAssocData.isActive === false) {
+          return null;
+        }
+
+        return {
+          spId: spDoc.id,
+          businessName: data.businessName,
+          ownerName: data.ownerName,
+          email: data.email,
+          phone: data.phone,
+        };
       })
-      .map((doc) => ({
-        spId: doc.id,
-        businessName: doc.data().businessName,
-        ownerName: doc.data().ownerName,
-        email: doc.data().email,
-        phone: doc.data().phone,
-      }));
+    );
+
+    const providers = providersCheck.filter(Boolean);
 
     return sendSuccess(res, { providers });
   } catch (error: any) {
@@ -157,7 +178,6 @@ export async function getCustomerServiceProviders(req: AuthRequest, res: Respons
     const spSnapshot = await db
       .collection('users')
       .where('role', '==', 'SERVICE_PROVIDER')
-      .where('status', '==', 'ACTIVE')
       .get();
 
     const providersCheck = await Promise.all(
@@ -167,9 +187,16 @@ export async function getCustomerServiceProviders(req: AuthRequest, res: Respons
           .doc(serviceId as string)
           .get();
 
+        const spData = spDoc.data() || {};
+        const normalizedStatus = String(spData.status || '').toUpperCase();
+        const isVisibleStatus = normalizedStatus === 'ACTIVE' || normalizedStatus === 'ASSIGNED';
+
         return {
           spDoc,
-          supportsService: serviceAssoc.exists,
+          supportsService:
+            serviceAssoc.exists &&
+            isVisibleStatus &&
+            serviceAssoc.data()?.isActive !== false,
         };
       })
     );
@@ -191,6 +218,63 @@ export async function getCustomerServiceProviders(req: AuthRequest, res: Respons
     });
   } catch (error: any) {
     logger.error('Failed to fetch customer service providers', error);
+    return sendError(res, error);
+  }
+}
+
+/**
+ * Public: list active service providers for a service, for the pre-login service
+ * landing page. Only exposes business-facing info (no phone/email).
+ */
+export async function getPublicServiceProviders(req: AuthRequest, res: Response) {
+  try {
+    const { serviceId } = req.params;
+    if (!serviceId) {
+      return sendError(res, new ValidationError('serviceId is required'));
+    }
+
+    const spSnapshot = await db
+      .collection('users')
+      .where('role', '==', 'SERVICE_PROVIDER')
+      .get();
+
+    const providersCheck = await Promise.all(
+      spSnapshot.docs.map(async (spDoc) => {
+        const serviceAssoc = await spDoc.ref
+          .collection('serviceAssociations')
+          .doc(serviceId)
+          .get();
+
+        const spData = spDoc.data() || {};
+        const normalizedStatus = String(spData.status || '').toUpperCase();
+        const isVisibleStatus = normalizedStatus === 'ACTIVE' || normalizedStatus === 'ASSIGNED';
+
+        return {
+          spDoc,
+          supportsService:
+            serviceAssoc.exists &&
+            isVisibleStatus &&
+            serviceAssoc.data()?.isActive !== false,
+        };
+      })
+    );
+
+    const providers = providersCheck
+      .filter((item) => item.supportsService)
+      .map((item) => {
+        const data = item.spDoc.data();
+        return {
+          spId: item.spDoc.id,
+          businessName: data.businessName || data.name || 'Service Provider',
+          city: data.city || '',
+          area: data.area || '',
+          logo: data.businessLogo || '',
+        };
+      });
+
+    return sendSuccess(res, { providers });
+  } catch (error: any) {
+    logger.error('Failed to fetch public service providers', error);
     return sendError(res, error);
   }
 }

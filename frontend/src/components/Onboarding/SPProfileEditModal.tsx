@@ -52,6 +52,7 @@ export function SPProfileEditModal({
   const toast = useToast();
   const [currentStep, setCurrentStep] = useState<Step>('basicInfo');
   const [isSaving, setIsSaving] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // Initialize from existing data if available, otherwise from props
   const initialBasicInfo = existingBasicInfo || {
@@ -157,13 +158,7 @@ export function SPProfileEditModal({
   };
 
   const handleCancel = () => {
-    if (
-      window.confirm(
-        'Are you sure you want to cancel? All unsaved changes will be lost.'
-      )
-    ) {
-      onCancel?.();
-    }
+    setShowCancelConfirm(true);
   };
 
   return (
@@ -319,6 +314,46 @@ export function SPProfileEditModal({
           </div>
         </div>
       </div>
+
+      {showCancelConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[60]">
+          <div
+            className="w-full max-w-md rounded-xl border p-5"
+            style={{ backgroundColor: COLORS.bg.primary, borderColor: COLORS.border.light }}
+          >
+            <h3 className="text-lg font-semibold mb-2" style={{ color: COLORS.text.primary }}>
+              Discard changes?
+            </h3>
+            <p className="text-sm mb-4" style={{ color: COLORS.text.secondary }}>
+              Unsaved profile changes will be lost.
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                className="flex-1 px-4 py-2 rounded-lg font-semibold"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  color: COLORS.text.primary,
+                  border: `1px solid ${COLORS.border.light}`,
+                }}
+              >
+                Keep Editing
+              </button>
+              <button
+                onClick={() => {
+                  setShowCancelConfirm(false);
+                  onCancel?.();
+                }}
+                className="flex-1 px-4 py-2 rounded-lg font-semibold text-white"
+                style={{ backgroundColor: COLORS.semantic.error }}
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

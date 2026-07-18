@@ -48,13 +48,17 @@ export function OrderReviewStep({
   const toast = useToast();
   const [isCreating, setIsCreating] = useState(false);
 
+  // Online payment is only valid when the SP has GST collection mandatory. Guard here too
+  // in case spGstMandatory changed after this step was entered (e.g. SP switched mid-flow).
+  const effectivePaymentMethod: 'ONLINE' | 'DIRECT' = spGstMandatory ? paymentMethod : 'DIRECT';
+
   // Calculate totals
   const subtotal = items.reduce((sum, item) => sum + item.itemTotal, 0);
 
   // GST is applied if:
   // 1. SP has gstCollectionMandatory = true, OR
   // 2. Payment method is ONLINE
-  const applyGST = spGstMandatory || paymentMethod === 'ONLINE';
+  const applyGST = spGstMandatory || effectivePaymentMethod === 'ONLINE';
   const gstAmount = applyGST && spGstPercent > 0 ? (subtotal * spGstPercent) / 100 : 0;
   const total = subtotal + gstAmount;
 
@@ -71,7 +75,7 @@ export function OrderReviewStep({
         deliveryAddress,
         deliveryDateTime: deliveryDateTime ? new Date(deliveryDateTime).toISOString() : null,
         specialInstructions,
-        paymentMethod,
+        paymentMethod: effectivePaymentMethod,
         deliveryType,
         selectedCoworker,
         items: items.map(item => ({
@@ -159,7 +163,7 @@ export function OrderReviewStep({
           <div className="flex justify-between">
             <span style={{ color: COLORS.text.secondary }}>Payment Method</span>
             <span className="font-semibold" style={{ color: COLORS.text.primary }}>
-              {paymentMethod === 'DIRECT' ? 'Direct Payment' : 'Online Payment'}
+              {effectivePaymentMethod === 'DIRECT' ? 'Direct Payment' : 'Online Payment'}
             </span>
           </div>
         </div>

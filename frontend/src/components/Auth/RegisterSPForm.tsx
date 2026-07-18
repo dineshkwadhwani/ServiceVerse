@@ -98,6 +98,11 @@ export function RegisterSPForm({ serviceId, serviceName }: Props) {
 
     setIsLoading(true);
     try {
+      const recaptchaContainer = document.getElementById('recaptcha-container');
+      if (recaptchaContainer) {
+        recaptchaContainer.innerHTML = '';
+      }
+
       const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         size: 'invisible',
       });
@@ -117,6 +122,28 @@ export function RegisterSPForm({ serviceId, serviceName }: Props) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleResendPhoneOTP = async () => {
+    if (!validateForm()) return;
+
+    const recaptchaContainer = document.getElementById('recaptcha-container');
+    if (recaptchaContainer) {
+      recaptchaContainer.innerHTML = '';
+    }
+
+    const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+      size: 'invisible',
+    });
+
+    const confirmationResult = await signInWithPhoneNumber(
+      auth,
+      `+91${formData.phone}`,
+      recaptchaVerifier
+    );
+
+    setPhoneConfirmationResult(confirmationResult);
+    setVerificationMethod('phone');
   };
 
   const handleVerificationComplete = async (_verifiedMethod: 'email' | 'phone') => {
@@ -185,6 +212,7 @@ export function RegisterSPForm({ serviceId, serviceName }: Props) {
         phone={formData.phone}
         onVerified={() => handleVerificationComplete(verificationMethod)}
         onBack={() => setStep('details')}
+        onResend={verificationMethod === 'phone' ? handleResendPhoneOTP : undefined}
         isLoading={isLoading}
         confirmationResult={phoneConfirmationResult}
       />
