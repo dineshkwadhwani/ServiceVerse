@@ -275,7 +275,7 @@ export function SPReportPage({ reportType, orders, customers, stats, onBack }: S
                     {order.customerName}
                   </p>
                   <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
-                    {order.createdAt.toLocaleDateString()}
+                    Order Date: {order.createdAt.toLocaleDateString()}
                   </p>
                   <div className="mt-3 pt-3 border-t" style={{ borderColor: COLORS.border.light }}>
                     <p className="text-xs" style={{ color: COLORS.text.secondary }}>

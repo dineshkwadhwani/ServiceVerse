@@ -372,10 +372,10 @@ export function ServiceCustomerDashboard() {
                             Order #{order.orderId}
                           </p>
                           <p
-                            className="text-sm mt-1"
+                            className="text-xs mt-1"
                             style={{ color: COLORS.text.secondary }}
                           >
-                            {new Date(order.createdAt).toLocaleDateString()}
+                            Order Date: {new Date(order.createdAt).toLocaleDateString()}
                           </p>
                         </div>
                         <div
