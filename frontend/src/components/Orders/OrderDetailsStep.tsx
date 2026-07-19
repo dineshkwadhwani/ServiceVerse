@@ -783,6 +783,7 @@ export function OrderDetailsStep({
 
       {showCreateCustomerModal && (
         <CreateCustomerModal
+          initialPhone={customerPhone}
           onClose={() => setShowCreateCustomerModal(false)}
           onCustomerCreated={async () => {
             try {
