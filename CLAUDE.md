@@ -1,6 +1,6 @@
 # ServiceVerse Project Documentation
 
-**Last Updated**: July 13, 2026  
+**Last Updated**: July 20, 2026  
 **Status**: 🚀 Active Development - Milestone 1 Complete: All Logins Working ✅
 
 ---
@@ -277,6 +277,49 @@ GET    /service-providers/:spId/menu                (public)
 - All new endpoints live and tested ✅
 - Frontend integration complete and type-checked ✅
 
+#### Phase 13: Notification Center (Bell Icon → Persisted Notifications Page) ✅
+
+- Push notifications were previously fire-and-forget (FCM only, nothing persisted) — the bell icon in the navbar was decorative with no `onClick` at all
+- Added Firestore persistence so every push notification is now also saved per-recipient and viewable in-app, most recent first, disappearing once read
+- Bell icon now navigates to `/dashboard/notifications` and refreshes on click; deliberately **no polling** (removed an initial 60s `setInterval` after user feedback that it would multiply Firestore reads across all active sessions)
+
+**Files Implemented/Modified**:
+- `backend/functions/src/utils/notificationCenter.ts` — `notifyUsers()` now also writes a `notifications/{id}` doc per recipient (`userId`, `title`, `body`, `type`, `data`, `read: false`, `createdAt`) whenever it sends a push
+- `backend/functions/src/handlers/notifications/notifications.ts` (new) — `getNotifications` (today's unread, newest first) and `markNotificationRead`
+- `backend/functions/src/index.ts` — `GET /notifications`, `PATCH /notifications/:notificationId/read`
+- `frontend/src/store/notificationCenterStore.ts` (new) — Zustand store shared between the bell and the page so read/unread state stays in sync
+- `frontend/src/pages/NotificationsPage.tsx` (new) — route at `/dashboard/notifications`
+- `frontend/src/components/Shared/Navbar.tsx` — bell wired up, shows unread dot only when there are unread notifications
+
+**Architecture Note — avoiding composite Firestore indexes**:
+- The notifications query (`userId ==`, `read ==`, filtered to today, sorted newest-first) deliberately uses **only two equality filters in Firestore** (`userId`, `read`) — no `orderBy`/range filter in the query itself, since combining those would require a composite index that must be explicitly deployed (`firebase deploy --only firestore:indexes`) and can take time to build. The "today" cutoff and descending sort happen in application code after the fetch instead. This mirrors an existing convention already in the codebase (`getSPCoworkers` in `coworkers/manage.ts` does the same — query by one field, filter the rest in memory, with a comment explicitly noting it's "to avoid composite index").
+- `firestore.indexes.json` was briefly touched then reverted back to empty once the query was redesigned — no indexes are required for this feature.
+
+#### Phase 14: Profile Pictures (All Roles) + Anti-Fraud Identity Reveal on Orders ✅
+
+- Every role (SuperAdmin, AccountManager, ServiceProvider, Coworker, Customer) can now upload a personal profile picture (≤100KB), separate from the SP's existing `businessLogo`
+- Order tiles now show the assigned Coworker's name (for pickup) and the Customer's name (for delivery) as clickable text — clicking pops a modal with name + photo, so the person physically handing off/receiving laundry can be visually confirmed
+
+**Key design decision — snapshot photos onto the order, no new "any user's photo" endpoint**:
+- `selectedCoworker` on an order was already a plain name string (not a uid), so there was no reliable id to look up a live photo by later
+- Rather than restructure that or add a broad new endpoint that could let any authenticated user pull any other user's photo by uid (a privacy/enumeration risk), photo URLs are **denormalized onto the order** at the moment they're known — `customerPhotoUrl` at order creation, `selectedCoworkerPhotoUrl` when a coworker is assigned for pickup (resolved server-side by name + spId match, same in-memory-filter convention as above). The "click name → see photo" UI needed zero new fetches as a result — it's all already on the order object each dashboard has loaded
+
+**Files Implemented/Modified**:
+- `frontend/src/components/Shared/ProfilePictureUpload.tsx` (new) — circular avatar upload widget, uploads to `profile-pictures/{uid}/photo` in Firebase Storage, rejects files over 100KB
+- `frontend/src/components/Shared/PersonPreviewModal.tsx` + `ClickableIdentity.tsx` (new) — click a name anywhere on an order → modal with photo + name + role label
+- `frontend/src/utils/imageUpload.ts` (new) — shared `resolveImageContentType()` and `withTimeout()` helpers (see bug fix below)
+- Wired into `CustomerProfileEditModal.tsx`, `AMProfileEditModal.tsx`, `CoworkerProfileEditModal.tsx`, `SuperAdminProfileEditModal.tsx`, and SP's `BasicInfoForm.tsx` ("Your Photo", distinct from "Business Logo")
+- `frontend/src/components/Dashboard/SPDashboard.tsx`, `ServiceCustomerDashboard.tsx`, `frontend/src/components/Orders/OrderLifecycleModal.tsx` — customer/coworker names on order tiles now render via `ClickableIdentity`
+- Backend: `photoUrl` added to all 5 profile-update handlers (`customers/profile.ts`, `accountManagers/profile.ts`, `coworkers/profile.ts`, `superAdmin/profile.ts`, `serviceProviders/updateData.ts`); `customerPhotoUrl`/`selectedCoworkerPhotoUrl` denormalized in `backend/functions/src/handlers/orders/createOrder.ts`
+- `storage.rules` — new `profile-pictures/{uid}/{fileName}` rule (owner-only write, ≤100KB, must be `image/*`; any authenticated user can read, since that's the point — a customer needs to see the coworker's photo and vice versa)
+
+**Bugs found and fixed along the way**:
+1. **`firebase.json` had no `storage` block at all** — `storage.rules` had likely never actually been deployed, ever, regardless of what was in the repo file. Added the missing `"storage": {"rules": "storage.rules"}` config and deployed Storage rules for the first time.
+2. **`sp-logos/{spId}/logo` (the pre-existing business logo upload) had zero Storage write rule** — its upload code already had a telling `// Upload failed silently` comment. Added a matching rule (owner-only write, ≤2MB, must be image).
+3. **Browser-detected MIME type (`file.type`) is unreliable for some images** — screenshots/forwarded images can have an empty or wrong detected type even with a normal-looking extension, which then failed the Storage rule's `contentType` check silently. Fixed by deriving a reliable `image/*` content type ourselves (`resolveImageContentType()`) instead of trusting the browser, applied to both the new profile-picture upload and the pre-existing logo upload.
+4. **Uploads could hang on "Uploading…" indefinitely** — added a 20-second client-side timeout (`withTimeout()`) so a failure always surfaces a clear, retryable error instead of an infinite spinner.
+5. **The one specific file that kept failing everywhere** turned out to be a copy-protected/IRM-restricted file in a OneDrive folder that the browser couldn't fully read — not a code or config bug at all. Confirmed by moving the same file to a different folder, which then uploaded fine.
+
 ---
 
 ## 🏗️ Architecture & Structure
@@ -371,7 +414,9 @@ backend/functions/src/
 | AM-SP Assignment | ✅ Complete | Fixed schema mismatch, now working correctly |
 | Payment Integration | 🔄 In Progress | Razorpay integration pending |
 | Order Management | 🔄 In Progress | Order creation and tracking |
-| Push Notifications | 🔄 In Progress | Firebase Cloud Messaging setup |
+| Push Notifications | ✅ Complete | FCM send + persisted in-app notification page (bell icon → `/dashboard/notifications`) |
+| Profile Pictures | ✅ Complete | All 5 roles, 100KB cap, distinct from SP business logo |
+| Order Anti-Fraud Identity | ✅ Complete | Clickable coworker/customer name → photo modal on pickup/delivery |
 | Email Notifications | 🔄 In Progress | Resend integration pending |
 | Analytics Dashboard | 📋 Planned | KPIs, charts, reporting |
 | Mobile App | 📋 Planned | Capacitor iOS/Android build |
@@ -392,11 +437,6 @@ backend/functions/src/
    - Customer order history
    - ServiceProvider order management
    - Real-time order status updates
-
-3. **Push Notifications**
-   - Firebase Cloud Messaging setup
-   - Notification templates for different events
-   - User notification preferences
 
 ### Short Term (2-3 Weeks)
 1. **Email Notifications**
@@ -516,7 +556,15 @@ npm run logs          # View logs
 
 ## 📝 Recent Commits
 
-Latest work (as of July 13, 2026):
+Latest work (as of July 20, 2026) — **uncommitted locally, not yet pushed via GitHub Desktop**:
+
+- Notification Center: bell icon now opens a real `/dashboard/notifications` page; pushes are persisted per-recipient in Firestore instead of fire-and-forget FCM only; read notifications disappear, no polling
+- Profile pictures for all 5 roles (100KB cap), distinct from the SP's business logo, with a "Change Photo" flow on every profile edit screen
+- Clickable coworker/customer identity reveal on order tiles (name + photo modal) for pickup/delivery fraud prevention, with photos denormalized onto the order rather than a new user-lookup endpoint
+- Fixed two previously-silent Storage gaps: `firebase.json` had no `storage` target at all (rules were never deployed), and the business logo upload path had no Storage write rule
+- Fixed unreliable browser MIME-type detection and unbounded upload hangs in the image upload flow (affects both new profile pictures and the existing business logo upload)
+
+Prior milestone (as of July 13, 2026):
 
 - **Milestone 1 Complete**: All 5 role-based logins working (Customer, SP, AM, Coworker, SuperAdmin)
 - ServiceProvider menu selection step integrated into AM onboarding workflow
@@ -544,12 +592,12 @@ Latest work (as of July 13, 2026):
 
 ## 🔄 Current Development Focus
 
-**Phase Status**: Phase 12 Complete - ServiceProvider Menu Selection During Onboarding  
+**Phase Status**: Phase 14 Complete - Profile Pictures + Anti-Fraud Identity Reveal on Orders (Phase 13 Notification Center also complete)  
 **Milestone**: Milestone 1 ✅ - All Logins Working (5 roles fully authenticated and assigned)  
-**Current Work**: Testing menu selection with real data and preparing for order management phase; invoice generation UX added for completed orders  
+**Current Work**: Manual verification of profile picture upload + order identity-reveal flows across roles; preparing for order management phase  
 **Blockers**: None  
 **Dependencies**: Razorpay integration for payments, Firebase data validation rules  
-**Next Phase**: Order Management (Phase 13) - order creation, tracking, and status updates  
+**Next Phase**: Order Management (Phase 15) - order creation, tracking, and status updates  
 
 **Known Issues to Address**:
 
@@ -557,8 +605,9 @@ Latest work (as of July 13, 2026):
 - Fix accountManager field structure (should be fully nested, not mixed flat/nested)
 - Implement SP profile completion with GST details and business address
 - Add Firestore security rules for multi-tenant data isolation
+- `sp-logos`/`profile-pictures` Storage rules only allow the account's own uid to write — an Account Manager uploading a business logo on behalf of an SP during onboarding (via `SPOnboardingStepper.tsx`) would still be blocked, since that flow runs under the AM's own signed-in uid, not the SP's. Not yet fixed — would need a Firestore-backed rule check (AM assigned to that SP) if that flow is actually used.
 
 ---
 
-**Last Updated**: July 15, 2026  
+**Last Updated**: July 20, 2026  
 **Next Review**: After order management implementation

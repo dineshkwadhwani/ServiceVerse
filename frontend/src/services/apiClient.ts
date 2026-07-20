@@ -534,6 +534,18 @@ class ApiClient {
       params: { startDate, endDate },
     });
   }
+
+  // ============================================================================
+  // NOTIFICATIONS
+  // ============================================================================
+
+  async getNotifications() {
+    return this.axiosInstance.get('/notifications');
+  }
+
+  async markNotificationRead(notificationId: string) {
+    return this.axiosInstance.patch(`/notifications/${notificationId}/read`);
+  }
 }
 
 // Export singleton instance

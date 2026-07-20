@@ -32,6 +32,7 @@ import * as ordersListHandlers from '@/handlers/orders/getSPOrders';
 import * as orderMenuHandlers from '@/handlers/orders/getSPMenu';
 import * as coworkerHandlers from '@/handlers/coworkers/manage';
 import * as coworkerProfileHandlers from '@/handlers/coworkers/profile';
+import * as notificationHandlers from '@/handlers/notifications/notifications';
 
 import { getSeedAdminConfig, seedSuperAdminUser } from '@/handlers/admin/seedAdmin';
 
@@ -144,6 +145,18 @@ app.use(verifyToken);
 
 app.post('/auth/register-push-token', async (req, res) => {
   authHandlers.registerPushToken(req, res);
+});
+
+// ============================================================================
+// NOTIFICATIONS
+// ============================================================================
+
+app.get('/notifications', async (req, res) => {
+  notificationHandlers.getNotifications(req as any, res);
+});
+
+app.patch('/notifications/:notificationId/read', async (req, res) => {
+  notificationHandlers.markNotificationRead(req as any, res);
 });
 
 // ============================================================================

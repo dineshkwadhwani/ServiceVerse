@@ -7,12 +7,14 @@ import { useAuthStore } from '@/store/authStore';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, storage } from '@/utils/firebase-config';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { ClickableIdentity } from '@/components/Shared/ClickableIdentity';
 
 interface OrderLike {
   orderId: string;
   spId?: string;
   customerId?: string;
   customerName?: string;
+  customerPhotoUrl?: string;
   createdBy?: string;
   createdByRole?: string;
   createdByUserId?: string;
@@ -20,6 +22,7 @@ interface OrderLike {
   totalAmount?: number;
   deliveryType?: string;
   selectedCoworker?: string;
+  selectedCoworkerPhotoUrl?: string;
   paymentMethod?: 'ONLINE' | 'DIRECT';
   specialInstructions?: string;
   isFrozen?: boolean;
@@ -146,6 +149,9 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
     order?.customerName ||
     (role === 'CUSTOMER' ? (user as any)?.name : '') ||
     'N/A';
+  const displayCustomerPhotoUrl = orderDetails?.customerPhotoUrl || order?.customerPhotoUrl || '';
+  const assignedCoworkerName = orderDetails?.selectedCoworker || order?.selectedCoworker || '';
+  const assignedCoworkerPhotoUrl = orderDetails?.selectedCoworkerPhotoUrl || order?.selectedCoworkerPhotoUrl || '';
   const canCustomerConfirm = role === 'CUSTOMER' && isPreConfirmStatus && !createdByCustomer;
   const canCustomerPay = role === 'CUSTOMER' && currentStatus === 'DELIVERED';
   const currentPaymentMethod = paymentMethod || orderDetails?.paymentMethod || order?.paymentMethod || 'DIRECT';
@@ -470,13 +476,24 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
         <div className="p-4 space-y-4">
           <div>
             <p className="text-sm" style={{ color: COLORS.text.secondary }}>Customer</p>
-            <p className="font-semibold" style={{ color: COLORS.text.primary }}>{displayCustomerName}</p>
+            <p className="font-semibold" style={{ color: COLORS.text.primary }}>
+              <ClickableIdentity name={displayCustomerName} photoUrl={displayCustomerPhotoUrl} label="Customer" />
+            </p>
           </div>
 
           <div>
             <p className="text-sm" style={{ color: COLORS.text.secondary }}>Current Status</p>
             <p className="font-semibold" style={{ color: COLORS.text.primary }}>{currentStatus}</p>
           </div>
+
+          {role === 'CUSTOMER' && assignedCoworkerName && (
+            <div>
+              <p className="text-sm" style={{ color: COLORS.text.secondary }}>Assigned for Pickup</p>
+              <p className="font-semibold" style={{ color: COLORS.text.primary }}>
+                <ClickableIdentity name={assignedCoworkerName} photoUrl={assignedCoworkerPhotoUrl} label="Coworker" />
+              </p>
+            </div>
+          )}
 
           {isFullEditMode && (
             <>

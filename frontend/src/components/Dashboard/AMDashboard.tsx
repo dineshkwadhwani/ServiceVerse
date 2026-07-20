@@ -442,6 +442,7 @@ export function AMDashboard() {
           userId={firebaseUser.uid}
           name={amData?.name || ''}
           email={amData?.email || ''}
+          photoUrl={amData?.photoUrl || ''}
           onClose={() => setShowProfileModal(false)}
           onComplete={() => loadAMProfile()}
         />

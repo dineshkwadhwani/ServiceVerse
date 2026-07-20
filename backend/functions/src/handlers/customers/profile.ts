@@ -16,7 +16,7 @@ export async function updateCustomerProfile(req: AuthRequest, res: Response) {
     }
 
     const { userId } = req.params;
-    const { name, email, address, area, city, pin } = req.body;
+    const { name, email, address, area, city, pin, photoUrl } = req.body;
 
     // Ensure user can only update their own profile
     if (req.user.uid !== userId) {
@@ -47,6 +47,7 @@ export async function updateCustomerProfile(req: AuthRequest, res: Response) {
     if (area) updateData.area = area.trim();
     if (city) updateData.city = city.trim();
     if (pin) updateData.pin = pin.trim();
+    if (photoUrl) updateData.photoUrl = photoUrl;
 
     updateData.updatedAt = new Date();
 

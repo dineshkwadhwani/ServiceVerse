@@ -12,6 +12,7 @@ export interface BaseUser {
   businessName?: string;
   isOrphaned?: boolean;
   verified?: boolean;
+  photoUrl?: string;
 }
 
 export interface SuperAdmin extends BaseUser {
@@ -178,6 +179,7 @@ export interface BasicInfoData {
   city: string;
   pinCode: string;
   logoUrl?: string;
+  photoUrl?: string;
 }
 
 export interface OperationsData {

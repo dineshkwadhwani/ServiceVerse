@@ -3,6 +3,7 @@ import { Loader2, TrendingUp, Package, Star, BarChart3, ShoppingBag, DollarSign,
 import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
 import { StatsGrid, StatCard } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
+import { ClickableIdentity } from '@/components/Shared/ClickableIdentity';
 import { SPProfileEditModal } from '@/components/Onboarding/SPProfileEditModal';
 import { CoworkerProfileEditModal } from '@/components/Dashboard/CoworkerProfileEditModal';
 import { CreateOrderModal } from '@/components/Orders/CreateOrderModal';
@@ -22,10 +23,12 @@ interface Order {
   orderId: string;
   customerId: string;
   customerName: string;
+  customerPhotoUrl?: string;
   status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED' | 'COMPLETED' | 'PAID' | 'ASSIGNED_FOR_PICKUP' | 'READY_FOR_DELIVERY';
   deliveryType?: 'DROP' | 'PICKUP';
   spId?: string;
   selectedCoworker?: string;
+  selectedCoworkerPhotoUrl?: string;
   totalAmount: number;
   createdAt: Date;
   items: Array<{ name: string; quantity: number; price: number }>;
@@ -91,10 +94,12 @@ async function fetchSPDashboardData(uid: string, forceRefresh = false): Promise<
       orderId: order.orderId || '',
       customerId: order.customerId || '',
       customerName: order.customerName || 'Unknown',
+      customerPhotoUrl: order.customerPhotoUrl || '',
       status: order.status || 'NEW',
       deliveryType: order.deliveryType || 'DROP',
       spId: order.spId || uid,
       selectedCoworker: order.selectedCoworker || '',
+      selectedCoworkerPhotoUrl: order.selectedCoworkerPhotoUrl || '',
       totalAmount: order.total || order.totalAmount || 0,
       createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
       items: order.items || [],
@@ -275,10 +280,12 @@ export function SPDashboard() {
         orderId: order.orderId || '',
         customerId: order.customerId || '',
         customerName: order.customerName || 'Unknown',
+        customerPhotoUrl: order.customerPhotoUrl || '',
         status: order.status || 'NEW',
         deliveryType: order.deliveryType || 'DROP',
         spId: order.spId || effectiveSpId,
         selectedCoworker: order.selectedCoworker || '',
+        selectedCoworkerPhotoUrl: order.selectedCoworkerPhotoUrl || '',
         totalAmount: order.total || order.totalAmount || 0,
         createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
         items: order.items || [],
@@ -495,7 +502,11 @@ export function SPDashboard() {
                     >
                       <div>
                         <p className="font-semibold" style={{ color: COLORS.text.primary }}>
-                          {order.customerName}
+                          <ClickableIdentity
+                            name={order.customerName}
+                            photoUrl={order.customerPhotoUrl}
+                            label="Customer"
+                          />
                         </p>
                         <p style={{ color: COLORS.text.secondary }}>
                           Order #{order.orderId} • ₹{order.totalAmount.toFixed(2)}
@@ -574,7 +585,11 @@ export function SPDashboard() {
                         <div className="flex items-start justify-between mb-3">
                           <div>
                             <p className="font-semibold" style={{ color: COLORS.text.primary }}>
-                              {order.customerName}
+                              <ClickableIdentity
+                                name={order.customerName}
+                                photoUrl={order.customerPhotoUrl}
+                                label="Customer"
+                              />
                             </p>
                             <p className="text-sm" style={{ color: COLORS.text.secondary }}>
                               Order #{order.orderId}
@@ -671,7 +686,11 @@ export function SPDashboard() {
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <p className="font-semibold" style={{ color: COLORS.text.primary }}>
-                          {order.customerName}
+                          <ClickableIdentity
+                            name={order.customerName}
+                            photoUrl={order.customerPhotoUrl}
+                            label="Customer"
+                          />
                         </p>
                         <p className="text-sm" style={{ color: COLORS.text.secondary }}>
                           Order #{order.orderId}
@@ -680,7 +699,12 @@ export function SPDashboard() {
                           Order Date: {order.createdAt.toLocaleDateString()}
                         </p>
                         <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
-                          Assigned pickup: {order.selectedCoworker}
+                          <ClickableIdentity
+                            name={order.selectedCoworker || ''}
+                            photoUrl={order.selectedCoworkerPhotoUrl}
+                            label="Coworker"
+                            prefix="Assigned pickup: "
+                          />
                         </p>
                       </div>
                       <div
@@ -925,6 +949,7 @@ export function SPDashboard() {
             name={fullUserData?.name || (user as any)?.name || ''}
             phone={fullUserData?.phone || (user as any)?.phone || ''}
             email={fullUserData?.email || (user as any)?.email || ''}
+            photoUrl={fullUserData?.photoUrl || (user as any)?.photoUrl || ''}
             onClose={() => setShowProfileModal(false)}
             onComplete={() => {
               setShowProfileModal(false);

@@ -3,7 +3,13 @@ import { Mail, Phone, User, MapPin, Upload, ImageIcon } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/utils/firebase-config';
 import { COLORS } from '@/utils/theme';
+import { ProfilePictureUpload } from '@/components/Shared/ProfilePictureUpload';
+import { resolveImageContentType, withTimeout } from '@/utils/imageUpload';
+import { useToast } from '@/store/notificationStore';
 import type { BasicInfoData } from '@/types';
+
+const UPLOAD_TIMEOUT_MS = 20_000;
+const TIMEOUT_MESSAGE = 'Upload timed out - please check your connection and try again';
 
 interface Props {
   data: BasicInfoData;
@@ -13,6 +19,7 @@ interface Props {
 }
 
 export function BasicInfoForm({ data, onChange, phoneNumber, spId }: Props) {
+  const toast = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -28,11 +35,16 @@ export function BasicInfoForm({ data, onChange, phoneNumber, spId }: Props) {
     try {
       const path = `sp-logos/${spId || 'unknown'}/logo`;
       const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
+      await withTimeout(
+        uploadBytes(storageRef, file, { contentType: resolveImageContentType(file) }),
+        UPLOAD_TIMEOUT_MS,
+        TIMEOUT_MESSAGE
+      );
+      const url = await withTimeout(getDownloadURL(storageRef), UPLOAD_TIMEOUT_MS, TIMEOUT_MESSAGE);
       onChange({ ...data, logoUrl: url });
-    } catch {
-      // Upload failed silently — logo remains optional
+    } catch (error: any) {
+      console.error('Logo upload failed', { spId, code: error?.code, message: error?.message, error });
+      toast.error(error?.message?.includes('timed out') ? error.message : `Failed to upload logo${error?.code ? ` (${error.code})` : ''}`);
     } finally {
       setIsUploading(false);
     }
@@ -58,6 +70,23 @@ export function BasicInfoForm({ data, onChange, phoneNumber, spId }: Props) {
       </div>
 
       <form className="space-y-6">
+        {/* Your Photo (Owner - Optional) */}
+        <div>
+          <label className="flex items-center gap-2 font-semibold mb-3" style={{ color: COLORS.text.primary }}>
+            <User className="w-4 h-4" />
+            Your Photo <span className="text-xs font-normal ml-1" style={{ color: COLORS.text.secondary }}>(optional)</span>
+          </label>
+          <ProfilePictureUpload
+            uid={spId || 'unknown'}
+            photoUrl={data.photoUrl}
+            name={data.ownerName || data.name}
+            onChange={(url) => handleChange('photoUrl', url)}
+          />
+          <p className="text-xs mt-2" style={{ color: COLORS.text.secondary }}>
+            This is you, the owner — separate from your business logo.
+          </p>
+        </div>
+
         {/* Business Logo (Optional) */}
         <div>
           <label className="flex items-center gap-2 font-semibold mb-3" style={{ color: COLORS.text.primary }}>

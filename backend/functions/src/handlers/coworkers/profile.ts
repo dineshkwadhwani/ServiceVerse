@@ -16,7 +16,7 @@ export async function updateCoworkerProfile(req: AuthRequest, res: Response) {
     }
 
     const { userId } = req.params;
-    const { name, email } = req.body;
+    const { name, email, photoUrl } = req.body;
 
     // Ensure user can only update their own profile
     if (req.user.uid !== userId) {
@@ -37,11 +37,13 @@ export async function updateCoworkerProfile(req: AuthRequest, res: Response) {
     logger.info('Updating coworker profile', { userId });
 
     // Update user document
-    const updateData = {
+    const updateData: any = {
       name: name.trim(),
       email: email.trim(),
       updatedAt: new Date(),
     };
+
+    if (photoUrl) updateData.photoUrl = photoUrl;
 
     await db.collection('users').doc(userId).update(updateData);
 

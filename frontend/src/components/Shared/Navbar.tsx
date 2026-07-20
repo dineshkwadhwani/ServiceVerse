@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/store/notificationStore';
+import { useNotificationCenterStore } from '@/store/notificationCenterStore';
 import { LogOut, Bell, User } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { COLORS } from '@/utils/theme';
 
 interface NavbarProps {
@@ -15,6 +16,17 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
   const { user, firebaseUser, signOut } = useAuthStore();
   const toast = useToast();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const { notifications, fetchNotifications } = useNotificationCenterStore();
+
+  useEffect(() => {
+    if (!firebaseUser) return;
+    fetchNotifications();
+  }, [firebaseUser, fetchNotifications]);
+
+  const handleBellClick = () => {
+    fetchNotifications();
+    navigate('/dashboard/notifications');
+  };
 
   const handleDashboardClick = () => {
     setShowProfileMenu(false);
@@ -72,16 +84,19 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
             <>
               {/* Notifications */}
               <button
-                className="p-2 rounded-lg transition"
+                onClick={handleBellClick}
+                className="relative p-2 rounded-lg transition"
                 style={{
                   color: COLORS.text.secondary,
                 }}
               >
                 <Bell className="w-5 h-5" />
-                <span
-                  className="absolute top-2 right-2 w-2 h-2 rounded-full"
-                  style={{ backgroundColor: COLORS.semantic.error }}
-                />
+                {notifications.length > 0 && (
+                  <span
+                    className="absolute top-2 right-2 w-2 h-2 rounded-full"
+                    style={{ backgroundColor: COLORS.semantic.error }}
+                  />
+                )}
               </button>
 
               {/* Profile Menu */}
@@ -100,10 +115,14 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
                     </p>
                   </div>
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold overflow-hidden"
                     style={{ backgroundColor: COLORS.semantic.info }}
                   >
-                    {user?.name?.charAt(0) || 'U'}
+                    {user?.photoUrl ? (
+                      <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
+                    ) : (
+                      user?.name?.charAt(0) || 'U'
+                    )}
                   </div>
                 </button>
 

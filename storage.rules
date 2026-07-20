@@ -13,5 +13,25 @@ service firebase.storage {
     match /services/{serviceId}/{fileName} {
       allow read: if true;
     }
+
+    // Profile pictures - owner can upload their own, any authenticated user can
+    // view (needed so a customer can verify a coworker's photo for pickup, and
+    // vice versa for delivery). Capped at 100KB and must be an image.
+    match /profile-pictures/{uid}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.size < 100 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // SP business logos - the SP themselves can upload their own logo, publicly
+    // readable since it's shown on the public landing/service pages. Capped at
+    // 2MB (matches the "Max 2MB" hint already shown in the upload UI).
+    match /sp-logos/{spId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == spId
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
   }
 }

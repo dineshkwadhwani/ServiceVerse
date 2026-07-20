@@ -20,6 +20,7 @@ import { ServiceCustomerDashboard } from '@/components/Dashboard/ServiceCustomer
 import { SPDashboard } from '@/components/Dashboard/SPDashboard';
 import { AMDashboard } from '@/components/Dashboard/AMDashboard';
 import { SuperAdminDashboard } from '@/components/Dashboard/SuperAdminDashboard';
+import { NotificationsPage } from '@/pages/NotificationsPage';
 
 function AuthLoadingScreen() {
   return (
@@ -143,6 +144,9 @@ export function App() {
 
               {/* Customer service dashboard */}
               <Route path="service/:serviceId" element={<ServiceCustomerDashboard />} />
+
+              {/* Notifications */}
+              <Route path="notifications" element={<NotificationsPage />} />
             </Route>
           </Route>
 

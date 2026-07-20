@@ -671,6 +671,7 @@ export function SuperAdminDashboard() {
           userId={firebaseUser.uid}
           name={saData?.name || ''}
           email={saData?.email || ''}
+          photoUrl={saData?.photoUrl || ''}
           onClose={() => setShowProfileModal(false)}
           onComplete={() => loadSAProfile()}
         />

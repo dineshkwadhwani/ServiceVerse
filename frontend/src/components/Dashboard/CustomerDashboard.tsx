@@ -212,6 +212,7 @@ export function CustomerDashboard() {
           area={customerData?.area || ''}
           city={customerData?.city || ''}
           pin={customerData?.pin || ''}
+          photoUrl={customerData?.photoUrl || ''}
           onClose={() => setShowProfileModal(false)}
           onComplete={() => loadCustomerProfile()}
         />

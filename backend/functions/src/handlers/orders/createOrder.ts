@@ -27,6 +27,22 @@ function getRazorpayClient(): Razorpay {
   return razorpayClient;
 }
 
+/**
+ * Resolve a coworker's photoUrl by name, scoped to their SP.
+ * Queries only by role (like getSPCoworkers) and filters spId/name in memory
+ * to avoid needing a composite index.
+ */
+async function resolveCoworkerPhotoUrl(spId: string, coworkerName: string): Promise<string | null> {
+  if (!spId || !coworkerName) return null;
+
+  const coworkersSnapshot = await db.collection('users').where('role', '==', 'COWORKER').get();
+  const match = coworkersSnapshot.docs.find(
+    (doc) => doc.data().spId === spId && doc.data().name === coworkerName
+  );
+
+  return match?.data()?.photoUrl || null;
+}
+
 interface OrderItem {
   menuItemId: string;
   name: string;
@@ -171,6 +187,7 @@ export const createOrder = async (req: Request, res: Response) => {
       customerId: data.customerId,
       customerPhone: data.customerPhone,
       customerName: data.customerName,
+      customerPhotoUrl: customerDoc.data()?.photoUrl || null,
       customerAddress: data.customerAddress,
       deliveryAddress: data.deliveryAddress || data.customerAddress,
       deliveryDateTime: data.deliveryDateTime ? new Date(data.deliveryDateTime) : null,
@@ -374,6 +391,7 @@ export const updateOrderLifecycle = async (req: Request, res: Response) => {
 
     if (status === 'ASSIGNED_FOR_PICKUP') {
       updateData.selectedCoworker = selectedCoworker;
+      updateData.selectedCoworkerPhotoUrl = await resolveCoworkerPhotoUrl(orderData.spId, selectedCoworker);
       updateData.assignedForPickupAt = new Date();
     }
 
@@ -505,6 +523,7 @@ export const updateOrderDetails = async (req: Request, res: Response) => {
 
     if (typeof selectedCoworker === 'string') {
       updateData.selectedCoworker = selectedCoworker;
+      updateData.selectedCoworkerPhotoUrl = await resolveCoworkerPhotoUrl(orderData.spId, selectedCoworker);
     }
 
     if (paymentMethod === 'ONLINE' || paymentMethod === 'DIRECT') {

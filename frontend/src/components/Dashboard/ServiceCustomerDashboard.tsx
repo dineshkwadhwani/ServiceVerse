@@ -8,6 +8,7 @@ import { useDashboardContext } from '@/context/DashboardContext';
 import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
 import { StatsGrid } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
+import { ClickableIdentity } from '@/components/Shared/ClickableIdentity';
 import { CreateOrderModal } from '@/components/Orders/CreateOrderModal';
 import { OrderLifecycleModal } from '@/components/Orders/OrderLifecycleModal';
 import { InvoiceModal } from '@/components/Orders/InvoiceModal';
@@ -21,6 +22,8 @@ interface Order {
   orderId: string;
   spId?: string;
   customerName?: string;
+  selectedCoworker?: string;
+  selectedCoworkerPhotoUrl?: string;
   status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED' | 'NEW' | 'COMPLETED' | 'PAID';
   totalAmount: number;
   createdAt: Date;
@@ -134,6 +137,8 @@ export function ServiceCustomerDashboard() {
             orderId: order.orderId || '',
             spId: order.spId || '',
             customerName: order.customerName || '',
+            selectedCoworker: order.selectedCoworker || '',
+            selectedCoworkerPhotoUrl: order.selectedCoworkerPhotoUrl || '',
             status: order.status || 'NEW',
             totalAmount: order.total || 0,
             createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
@@ -380,6 +385,19 @@ export function ServiceCustomerDashboard() {
                           >
                             Order Date: {new Date(order.createdAt).toLocaleDateString()}
                           </p>
+                          {order.selectedCoworker && (
+                            <p
+                              className="text-xs mt-1"
+                              style={{ color: COLORS.text.secondary }}
+                            >
+                              <ClickableIdentity
+                                name={order.selectedCoworker}
+                                photoUrl={order.selectedCoworkerPhotoUrl}
+                                label="Coworker"
+                                prefix="Assigned for Pickup: "
+                              />
+                            </p>
+                          )}
                         </div>
                         <div
                           className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold text-white"
@@ -483,6 +501,7 @@ export function ServiceCustomerDashboard() {
           area={customerData?.area || ''}
           city={customerData?.city || ''}
           pin={customerData?.pin || ''}
+          photoUrl={customerData?.photoUrl || ''}
           onClose={() => setShowProfileModal(false)}
           onComplete={() => {
             // Reload data to refresh profile

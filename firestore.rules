@@ -123,5 +123,17 @@ service cloud.firestore {
     match /analytics/{analyticsId} {
       allow read, write: if isSuperAdmin();
     }
+
+    // ============================================================================
+    // Notifications collection - owner can read own notifications and mark read,
+    // creation/deletion restricted to SuperAdmin (backend uses Admin SDK, which
+    // bypasses these rules entirely)
+    // ============================================================================
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+      allow create, delete: if isSuperAdmin();
+    }
   }
 }

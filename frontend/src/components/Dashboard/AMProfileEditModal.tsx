@@ -3,11 +3,13 @@ import { X, Loader2, Mail, User } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
+import { ProfilePictureUpload } from '@/components/Shared/ProfilePictureUpload';
 
 interface Props {
   userId: string;
   name?: string;
   email?: string;
+  photoUrl?: string;
   onClose: () => void;
   onComplete?: () => void;
 }
@@ -15,12 +17,14 @@ interface Props {
 interface FormData {
   name: string;
   email: string;
+  photoUrl: string;
 }
 
 export function AMProfileEditModal({
   userId,
   name = '',
   email = '',
+  photoUrl = '',
   onClose,
   onComplete,
 }: Props) {
@@ -29,6 +33,7 @@ export function AMProfileEditModal({
   const [formData, setFormData] = useState<FormData>({
     name: name || '',
     email: email || '',
+    photoUrl: photoUrl || '',
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,6 +106,14 @@ export function AMProfileEditModal({
 
         {/* Content */}
         <div className="p-6 space-y-4">
+          {/* Profile Picture */}
+          <ProfilePictureUpload
+            uid={userId}
+            photoUrl={formData.photoUrl}
+            name={formData.name}
+            onChange={(url) => setFormData((prev) => ({ ...prev, photoUrl: url }))}
+          />
+
           {/* Name */}
           <div>
             <label className="flex items-center gap-2 font-semibold mb-2" style={{ color: COLORS.text.primary }}>
