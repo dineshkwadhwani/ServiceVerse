@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '@/utils/firebase';
 import { Logger } from '@/utils/logger';
+import { enrichOrdersWithLivePhotos } from '@/utils/orderPhotos';
 
 const logger = new Logger('GetSPOrders');
 
@@ -39,7 +40,7 @@ export const getSPOrders = async (req: Request, res: Response) => {
       .get();
     const hasMore = snapshot.docs.length > limit;
     const docsList = snapshot.docs.slice(0, limit);
-    const orders = docsList.map(doc => {
+    const rawOrders = docsList.map(doc => {
       const data = doc.data();
       return {
         ...data,
@@ -48,6 +49,7 @@ export const getSPOrders = async (req: Request, res: Response) => {
         deliveryDateTime: data.deliveryDateTime?.toDate?.() || data.deliveryDateTime,
       };
     });
+    const orders = await enrichOrdersWithLivePhotos(rawOrders);
 
     logger.info('SP orders retrieved', { spId, count: orders.length, hasMore });
 
@@ -103,7 +105,7 @@ export const getCustomerOrders = async (req: Request, res: Response) => {
       .get();
     const hasMore = snapshot.docs.length > limit;
     const docsList = snapshot.docs.slice(0, limit);
-    const orders = docsList.map(doc => {
+    const rawOrders = docsList.map(doc => {
       const data = doc.data();
       return {
         ...data,
@@ -112,6 +114,7 @@ export const getCustomerOrders = async (req: Request, res: Response) => {
         deliveryDateTime: data.deliveryDateTime?.toDate?.() || data.deliveryDateTime,
       };
     });
+    const orders = await enrichOrdersWithLivePhotos(rawOrders);
 
     logger.info('Customer orders retrieved', { customerId, count: orders.length, hasMore });
 

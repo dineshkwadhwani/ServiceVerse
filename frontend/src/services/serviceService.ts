@@ -15,7 +15,7 @@ import { auth, db, storage } from '@/utils/firebase-config';
 import { COLLECTIONS } from '@/utils/constants';
 import type { CreateServiceFormData, Service } from '@/types';
 
-async function uploadServiceImage(
+export async function uploadServiceImage(
   serviceId: string,
   file: File,
   imageType: 'logo' | 'hero'

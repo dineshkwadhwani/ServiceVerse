@@ -56,9 +56,9 @@ export function MenuItemForm({ onAdd, items, onRemove, isLoading = false }: Menu
     try {
       const newItem: Omit<MenuItem, 'menuItemId'> = {
         name: data.name,
-        description: data.description,
         basePrice: data.basePrice,
-        image: imagePreview || undefined,
+        ...(data.description ? { description: data.description } : {}),
+        ...(imagePreview ? { image: imagePreview } : {}),
       };
 
       onAdd(newItem);

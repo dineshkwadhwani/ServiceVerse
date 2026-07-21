@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '@/utils/firebase';
 import { Logger } from '@/utils/logger';
 import { sendNotificationByEvent } from '@/utils/notificationCenter';
+import { enrichOrdersWithLivePhotos } from '@/utils/orderPhotos';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
@@ -266,14 +267,18 @@ export const getOrderById = async (req: Request, res: Response) => {
     }
 
     const orderData: any = orderDoc.data() || {};
-    return res.status(200).json({
-      success: true,
-      data: {
+    const [enrichedOrder] = await enrichOrdersWithLivePhotos([
+      {
         ...orderData,
         createdAt: orderData.createdAt?.toDate?.() || orderData.createdAt,
         updatedAt: orderData.updatedAt?.toDate?.() || orderData.updatedAt,
         deliveryDateTime: orderData.deliveryDateTime?.toDate?.() || orderData.deliveryDateTime,
       },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: enrichedOrder,
     });
   } catch (error: any) {
     logger.error('Get order by ID failed', error);

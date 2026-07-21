@@ -184,7 +184,7 @@ export async function getService(req: AuthRequest, res: Response) {
 export async function updateService(req: AuthRequest, res: Response) {
   try {
     const { serviceId } = req.params;
-    const updates = req.body;
+    const body = req.body || {};
 
     logger.info('Updating service', { serviceId });
 
@@ -193,6 +193,25 @@ export async function updateService(req: AuthRequest, res: Response) {
     if (!serviceDoc.exists) {
       return sendError(res, new Error('Service not found'));
     }
+
+    // Whitelist updatable fields rather than blindly spreading req.body -
+    // logo/heroImage in particular must never be overwritten with a blank/
+    // malformed value (e.g. a serialized File object) when the admin didn't
+    // pick a new image; only accept them here as non-empty strings.
+    const updates: Record<string, any> = {};
+    const stringFields = ['name', 'description', 'fromEmail', 'fromName'] as const;
+    for (const field of stringFields) {
+      if (typeof body[field] === 'string' && body[field].trim()) {
+        updates[field] = body[field];
+      }
+    }
+    if (typeof body.logo === 'string' && body.logo.trim()) updates.logo = body.logo;
+    if (typeof body.heroImage === 'string' && body.heroImage.trim()) updates.heroImage = body.heroImage;
+    if (typeof body.gstPercentage === 'number') updates.gstPercentage = body.gstPercentage;
+    if (body.colorTheme && typeof body.colorTheme === 'object') updates.colorTheme = body.colorTheme;
+    if (body.defaultCommission && typeof body.defaultCommission === 'object') updates.defaultCommission = body.defaultCommission;
+    if (Array.isArray(body.menuItems)) updates.menuItems = body.menuItems;
+    if (body.status === 'ACTIVE' || body.status === 'INACTIVE') updates.status = body.status;
 
     // Update service
     await db
