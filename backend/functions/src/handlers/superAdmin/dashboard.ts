@@ -300,6 +300,7 @@ export async function getAllUsers(req: AuthRequest, res: Response) {
         role: data.role,
         status: data.status || 'ACTIVE',
         verified: data.verified || false,
+        businessName: data.role === 'SERVICE_PROVIDER' ? data.businessName || '' : undefined,
         createdAt: data.createdAt?.toDate?.() || data.createdAt,
       };
     });
@@ -391,7 +392,7 @@ export async function createUser(req: AuthRequest, res: Response) {
 export async function updateUser(req: AuthRequest, res: Response) {
   try {
     const { userId } = req.params;
-    const { name, email, phone, status } = req.body;
+    const { name, email, phone, status, businessName } = req.body;
 
     if (!userId) {
       return sendError(res, new ValidationError('User ID is required'));
@@ -414,8 +415,12 @@ export async function updateUser(req: AuthRequest, res: Response) {
     if (name !== undefined) updateData.name = name;
     if (phone !== undefined) updateData.phone = phone;
     if (status !== undefined) updateData.status = status;
-    if (email !== undefined && currentUser && email !== currentUser.email) {
-      // Update Firebase Auth email
+    if (currentUser?.role === 'SERVICE_PROVIDER' && businessName !== undefined) {
+      updateData.businessName = businessName;
+    }
+    // Email is optional (phone is the primary auth method) - only touch Firebase
+    // Auth/Firestore email when a non-empty value is actually provided and changed.
+    if (email && currentUser && email !== currentUser.email) {
       await auth.updateUser(userId, { email });
       updateData.email = email;
     }

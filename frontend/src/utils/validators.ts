@@ -47,7 +47,7 @@ export const editServiceSchema = createServiceSchema.extend({
 // Menu item schema (for master menu creation)
 export const menuItemSchema = z.object({
   name: z.string().min(2, 'Item name is required').max(100),
-  description: z.string().min(5, 'Description required').max(200).optional(),
+  description: z.string().min(5, 'Description must be at least 5 characters').max(200),
   basePrice: z.number().min(0, 'Price must be positive'),
   image: z.instanceof(File).refine(file => file.size <= 100 * 1024, 'Image must be less than 100KB').optional().nullable(),
 });

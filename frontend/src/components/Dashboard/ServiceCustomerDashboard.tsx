@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Clock, CheckCircle2, XCircle, BarChart3, ShoppingBag, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, Clock, CheckCircle2, XCircle, BarChart3, ShoppingBag, Plus, Search, X } from 'lucide-react';
 import { useToast } from '@/store/notificationStore';
 import { apiClient } from '@/services/apiClient';
 import { useAuthStore } from '@/store/authStore';
@@ -61,6 +61,9 @@ export function ServiceCustomerDashboard() {
   const [selectedSPForOrder, setSelectedSPForOrder] = useState<SPInfo | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SPInfo[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     if (serviceId && firebaseUser?.uid) {
@@ -194,6 +197,39 @@ export function ServiceCustomerDashboard() {
     return normalized === 'COMPLETED' || normalized === 'DELIVERED' || normalized === 'PAID';
   };
 
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = searchQuery.trim();
+    if (!query || !serviceId) {
+      setSearchResults(null);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const response = await apiClient.searchServiceProviders(serviceId, query);
+      const providers = (response.data?.providers || []) as any[];
+      setSearchResults(
+        providers.map((p) => ({
+          spId: p.spId,
+          businessName: p.businessName || p.ownerName || 'Service Provider',
+          email: p.email || '',
+          phone: p.phone || '',
+        }))
+      );
+    } catch (error) {
+      toast.error('Search failed');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setSearchResults(null);
+  };
+
+  const displayedSPs = searchResults ?? spsInPinCode;
+
   const handleStartOrder = (sp: SPInfo) => {
     setSelectedSPForOrder(sp);
     setShowCreateOrder(true);
@@ -233,10 +269,56 @@ export function ServiceCustomerDashboard() {
           </h1>
         </div>
 
+        {/* Search - finds providers by name across all PIN codes */}
+        <form onSubmit={handleSearch} className="mb-4 flex gap-2">
+          <div className="relative flex-1">
+            <Search
+              className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2"
+              style={{ color: COLORS.text.secondary }}
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search any service provider by name (any PIN code)"
+              className="w-full pl-9 pr-9 py-2 rounded-lg border text-sm focus:outline-none"
+              style={{
+                backgroundColor: COLORS.bg.surface,
+                borderColor: COLORS.border.light,
+                color: COLORS.text.primary,
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+                style={{ color: COLORS.text.secondary }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <button
+            type="submit"
+            disabled={isSearching}
+            className="px-4 py-2 rounded-lg font-semibold text-white transition hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+            style={{ backgroundColor: COLORS.semantic.info }}
+          >
+            {isSearching && <Loader2 className="w-4 h-4 animate-spin" />}
+            Search
+          </button>
+        </form>
+
         {/* Service Providers List */}
         <div className="mb-8 space-y-3">
-          {spsInPinCode.length > 0 ? (
-            spsInPinCode.map((sp) => (
+          {searchResults !== null && (
+            <p className="text-xs" style={{ color: COLORS.text.secondary }}>
+              Showing search results for "{searchQuery}" across all PIN codes
+            </p>
+          )}
+          {displayedSPs.length > 0 ? (
+            displayedSPs.map((sp) => (
               <div
                 key={sp.spId}
                 className="p-4 rounded-lg border flex items-center gap-4 justify-between"
@@ -293,7 +375,13 @@ export function ServiceCustomerDashboard() {
               </div>
             ))
           ) : (
-            <EmptyState message="No service providers available in your area for this service" />
+            <EmptyState
+              message={
+                searchResults !== null
+                  ? `No service providers found matching "${searchQuery}"`
+                  : 'No service providers available in your area for this service'
+              }
+            />
           )}
         </div>
 

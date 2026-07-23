@@ -105,6 +105,15 @@ export async function completeOnboarding(req: AuthRequest, res: Response) {
         ...basicInfo,
         logoUrl: basicInfo.logoUrl || '',
       },
+      // Also denormalize onto flat top-level fields - matches the convention
+      // used by profileUpdate.ts/updateData.ts, which customer-facing SP
+      // lookups (e.g. pincode matching in ServiceCustomerDashboard) read from.
+      businessName: basicInfo.name,
+      ownerName: basicInfo.ownerName,
+      address: basicInfo.address,
+      area: basicInfo.area,
+      city: basicInfo.city,
+      pin: basicInfo.pinCode,
       businessLogo: basicInfo.logoUrl || null,
       operations,
       documentation,

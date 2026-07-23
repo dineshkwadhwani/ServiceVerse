@@ -44,6 +44,7 @@ interface User {
   role: 'SUPERADMIN' | 'ACCOUNT_MANAGER' | 'SERVICE_PROVIDER' | 'CUSTOMER' | 'COWORKER';
   status?: 'ACTIVE' | 'PENDING' | 'INACTIVE';
   verified: boolean;
+  businessName?: string;
   createdAt: Date;
 }
 
@@ -179,6 +180,8 @@ export function SuperAdminDashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saData, setSAData] = useState<any>(null);
   const [openReport, setOpenReport] = useState<ReportType>(null);
+  const [userTypeFilter, setUserTypeFilter] = useState<'ALL' | User['role']>('ALL');
+  const [userStatusFilter, setUserStatusFilter] = useState<'ALL' | 'Active' | 'Pending' | 'Inactive'>('ALL');
 
   useEffect(() => {
     loadDashboardData();
@@ -331,6 +334,12 @@ export function SuperAdminDashboard() {
     return user.verified ? 'Active' : 'Pending';
   };
 
+  const filteredUsers = users.filter((u) => {
+    if (userTypeFilter !== 'ALL' && u.role !== userTypeFilter) return false;
+    if (userStatusFilter !== 'ALL' && getUserStatus(u) !== userStatusFilter) return false;
+    return true;
+  });
+
   const handleStatClick = (stat: StatCard) => {
     if (stat.id === 'users') setOpenReport('users');
     else if (stat.id === 'services') setOpenReport('services');
@@ -387,11 +396,47 @@ export function SuperAdminDashboard() {
               </button>
             </div>
 
-            {users.length === 0 ? (
-              <EmptyState message="No users yet" />
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3">
+              <select
+                value={userTypeFilter}
+                onChange={(e) => setUserTypeFilter(e.target.value as typeof userTypeFilter)}
+                className="px-3 py-2 rounded-lg border text-sm focus:outline-none"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  borderColor: COLORS.border.light,
+                  color: COLORS.text.primary,
+                }}
+              >
+                <option value="ALL">All Types</option>
+                <option value="SUPERADMIN">Super Admin</option>
+                <option value="ACCOUNT_MANAGER">Account Manager</option>
+                <option value="SERVICE_PROVIDER">Service Provider</option>
+                <option value="COWORKER">Coworker</option>
+                <option value="CUSTOMER">Customer</option>
+              </select>
+              <select
+                value={userStatusFilter}
+                onChange={(e) => setUserStatusFilter(e.target.value as typeof userStatusFilter)}
+                className="px-3 py-2 rounded-lg border text-sm focus:outline-none"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  borderColor: COLORS.border.light,
+                  color: COLORS.text.primary,
+                }}
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="Pending">Pending</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+
+            {filteredUsers.length === 0 ? (
+              <EmptyState message={users.length === 0 ? 'No users yet' : 'No users match the selected filters'} />
             ) : (
               <div className="space-y-2">
-                {users.map((u) => (
+                {filteredUsers.map((u) => (
                   <div
                     key={u.id}
                     className="rounded-lg p-4 flex items-center justify-between gap-3 border transition"
