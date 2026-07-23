@@ -127,6 +127,30 @@ export async function completeOnboarding(req: AuthRequest, res: Response) {
     await db.collection('users').doc(spId).update(updateData);
     logger.info('SP user document updated', { spId });
 
+    // Sync the service association's isActive flag with the final status -
+    // customer-facing SP lookups (getCustomerServiceProviders, searchServiceProviders,
+    // getPublicServiceProviders) all filter on serviceAssociations isActive, but it's
+    // only ever created as `false` at SP self-registration time (registration.ts) and
+    // was otherwise never flipped by this onboarding flow, leaving onboarded/activated
+    // SPs permanently invisible to customers.
+    const isActivated = finalStatus === 'ACTIVE';
+    const associationsSnapshot = await db
+      .collection('users')
+      .doc(spId)
+      .collection('serviceAssociations')
+      .get();
+
+    await Promise.all(
+      associationsSnapshot.docs.map((assocDoc) =>
+        assocDoc.ref.update({
+          status: isActivated ? 'ACTIVE' : 'INACTIVE',
+          isActive: isActivated,
+          ...(isActivated ? { activatedAt: new Date() } : {}),
+        })
+      )
+    );
+    logger.info('Service association activation synced', { spId, isActivated });
+
     // Find and update approval request
     try {
       const approvalsQuery = await db
