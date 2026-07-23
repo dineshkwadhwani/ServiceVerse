@@ -95,7 +95,10 @@ export function CustomerDashboard() {
   };
 
   const handleOtherServiceClick = (service: Service) => {
-    navigate(`/service/${service.serviceId}`);
+    // Must go to the authenticated /dashboard/service/:id route (ServiceCustomerDashboard),
+    // not the public pre-login /service/:id page - that page's "Book Now" always routes
+    // through role-selection into /register, even for an already signed-in customer.
+    navigate(`/dashboard/service/${service.serviceId}`);
   };
 
   if (isLoading) {
