@@ -10,9 +10,9 @@ import {
   Loader2,
   BarChart3,
   Edit2,
-  DollarSign,
 } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
+import { IndianRupeeIcon } from '@/components/Shared/IndianRupeeIcon';
 import { EditUserModal } from './EditUserModal';
 import { CreateServiceModal } from '@/components/SuperAdmin/CreateServiceModal';
 import { ApprovalsTab } from '@/components/SuperAdmin/ApprovalsTab';
@@ -374,7 +374,7 @@ export function SuperAdminDashboard() {
               { id: 'providers', label: 'Providers', value: stats.totalServiceProviders, icon: Users, color: COLORS.semantic.warning },
               { id: 'customers', label: 'Customers', value: stats.totalCustomers, icon: Users, color: COLORS.semantic.error },
               { id: 'managers', label: 'Managers', value: stats.totalAccountManagers, icon: Settings, color: COLORS.semantic.info },
-              { id: 'earnings', label: 'Earnings', value: `₹${Number(stats.totalEarnings || 0).toFixed(2)}`, icon: DollarSign, color: COLORS.semantic.success },
+              { id: 'earnings', label: 'Earnings', value: `₹${Number(stats.totalEarnings || 0).toFixed(2)}`, icon: IndianRupeeIcon, color: COLORS.semantic.success },
             ]}
           />
         )}

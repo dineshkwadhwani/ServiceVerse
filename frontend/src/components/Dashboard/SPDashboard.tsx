@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Loader2, TrendingUp, Package, Star, BarChart3, ShoppingBag, DollarSign, AlertCircle, Users, Plus } from 'lucide-react';
+import { Loader2, TrendingUp, Package, Star, BarChart3, ShoppingBag, AlertCircle, Users, Plus } from 'lucide-react';
 import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
 import { StatsGrid, StatCard } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
+import { IndianRupeeIcon } from '@/components/Shared/IndianRupeeIcon';
 import { ClickableIdentity } from '@/components/Shared/ClickableIdentity';
 import { SPProfileEditModal } from '@/components/Onboarding/SPProfileEditModal';
 import { CoworkerProfileEditModal } from '@/components/Dashboard/CoworkerProfileEditModal';
@@ -449,7 +450,7 @@ export function SPDashboard() {
     { id: 'customers', icon: Users, label: 'Customers' },
     // Coworkers can't create other coworkers, so they don't get this tab.
     ...(isCoworker ? [] : [{ id: 'coworkers' as const, icon: Users, label: 'Coworkers' }]),
-    { id: 'earnings', icon: DollarSign, label: 'Earnings' },
+    { id: 'earnings', icon: IndianRupeeIcon, label: 'Earnings' },
   ];
 
   return (

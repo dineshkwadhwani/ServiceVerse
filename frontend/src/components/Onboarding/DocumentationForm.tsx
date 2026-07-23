@@ -1,5 +1,6 @@
-import { FileText, QrCode, Percent, DollarSign, AlertCircle } from 'lucide-react';
+import { FileText, QrCode, Percent, AlertCircle } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
+import { IndianRupeeIcon } from '@/components/Shared/IndianRupeeIcon';
 import type { DocumentationData, OnboardingCommissionConfig } from '@/types';
 
 interface Props {
@@ -247,7 +248,7 @@ export function DocumentationForm({
           }}
         >
           <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: COLORS.text.primary }}>
-            <DollarSign className="w-5 h-5" />
+            <IndianRupeeIcon className="w-5 h-5" />
             Commission Model
           </h3>
 
@@ -333,7 +334,7 @@ export function DocumentationForm({
               />
               <div className="flex-1">
                 <div className="flex items-center gap-2 font-semibold" style={{ color: COLORS.text.primary }}>
-                  <DollarSign className="w-4 h-4" />
+                  <IndianRupeeIcon className="w-4 h-4" />
                   Fixed Commission
                 </div>
                 <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
