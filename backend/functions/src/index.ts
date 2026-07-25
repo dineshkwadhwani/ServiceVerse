@@ -127,6 +127,10 @@ app.post('/auth/complete-phone-signin', async (req, res) => {
   phoneSignInHandlers.completePhoneSignIn(req, res);
 });
 
+app.post('/auth/check-phone', async (req, res) => {
+  phoneSignInHandlers.checkPhoneRegistered(req, res);
+});
+
 app.post('/auth/register-customer', async (req, res) => {
   authHandlers.registerCustomer(req, res);
 });

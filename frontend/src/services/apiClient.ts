@@ -76,6 +76,10 @@ class ApiClient {
     return this.axiosInstance.post('/auth/complete-phone-signin', { uid, phone });
   }
 
+  async checkPhoneRegistered(phone: string) {
+    return this.axiosInstance.post('/auth/check-phone', { phone });
+  }
+
   async registerPushToken(token: string) {
     return this.axiosInstance.post('/auth/register-push-token', { token });
   }

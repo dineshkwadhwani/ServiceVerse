@@ -120,3 +120,43 @@ export async function completePhoneSignIn(req: any, res: Response) {
     return sendError(res, new Error(message));
   }
 }
+
+/**
+ * Read-only check for whether a phone number belongs to a registered user.
+ * Called BEFORE Firebase phone OTP sign-in is triggered on the client, so an
+ * unregistered number can be routed to registration without ever creating a
+ * Firebase Auth account for it. Does not touch Firebase Auth or write any data.
+ */
+export async function checkPhoneRegistered(req: any, res: Response) {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return sendError(res, new ValidationError('Missing phone'));
+    }
+
+    logger.info('Checking phone registration', { phone });
+
+    const phoneToUserDoc = await db.collection('phoneToUser').doc(phone).get();
+    if (phoneToUserDoc.exists) {
+      return sendSuccess(res, { registered: true });
+    }
+
+    let userQuery = await db.collection('users').where('phone', '==', phone).limit(1).get();
+
+    if (userQuery.empty && !phone.startsWith('+91')) {
+      userQuery = await db.collection('users').where('phone', '==', `+91${phone}`).limit(1).get();
+    }
+
+    if (userQuery.empty && phone.startsWith('+91')) {
+      const phoneWithout91 = phone.substring(3);
+      userQuery = await db.collection('users').where('phone', '==', phoneWithout91).limit(1).get();
+    }
+
+    return sendSuccess(res, { registered: !userQuery.empty });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to check phone registration';
+    logger.error('Check phone registration error', { error: message });
+    return sendError(res, new Error(message));
+  }
+}

@@ -18,7 +18,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
   const { firebaseUser, loadUserProfile } = useAuthStore();
   const toast = useToast();
 
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [step, setStep] = useState<'phone' | 'otp' | 'not-registered'>('phone');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +42,15 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
 
     setIsLoading(true);
     try {
+      // Check registration BEFORE triggering Firebase phone auth — signInWithPhoneNumber
+      // itself creates a Firebase Auth account as soon as OTP is confirmed, so an
+      // unregistered number must never reach that call in the first place.
+      const checkResponse: any = await apiClient.checkPhoneRegistered(`+91${phone}`);
+      if (checkResponse?.data?.registered !== true) {
+        setStep('not-registered');
+        return;
+      }
+
       const recaptchaContainer = document.getElementById('login-recaptcha');
       if (recaptchaContainer) {
         recaptchaContainer.innerHTML = '';
@@ -60,6 +69,15 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGoToRegister = () => {
+    setRegistrationContext({ phone: `+91${phone}` });
+    onSwitchToRegister();
+  };
+
+  const handleCancelRegisterPrompt = () => {
+    setStep('phone');
   };
 
   const handleResendOTP = async () => {
@@ -149,8 +167,36 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
         </div>
 
         {/* Content */}
-        <form onSubmit={step === 'phone' ? handleSendOTP : handleVerifyOTP} className="p-6 space-y-4">
-          {step === 'phone' ? (
+        <form
+          onSubmit={
+            step === 'phone' ? handleSendOTP : step === 'otp' ? handleVerifyOTP : (e) => e.preventDefault()
+          }
+          className="p-6 space-y-4"
+        >
+          {step === 'not-registered' ? (
+            <>
+              <div className="text-center py-2">
+                <p className="text-gray-900 font-medium mb-1">This number isn't registered yet</p>
+                <p className="text-sm text-gray-600">Would you like to create an account?</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoToRegister}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+              >
+                Register
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCancelRegisterPrompt}
+                className="w-full text-gray-600 hover:text-gray-800 font-medium py-2 transition"
+              >
+                Cancel
+              </button>
+            </>
+          ) : step === 'phone' ? (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -226,16 +272,18 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
             </>
           )}
 
-          <div className="text-center text-sm text-gray-600">
-            Don't have an account?{' '}
-            <button
-              type="button"
-              onClick={onSwitchToRegister}
-              className="text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Register
-            </button>
-          </div>
+          {step !== 'not-registered' && (
+            <div className="text-center text-sm text-gray-600">
+              Don't have an account?{' '}
+              <button
+                type="button"
+                onClick={onSwitchToRegister}
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Register
+              </button>
+            </div>
+          )}
         </form>
 
         {/* Recaptcha container */}
