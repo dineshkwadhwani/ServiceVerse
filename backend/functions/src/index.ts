@@ -47,6 +47,8 @@ const defaultAllowedOrigins = [
   'http://localhost:3000',
   'https://serviceverse.vercel.app',
   'https://serviceverse-stage.vercel.app',
+  'https://www.theserviceverse.in',
+  'https://theserviceverse.in',
 ];
 
 const configuredAllowedOrigins = (process.env.CORS_ORIGIN || '')
