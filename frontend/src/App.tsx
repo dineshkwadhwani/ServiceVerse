@@ -1,3 +1,4 @@
+// trigger stage deploy
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { auth, initFCM } from '@/utils/firebase-config';
