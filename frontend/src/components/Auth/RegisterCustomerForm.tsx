@@ -7,7 +7,7 @@ import { auth } from '@/utils/firebase-config';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 import { useAuthStore } from '@/store/authStore';
-import { clearRegistrationContext } from '@/utils/sessionStorage';
+import { clearRegistrationContext, getRegistrationPhone } from '@/utils/sessionStorage';
 import { getAuthErrorMessage } from '@/utils/authErrors';
 import { OTPVerificationStep } from './OTPVerificationStep';
 
@@ -34,7 +34,7 @@ export function RegisterCustomerForm({ serviceId, serviceName }: Props) {
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
-    phone: '',
+    phone: getRegistrationPhone()?.replace('+91', '') || '',
     address: '',
     area: '',
     city: '',

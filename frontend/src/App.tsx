@@ -31,8 +31,8 @@ function AuthLoadingScreen() {
 }
 
 function ProtectedRoute() {
-  const { firebaseUser } = useAuthStore();
-  if (!firebaseUser) {
+  const { user } = useAuthStore();
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
   return <Outlet />;

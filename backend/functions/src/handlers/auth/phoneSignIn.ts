@@ -58,6 +58,7 @@ export async function completePhoneSignIn(req: any, res: Response) {
           phone,
           role,
           email,
+          registered: true,
           message: 'Phone sign-in completed successfully',
         });
       }
@@ -95,6 +96,7 @@ export async function completePhoneSignIn(req: any, res: Response) {
           uid,
           phone,
           role,
+          registered: true,
           message: 'Phone sign-in completed and custom claims set',
         });
       }
@@ -109,7 +111,8 @@ export async function completePhoneSignIn(req: any, res: Response) {
     return sendSuccess(res, {
       uid,
       phone,
-      message: 'Phone sign-in verified',
+      registered: false,
+      message: 'Phone number not registered',
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to complete phone sign-in';

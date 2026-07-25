@@ -12,6 +12,7 @@ const REGISTRATION_SESSION_KEY = 'serviceverse_registration_context';
 interface RegistrationContext {
   serviceId?: string;
   role?: 'SERVICE_PROVIDER' | 'CUSTOMER';
+  phone?: string;
   timestamp: number;
 }
 
@@ -70,6 +71,14 @@ export function getRegistrationServiceId(): string | null {
 export function getRegistrationRole(): 'SERVICE_PROVIDER' | 'CUSTOMER' | null {
   const context = getRegistrationContext();
   return context?.role || null;
+}
+
+/**
+ * Get phone number from session storage
+ */
+export function getRegistrationPhone(): string | null {
+  const context = getRegistrationContext();
+  return context?.phone || null;
 }
 
 /**

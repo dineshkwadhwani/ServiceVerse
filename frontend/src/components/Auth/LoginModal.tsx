@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { RecaptchaVerifier, signInWithPhoneNumber, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from '@/utils/firebase-config';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/store/notificationStore';
+import { apiClient } from '@/services/apiClient';
 import { getAuthErrorMessage } from '@/utils/authErrors';
+import { setRegistrationContext } from '@/utils/sessionStorage';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -101,17 +103,22 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
       await confirmationResult.confirm(otp);
 
       if (auth.currentUser) {
+        const fullPhone = `+91${phone}`;
+        let registered = false;
         try {
-          await fetch(`${import.meta.env.VITE_API_URL}/auth/complete-phone-signin`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              uid: auth.currentUser.uid,
-              phone: `+91${phone}`,
-            }),
-          });
+          const response: any = await apiClient.completePhoneSignIn(auth.currentUser.uid, fullPhone);
+          registered = response?.data?.registered === true;
         } catch (error) {
-          console.warn('Backend sync failed, continuing with login');
+          console.warn('Phone sign-in check failed, treating as unregistered', error);
+          registered = false;
+        }
+
+        if (!registered) {
+          await firebaseSignOut(auth);
+          setRegistrationContext({ phone: fullPhone });
+          toast.error("This number isn't registered yet. Let's get you set up.");
+          onSwitchToRegister();
+          return;
         }
 
         await loadUserProfile(auth.currentUser);

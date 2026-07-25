@@ -13,15 +13,15 @@ interface NavbarProps {
 
 export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
   const navigate = useNavigate();
-  const { user, firebaseUser, signOut } = useAuthStore();
+  const { user, signOut } = useAuthStore();
   const toast = useToast();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const { notifications, fetchNotifications } = useNotificationCenterStore();
 
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (!user) return;
     fetchNotifications();
-  }, [firebaseUser, fetchNotifications]);
+  }, [user, fetchNotifications]);
 
   const handleBellClick = () => {
     fetchNotifications();
@@ -66,7 +66,7 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
         {/* Right */}
         <div className="flex items-center gap-2 md:gap-4">
           {/* Sign In (when not authenticated) */}
-          {!firebaseUser && (
+          {!user && (
             <button
               onClick={onSignInClick}
               className="px-4 py-2 rounded-lg font-medium text-sm transition hover:opacity-80"
@@ -80,7 +80,7 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
           )}
 
           {/* Authenticated User Menu */}
-          {firebaseUser && (
+          {user && (
             <>
               {/* Notifications */}
               <button
