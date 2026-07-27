@@ -33,7 +33,7 @@ interface Props {
     deliveryDateTime?: string;
     specialInstructions: string;
     paymentMethod: 'ONLINE' | 'DIRECT';
-    deliveryType?: 'DROP' | 'PICKUP';
+    deliveryType?: 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY';
     selectedCoworker?: string;
   };
   spGstMandatory?: boolean;
@@ -44,7 +44,7 @@ interface Props {
     deliveryDateTime?: string;
     specialInstructions: string;
     paymentMethod: 'ONLINE' | 'DIRECT';
-    deliveryType: 'DROP' | 'PICKUP';
+    deliveryType: 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY';
     selectedCoworker: string;
     spId: string;
   }) => void;
@@ -84,9 +84,9 @@ export function OrderDetailsStep({
   const [specialInstructions, setSpecialInstructions] = useState(initialData?.specialInstructions || '');
   const [paymentMethod, setPaymentMethod] = useState<'ONLINE' | 'DIRECT'>(initialData?.paymentMethod || 'DIRECT');
 
-  // Pickup/Drop delivery type
-  const [deliveryType, setDeliveryType] = useState<'DROP' | 'PICKUP'>(
-    initialData?.deliveryType || (isCustomerCreating ? 'PICKUP' : 'DROP')
+  // Desired service: which legs of the order (pickup / delivery) the SP handles
+  const [deliveryType, setDeliveryType] = useState<'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY'>(
+    initialData?.deliveryType || 'PICKUP_AND_DELIVERY'
   );
   const [selectedCoworker, setSelectedCoworker] = useState('');
 
@@ -142,7 +142,7 @@ export function OrderDetailsStep({
     setDeliveryDateTime(initialData.deliveryDateTime || '');
     setSpecialInstructions(initialData.specialInstructions || '');
     setPaymentMethod(initialData.paymentMethod || 'DIRECT');
-    setDeliveryType(initialData.deliveryType || (isCustomerCreating ? 'PICKUP' : 'DROP'));
+    setDeliveryType(initialData.deliveryType || 'PICKUP_AND_DELIVERY');
     setSelectedCoworker(initialData.selectedCoworker || '');
   }, [initialData, isCustomerCreating]);
 
@@ -286,6 +286,22 @@ export function OrderDetailsStep({
     );
   };
 
+  const handleQtySet = (menuItemId: string, newQty: number) => {
+    setOrderItems(prev =>
+      prev.map(item => {
+        if (item.menuItemId === menuItemId) {
+          const qty = Math.max(0, Number.isFinite(newQty) ? newQty : 0);
+          return {
+            ...item,
+            qty,
+            itemTotal: qty * item.customPrice,
+          };
+        }
+        return item;
+      })
+    );
+  };
+
   const handleReview = () => {
     // Use localSelectedSpId if available (customer selected SP via search), otherwise use prop spId
     const effectiveSpId = localSelectedSpId || spId;
@@ -303,15 +319,15 @@ export function OrderDetailsStep({
       return;
     }
 
-    // Items aren't required when the customer creates the order, or when it's a pickup -
-    // the coworker/SP adds items once the goods are actually picked up.
+    // Items aren't required when the customer creates the order, or when the SP is
+    // handling pickup - the coworker/SP adds items once the goods are actually picked up.
     const selectedItems = orderItems.filter(item => item.qty > 0);
-    if (!isCustomerCreating && deliveryType !== 'PICKUP' && selectedItems.length === 0) {
+    if (!isCustomerCreating && deliveryType === 'DELIVERY_ONLY' && selectedItems.length === 0) {
       toast.error('Please select at least one item');
       return;
     }
 
-    if (!isCustomerCreating && deliveryType === 'PICKUP' && !selectedCoworker) {
+    if (!isCustomerCreating && deliveryType !== 'DELIVERY_ONLY' && !selectedCoworker) {
       toast.error('Please select a coworker for pickup');
       return;
     }
@@ -341,8 +357,8 @@ export function OrderDetailsStep({
   const isReviewDisabled =
     !customer ||
     !spId ||
-    (!isCustomerCreating && deliveryType !== 'PICKUP' && selectedItemsCount === 0) ||
-    (!isCustomerCreating && deliveryType === 'PICKUP' && !selectedCoworker);
+    (!isCustomerCreating && deliveryType === 'DELIVERY_ONLY' && selectedItemsCount === 0) ||
+    (!isCustomerCreating && deliveryType !== 'DELIVERY_ONLY' && !selectedCoworker);
 
   const handleCancel = () => {
     onCancel();
@@ -489,7 +505,7 @@ export function OrderDetailsStep({
       {!isLoadingMenu ? (
         <div className="space-y-4">
           <h3 className="font-semibold" style={{ color: COLORS.text.primary }}>
-            Select Items
+            Select Items (Optional)
           </h3>
 
           {/* Scrollable list with sticky footer */}
@@ -524,9 +540,18 @@ export function OrderDetailsStep({
                       <Minus className="w-4 h-4" style={{ color: COLORS.text.primary }} />
                     </button>
 
-                    <span className="w-8 text-center font-semibold text-sm" style={{ color: COLORS.text.primary }}>
-                      {item.qty}
-                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={item.qty}
+                      onChange={e => {
+                        const digitsOnly = e.target.value.replace(/\D/g, '');
+                        handleQtySet(item.menuItemId, digitsOnly === '' ? 0 : parseInt(digitsOnly, 10));
+                      }}
+                      className="w-10 text-center font-semibold text-sm bg-transparent border rounded focus:outline-none"
+                      style={{ color: COLORS.text.primary, borderColor: COLORS.border.light }}
+                    />
 
                     <button
                       onClick={() => handleQtyChange(item.menuItemId, 1)}
@@ -655,25 +680,31 @@ export function OrderDetailsStep({
 
           <div>
             <label className="text-sm font-semibold block mb-2" style={{ color: COLORS.text.secondary }}>
-              Delivery Type
+              Desired Service
             </label>
-            <div className="flex gap-4">
-              {(['DROP', 'PICKUP'] as const).map(type => (
-                <label key={type} className="flex items-center gap-2 cursor-pointer">
+            <div className="flex gap-4 flex-wrap">
+              {([
+                { value: 'PICKUP_AND_DELIVERY', label: 'Pickup and Delivery' },
+                { value: 'PICKUP_ONLY', label: 'Pickup Only' },
+                { value: 'DELIVERY_ONLY', label: 'Delivery Only' },
+              ] as const).map(option => (
+                <label key={option.value} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
                     name="deliveryType"
-                    value={type}
-                    checked={deliveryType === type}
-                    onChange={e => setDeliveryType(e.target.value as 'DROP' | 'PICKUP')}
+                    value={option.value}
+                    checked={deliveryType === option.value}
+                    onChange={e =>
+                      setDeliveryType(e.target.value as 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY')
+                    }
                   />
-                  <span style={{ color: COLORS.text.primary }}>{type === 'DROP' ? 'Delivery (Drop)' : 'Pickup'}</span>
+                  <span style={{ color: COLORS.text.primary }}>{option.label}</span>
                 </label>
               ))}
             </div>
           </div>
 
-          {deliveryType === 'PICKUP' && !isCustomerCreating && (
+          {deliveryType !== 'DELIVERY_ONLY' && !isCustomerCreating && (
             <div>
               <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>
                 Select Coworker for Pickup

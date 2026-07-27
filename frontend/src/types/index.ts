@@ -61,8 +61,10 @@ export interface Coworker extends BaseUser {
 export interface Customer extends BaseUser {
   role: 'CUSTOMER';
   address?: string;
+  area?: string;
   city?: string;
   pin?: string;
+  mapsLink?: string;
   status: 'ACTIVE' | 'INACTIVE';
   verified: boolean;
   verifiedMethod?: 'email' | 'phone';

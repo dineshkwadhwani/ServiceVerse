@@ -20,7 +20,7 @@ interface Props {
   deliveryDateTime?: string;
   specialInstructions: string;
   paymentMethod: 'ONLINE' | 'DIRECT';
-  deliveryType?: 'DROP' | 'PICKUP';
+  deliveryType?: 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY';
   selectedCoworker?: string;
   spGstPercent?: number;
   spGstMandatory?: boolean;
@@ -37,7 +37,7 @@ export function OrderReviewStep({
   deliveryDateTime,
   specialInstructions,
   paymentMethod,
-  deliveryType = 'DROP',
+  deliveryType = 'PICKUP_AND_DELIVERY',
   selectedCoworker = '',
   spGstPercent = 0,
   spGstMandatory = false,
@@ -147,12 +147,16 @@ export function OrderReviewStep({
             </div>
           )}
           <div className="flex justify-between">
-            <span style={{ color: COLORS.text.secondary }}>Delivery Type</span>
+            <span style={{ color: COLORS.text.secondary }}>Desired Service</span>
             <span className="font-semibold" style={{ color: COLORS.text.primary }}>
-              {deliveryType === 'DROP' ? 'Delivery (Drop)' : 'Pickup'}
+              {deliveryType === 'PICKUP_ONLY'
+                ? 'Pickup Only'
+                : deliveryType === 'DELIVERY_ONLY'
+                ? 'Delivery Only'
+                : 'Pickup and Delivery'}
             </span>
           </div>
-          {deliveryType === 'PICKUP' && (
+          {deliveryType !== 'DELIVERY_ONLY' && (
             <div className="flex justify-between">
               <span style={{ color: COLORS.text.secondary }}>Coworker</span>
               <span className="font-semibold" style={{ color: COLORS.text.primary }}>

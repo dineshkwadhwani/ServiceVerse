@@ -62,7 +62,7 @@ interface CreateOrderRequest {
   deliveryDateTime?: string;
   specialInstructions?: string;
   paymentMethod: 'ONLINE' | 'DIRECT';
-  deliveryType: 'DROP' | 'PICKUP';
+  deliveryType: 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY';
   selectedCoworker?: string;
   items: OrderItem[];
   subtotal: number;
@@ -85,7 +85,7 @@ export const createOrder = async (req: Request, res: Response) => {
     // Validation
     // Items aren't required when the customer creates the order, or when it's a pickup -
     // the coworker/SP adds items once the goods are actually picked up.
-    const itemsRequired = createdByRole !== 'CUSTOMER' && data.deliveryType !== 'PICKUP';
+    const itemsRequired = createdByRole !== 'CUSTOMER' && data.deliveryType === 'DELIVERY_ONLY';
     if (!data.spId || !data.customerId || !data.customerPhone || !data.items || (itemsRequired && data.items.length === 0)) {
       return res.status(400).json({
         success: false,
@@ -346,6 +346,22 @@ export const updateOrderLifecycle = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, error: `${role} cannot set status ${status}` });
     }
 
+    // No-op re-save: same status (and, where relevant, the same coworker/payment
+    // proof) as what's already stored. Skip the write and notifications entirely
+    // so re-saving an unchanged status doesn't re-send emails to the customer.
+    const statusUnchanged = orderData.status === status;
+    const coworkerUnchanged =
+      status !== 'ASSIGNED_FOR_PICKUP' || selectedCoworker === orderData.selectedCoworker;
+    const paymentProofUnchanged =
+      status !== 'PAID' || !paymentProofUrl || paymentProofUrl === orderData.paymentProofUrl;
+
+    if (statusUnchanged && coworkerUnchanged && paymentProofUnchanged) {
+      return res.status(200).json({
+        success: true,
+        data: { orderId, status, unchanged: true },
+      });
+    }
+
     // Lifecycle constraints
     if (status === 'CONFIRMED' && role === 'CUSTOMER') {
       const creatorRole = orderData.createdByRole || orderData.createdBy || '';
@@ -522,7 +538,11 @@ export const updateOrderDetails = async (req: Request, res: Response) => {
       updateData.specialInstructions = specialInstructions;
     }
 
-    if (deliveryType === 'DROP' || deliveryType === 'PICKUP') {
+    if (
+      deliveryType === 'PICKUP_AND_DELIVERY' ||
+      deliveryType === 'PICKUP_ONLY' ||
+      deliveryType === 'DELIVERY_ONLY'
+    ) {
       updateData.deliveryType = deliveryType;
     }
 

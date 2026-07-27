@@ -8,7 +8,7 @@ interface Order {
   customerId: string;
   customerName: string;
   status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED' | 'COMPLETED' | 'PAID' | 'ASSIGNED_FOR_PICKUP' | 'READY_FOR_DELIVERY';
-  deliveryType?: 'DROP' | 'PICKUP';
+  deliveryType?: 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY';
   totalAmount: number;
   createdAt: Date;
   items: Array<{ name: string; quantity: number; price: number }>;

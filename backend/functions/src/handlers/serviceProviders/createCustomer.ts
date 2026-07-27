@@ -4,6 +4,7 @@ import { ValidationError, sendError, sendSuccess } from '@/middleware/errorHandl
 import type { AuthRequest } from '@/middleware/auth';
 import type { Response } from 'express';
 import { resolveSpId } from '@/utils/spContext';
+import { sendNotificationByEvent } from '@/utils/notificationCenter';
 
 const logger = new Logger('CreateCustomerHandler');
 
@@ -115,11 +116,11 @@ export async function searchCustomerByPhone(req: AuthRequest, res: Response) {
 
 /**
  * Step 2a: Create new customer and associate with SP
- * SP sends: phone, name, address, email (optional)
+ * SP sends: phone, name, address, city, pin, email (optional)
  */
 export async function createNewCustomerWithAssociation(req: AuthRequest, res: Response) {
   try {
-    const { phone, name, address, email } = req.body;
+    const { phone, name, address, city, pin, email } = req.body;
 
     // Validation
     if (!phone || !validatePhoneNumber(phone)) {
@@ -132,6 +133,14 @@ export async function createNewCustomerWithAssociation(req: AuthRequest, res: Re
 
     if (!address || address.trim().length === 0) {
       return sendError(res, new ValidationError('Customer address is required'));
+    }
+
+    if (!city || city.trim().length === 0) {
+      return sendError(res, new ValidationError('Customer city is required'));
+    }
+
+    if (!pin || !/^\d{6}$/.test(pin.trim())) {
+      return sendError(res, new ValidationError('A valid 6-digit customer PIN code is required'));
     }
 
     const spId = resolveSpId(req.user);
@@ -181,6 +190,8 @@ export async function createNewCustomerWithAssociation(req: AuthRequest, res: Re
       phone,
       name,
       address,
+      city,
+      pin,
       email: email || '',
       role: 'CUSTOMER',
       status: 'ACTIVE',
@@ -218,11 +229,15 @@ export async function createNewCustomerWithAssociation(req: AuthRequest, res: Re
       status: 'ASSOCIATED',
     });
 
-    // TODO: Send welcome email via Resend
-    logger.info('Welcome email should be sent', {
-      customerId: authUser.uid,
-      email: email || phone,
-    });
+    if (email) {
+      await sendNotificationByEvent('ACCOUNT_CREATED', {
+        userId: authUser.uid,
+        name,
+        email,
+        role: 'CUSTOMER',
+      });
+      logger.info('Welcome email sent', { customerId: authUser.uid, email });
+    }
 
     return sendSuccess(
       res,
@@ -231,6 +246,8 @@ export async function createNewCustomerWithAssociation(req: AuthRequest, res: Re
         phone,
         name,
         address,
+        city,
+        pin,
         email,
         status: 'ASSOCIATED',
         message: 'Customer created and associated successfully',

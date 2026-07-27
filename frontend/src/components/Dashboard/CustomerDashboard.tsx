@@ -215,6 +215,7 @@ export function CustomerDashboard() {
           area={customerData?.area || ''}
           city={customerData?.city || ''}
           pin={customerData?.pin || ''}
+          mapsLink={customerData?.mapsLink || ''}
           photoUrl={customerData?.photoUrl || ''}
           onClose={() => setShowProfileModal(false)}
           onComplete={() => loadCustomerProfile()}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Loader2, Mail, User, MapPin, Phone } from 'lucide-react';
+import { X, Loader2, Mail, User, MapPin, Phone, Link as LinkIcon } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
@@ -14,6 +14,7 @@ interface Props {
   area?: string;
   city?: string;
   pin?: string;
+  mapsLink?: string;
   photoUrl?: string;
   onClose: () => void;
   onComplete?: () => void;
@@ -26,6 +27,7 @@ interface FormData {
   area: string;
   city: string;
   pin: string;
+  mapsLink: string;
   photoUrl: string;
 }
 
@@ -38,6 +40,7 @@ export function CustomerProfileEditModal({
   area = '',
   city = '',
   pin = '',
+  mapsLink = '',
   photoUrl = '',
   onClose,
   onComplete,
@@ -51,6 +54,7 @@ export function CustomerProfileEditModal({
     area: area || '',
     city: city || '',
     pin: pin || '',
+    mapsLink: mapsLink || '',
     photoUrl: photoUrl || '',
   });
 
@@ -73,6 +77,10 @@ export function CustomerProfileEditModal({
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       toast.error('Please enter a valid email address');
+      return false;
+    }
+    if (formData.mapsLink.trim() && !/^https?:\/\/(www\.)?(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(formData.mapsLink.trim())) {
+      toast.error('Please enter a valid Google Maps link');
       return false;
     }
     return true;
@@ -279,6 +287,41 @@ export function CustomerProfileEditModal({
               onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.info)}
               onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
             />
+          </div>
+
+          {/* Google Maps location link */}
+          <div>
+            <label className="flex items-center gap-2 font-semibold mb-2" style={{ color: COLORS.text.primary }}>
+              <LinkIcon className="w-4 h-4" />
+              Google Maps Location (Optional)
+            </label>
+            <input
+              type="url"
+              name="mapsLink"
+              value={formData.mapsLink}
+              onChange={handleInputChange}
+              disabled={isSaving}
+              placeholder="Paste a Google Maps share link"
+              className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition disabled:opacity-50"
+              style={{
+                backgroundColor: COLORS.bg.primary,
+                borderColor: COLORS.border.light,
+                color: COLORS.text.primary,
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.info)}
+              onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
+            />
+            {formData.mapsLink.trim() && (
+              <a
+                href={formData.mapsLink.trim()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs mt-1 inline-block underline"
+                style={{ color: COLORS.semantic.info }}
+              >
+                Open in Google Maps
+              </a>
+            )}
           </div>
         </div>
 

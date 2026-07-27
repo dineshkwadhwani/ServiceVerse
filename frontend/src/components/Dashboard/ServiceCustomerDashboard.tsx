@@ -54,6 +54,7 @@ export function ServiceCustomerDashboard() {
 
   const [service, setService] = useState<Service | null>(null);
   const [spsInPinCode, setSPsInPinCode] = useState<SPInfo[]>([]);
+  const [associatedSpId, setAssociatedSpId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [customerData, setCustomerData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -99,7 +100,8 @@ export function ServiceCustomerDashboard() {
               try {
                 const spProvidersResponse = await apiClient.getCustomerServiceProviders(serviceId);
                 const spIds = spProvidersResponse.data?.providers || [];
-                const associatedSpId = spProvidersResponse.data?.associatedSpId || null;
+                const currentAssociatedSpId = spProvidersResponse.data?.associatedSpId || null;
+                setAssociatedSpId(currentAssociatedSpId);
 
                 for (const provider of spIds) {
                   try {
@@ -107,9 +109,12 @@ export function ServiceCustomerDashboard() {
                     const spDoc = await getDoc(spDocRef);
                     if (spDoc.exists()) {
                       const spData = spDoc.data();
-                      const isAssociated = provider.spId === associatedSpId;
-                      const matchesPinCode = Boolean(pinCode) && spData?.pin === pinCode;
-                      if (isAssociated || matchesPinCode) {
+                      // Once associated with an SP, only that SP should ever show -
+                      // customers must not be able to switch providers themselves
+                      const shouldInclude = currentAssociatedSpId
+                        ? provider.spId === currentAssociatedSpId
+                        : Boolean(pinCode) && spData?.pin === pinCode;
+                      if (shouldInclude) {
                         spDetails.push({
                           spId: spDoc.id,
                           businessName: spData.businessName || spData.name || 'Service Provider',
@@ -273,46 +278,50 @@ export function ServiceCustomerDashboard() {
           </h1>
         </div>
 
-        {/* Search - finds providers by name across all PIN codes */}
-        <form onSubmit={handleSearch} className="mb-4 flex gap-2">
-          <div className="relative flex-1">
-            <Search
-              className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2"
-              style={{ color: COLORS.text.secondary }}
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search any service provider by name (any PIN code)"
-              className="w-full pl-9 pr-9 py-2 rounded-lg border text-sm focus:outline-none"
-              style={{
-                backgroundColor: COLORS.bg.surface,
-                borderColor: COLORS.border.light,
-                color: COLORS.text.primary,
-              }}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={handleClearSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
+        {/* Search - finds providers by name across all PIN codes.
+            Hidden once the customer is already associated with a provider -
+            they should not be able to switch providers themselves. */}
+        {!associatedSpId && (
+          <form onSubmit={handleSearch} className="mb-4 flex gap-2">
+            <div className="relative flex-1">
+              <Search
+                className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2"
                 style={{ color: COLORS.text.secondary }}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-          <button
-            type="submit"
-            disabled={isSearching}
-            className="px-4 py-2 rounded-lg font-semibold text-white transition hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-            style={{ backgroundColor: COLORS.semantic.info }}
-          >
-            {isSearching && <Loader2 className="w-4 h-4 animate-spin" />}
-            Search
-          </button>
-        </form>
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search any service provider by name (any PIN code)"
+                className="w-full pl-9 pr-9 py-2 rounded-lg border text-sm focus:outline-none"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  borderColor: COLORS.border.light,
+                  color: COLORS.text.primary,
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  style={{ color: COLORS.text.secondary }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={isSearching}
+              className="px-4 py-2 rounded-lg font-semibold text-white transition hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+              style={{ backgroundColor: COLORS.semantic.info }}
+            >
+              {isSearching && <Loader2 className="w-4 h-4 animate-spin" />}
+              Search
+            </button>
+          </form>
+        )}
 
         {/* Service Providers List */}
         <div className="mb-8 space-y-3">
@@ -593,6 +602,7 @@ export function ServiceCustomerDashboard() {
           area={customerData?.area || ''}
           city={customerData?.city || ''}
           pin={customerData?.pin || ''}
+          mapsLink={customerData?.mapsLink || ''}
           photoUrl={customerData?.photoUrl || ''}
           onClose={() => setShowProfileModal(false)}
           onComplete={() => {

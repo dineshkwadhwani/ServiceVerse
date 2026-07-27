@@ -46,7 +46,7 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
     deliveryDateTime?: string;
     specialInstructions: string;
     paymentMethod: 'ONLINE' | 'DIRECT';
-    deliveryType: 'DROP' | 'PICKUP';
+    deliveryType: 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY';
     selectedCoworker: string;
     spId: string;
   } | null>(null);
@@ -134,7 +134,7 @@ export function CreateOrderModal({ spId, spBusinessName, serviceId, isCustomerCr
           deliveryDateTime: undefined,
           specialInstructions: '',
           paymentMethod: 'DIRECT',
-          deliveryType: 'DROP',
+          deliveryType: 'PICKUP_AND_DELIVERY',
           selectedCoworker: '',
           spId: '',
         });

@@ -40,6 +40,17 @@ interface Props {
 const SP_STATUSES = ['CONFIRMED', 'ASSIGNED_FOR_PICKUP', 'READY_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'];
 const COWORKER_STATUSES = ['CONFIRMED', 'READY_FOR_DELIVERY', 'DELIVERED'];
 
+type DeliveryType = 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY';
+
+// Older orders stored the legacy 2-value field ('DROP'/'PICKUP') - map them onto
+// the closest new 3-value equivalent instead of losing/misreading that data.
+function normalizeDeliveryType(value?: string): DeliveryType {
+  if (value === 'DROP') return 'DELIVERY_ONLY';
+  if (value === 'PICKUP') return 'PICKUP_AND_DELIVERY';
+  if (value === 'PICKUP_ONLY' || value === 'DELIVERY_ONLY' || value === 'PICKUP_AND_DELIVERY') return value;
+  return 'PICKUP_AND_DELIVERY';
+}
+
 export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSaved }: Props) {
   const toast = useToast();
   const { user, firebaseUser } = useAuthStore();
@@ -49,7 +60,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   const [status, setStatus] = useState(order.status);
   const [selectedCoworker, setSelectedCoworker] = useState(order.selectedCoworker || '');
   const [paymentMethod, setPaymentMethod] = useState<'ONLINE' | 'DIRECT'>(order.paymentMethod || 'DIRECT');
-  const [deliveryType, setDeliveryType] = useState<'DROP' | 'PICKUP'>((order.deliveryType as 'DROP' | 'PICKUP') || 'DROP');
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>(normalizeDeliveryType(order.deliveryType));
   const [specialInstructions, setSpecialInstructions] = useState(order.specialInstructions || '');
   const [editableItems, setEditableItems] = useState<Array<any>>(order.items || []);
   const [isLoadingMenu, setIsLoadingMenu] = useState(false);
@@ -73,7 +84,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
         setStatus(fullOrder?.status || order.status);
         setSelectedCoworker(fullOrder?.selectedCoworker || '');
         setPaymentMethod((fullOrder?.paymentMethod || 'DIRECT') as 'ONLINE' | 'DIRECT');
-        setDeliveryType((fullOrder?.deliveryType || 'DROP') as 'DROP' | 'PICKUP');
+        setDeliveryType(normalizeDeliveryType(fullOrder?.deliveryType));
         setSpecialInstructions(fullOrder?.specialInstructions || '');
         setEditableItems(fullOrder?.items || []);
 
@@ -562,19 +573,20 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
               </div>
 
               <div>
-                <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>Delivery Type</label>
+                <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>Desired Service</label>
                 <select
                   value={deliveryType}
-                  onChange={(e) => setDeliveryType(e.target.value as 'DROP' | 'PICKUP')}
+                  onChange={(e) => setDeliveryType(e.target.value as DeliveryType)}
                   className="w-full px-3 py-2 rounded-lg border"
                   style={{ borderColor: COLORS.border.light, backgroundColor: COLORS.bg.surface, color: COLORS.text.primary }}
                 >
-                  <option value="DROP">DROP</option>
-                  <option value="PICKUP">PICKUP</option>
+                  <option value="PICKUP_AND_DELIVERY">Pickup and Delivery</option>
+                  <option value="PICKUP_ONLY">Pickup Only</option>
+                  <option value="DELIVERY_ONLY">Delivery Only</option>
                 </select>
               </div>
 
-              {deliveryType === 'PICKUP' && role === 'SERVICE_PROVIDER' && (
+              {deliveryType !== 'DELIVERY_ONLY' && role === 'SERVICE_PROVIDER' && (
                 <div>
                   <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>Assign Pickup</label>
                   <select

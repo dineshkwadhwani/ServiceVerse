@@ -130,7 +130,7 @@ class ApiClient {
     return this.axiosInstance.post('/service-providers/customers/search-phone', { phone });
   }
 
-  async createNewCustomerWithAssociation(data: { phone: string; name: string; address: string; email?: string }) {
+  async createNewCustomerWithAssociation(data: { phone: string; name: string; address: string; city: string; pin: string; email?: string }) {
     return this.axiosInstance.post('/service-providers/customers/create-new', data);
   }
 

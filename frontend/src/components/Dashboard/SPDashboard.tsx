@@ -27,13 +27,22 @@ interface Order {
   customerName: string;
   customerPhotoUrl?: string;
   status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED' | 'COMPLETED' | 'PAID' | 'ASSIGNED_FOR_PICKUP' | 'READY_FOR_DELIVERY';
-  deliveryType?: 'DROP' | 'PICKUP';
+  deliveryType?: 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY';
   spId?: string;
   selectedCoworker?: string;
   selectedCoworkerPhotoUrl?: string;
   totalAmount: number;
   createdAt: Date;
   items: Array<{ name: string; quantity: number; price: number }>;
+}
+
+// Older orders stored the legacy 2-value field ('DROP'/'PICKUP') - map them onto
+// the closest new 3-value equivalent instead of losing/misreading that data.
+function normalizeDeliveryType(value?: string): 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY' {
+  if (value === 'DROP') return 'DELIVERY_ONLY';
+  if (value === 'PICKUP') return 'PICKUP_AND_DELIVERY';
+  if (value === 'PICKUP_ONLY' || value === 'DELIVERY_ONLY' || value === 'PICKUP_AND_DELIVERY') return value;
+  return 'PICKUP_AND_DELIVERY';
 }
 
 interface SPStats {
@@ -98,7 +107,7 @@ async function fetchSPDashboardData(uid: string, forceRefresh = false): Promise<
       customerName: order.customerName || 'Unknown',
       customerPhotoUrl: order.customerPhotoUrl || '',
       status: order.status || 'NEW',
-      deliveryType: order.deliveryType || 'DROP',
+      deliveryType: normalizeDeliveryType(order.deliveryType),
       spId: order.spId || uid,
       selectedCoworker: order.selectedCoworker || '',
       selectedCoworkerPhotoUrl: order.selectedCoworkerPhotoUrl || '',
@@ -284,7 +293,7 @@ export function SPDashboard() {
         customerName: order.customerName || 'Unknown',
         customerPhotoUrl: order.customerPhotoUrl || '',
         status: order.status || 'NEW',
-        deliveryType: order.deliveryType || 'DROP',
+        deliveryType: normalizeDeliveryType(order.deliveryType),
         spId: order.spId || effectiveSpId,
         selectedCoworker: order.selectedCoworker || '',
         selectedCoworkerPhotoUrl: order.selectedCoworkerPhotoUrl || '',
@@ -439,7 +448,7 @@ export function SPDashboard() {
     .filter((order) => {
       const assignedTo = normalizeAssigneeName(order.selectedCoworker || '');
       const statusValue = String(order.status || '').toUpperCase();
-      const isPickupOrder = order.deliveryType === 'PICKUP' || statusValue === 'ASSIGNED_FOR_PICKUP';
+      const isPickupOrder = order.deliveryType !== 'DELIVERY_ONLY' || statusValue === 'ASSIGNED_FOR_PICKUP';
       return isPickupOrder && assignedTo !== '' && spSelfNamesSet.has(assignedTo);
     })
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

@@ -27,6 +27,8 @@ interface FormData {
   phone: string;
   name: string;
   address: string;
+  city: string;
+  pin: string;
   email: string;
 }
 
@@ -40,6 +42,8 @@ export function CreateCustomerModal({ initialPhone, onClose, onCustomerCreated }
     phone: '',
     name: '',
     address: '',
+    city: '',
+    pin: '',
     email: '',
   });
   const [isCreating, setIsCreating] = useState(false);
@@ -58,7 +62,7 @@ export function CreateCustomerModal({ initialPhone, onClose, onCustomerCreated }
       setSearchResult(result?.data);
 
       if (result?.data?.status === 'NOT_EXISTS') {
-        setFormData({ phone: phoneToSearch, name: '', address: '', email: '' });
+        setFormData({ phone: phoneToSearch, name: '', address: '', city: '', pin: '', email: '' });
         setStep('details');
       } else if (result?.data?.status === 'EXISTS_ORPHANED') {
         setStep('details');
@@ -86,6 +90,16 @@ export function CreateCustomerModal({ initialPhone, onClose, onCustomerCreated }
   const handleCreateNewCustomer = async () => {
     if (!formData.name?.trim() || !formData.address?.trim()) {
       setError('Name and address are required');
+      return;
+    }
+
+    if (!formData.city?.trim()) {
+      setError('City is required');
+      return;
+    }
+
+    if (!/^\d{6}$/.test(formData.pin?.trim())) {
+      setError('A valid 6-digit PIN code is required');
       return;
     }
 
@@ -264,6 +278,59 @@ export function CreateCustomerModal({ initialPhone, onClose, onCustomerCreated }
                     />
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label
+                        className="block text-sm font-medium mb-2"
+                        style={{ color: COLORS.text.secondary }}
+                      >
+                        City *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.city}
+                        onChange={(e) => {
+                          setFormData({ ...formData, city: e.target.value });
+                          setError('');
+                        }}
+                        placeholder="City"
+                        className="w-full px-4 py-2 rounded-lg border focus:outline-none"
+                        style={{
+                          borderColor: COLORS.border.light,
+                          backgroundColor: COLORS.bg.primary,
+                          color: COLORS.text.primary,
+                        }}
+                        disabled={isCreating}
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        className="block text-sm font-medium mb-2"
+                        style={{ color: COLORS.text.secondary }}
+                      >
+                        PIN Code *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.pin}
+                        onChange={(e) => {
+                          setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '').slice(0, 6) });
+                          setError('');
+                        }}
+                        placeholder="PIN code"
+                        maxLength={6}
+                        className="w-full px-4 py-2 rounded-lg border focus:outline-none"
+                        style={{
+                          borderColor: COLORS.border.light,
+                          backgroundColor: COLORS.bg.primary,
+                          color: COLORS.text.primary,
+                        }}
+                        disabled={isCreating}
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label
                       className="block text-sm font-medium mb-2"
@@ -340,7 +407,7 @@ export function CreateCustomerModal({ initialPhone, onClose, onCustomerCreated }
                     setStep('search');
                     setPhone('');
                     setSearchResult(null);
-                    setFormData({ phone: '', name: '', address: '', email: '' });
+                    setFormData({ phone: '', name: '', address: '', city: '', pin: '', email: '' });
                     setError('');
                   }}
                   className="flex-1 px-4 py-2 rounded-lg font-semibold transition"

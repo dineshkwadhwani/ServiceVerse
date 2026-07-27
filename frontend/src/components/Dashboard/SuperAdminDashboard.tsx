@@ -14,6 +14,7 @@ import {
 import { COLORS } from '@/utils/theme';
 import { IndianRupeeIcon } from '@/components/Shared/IndianRupeeIcon';
 import { EditUserModal } from './EditUserModal';
+import { SPOnboardingStepper } from '@/components/Onboarding/SPOnboardingStepper';
 import { CreateServiceModal } from '@/components/SuperAdmin/CreateServiceModal';
 import { ApprovalsTab } from '@/components/SuperAdmin/ApprovalsTab';
 import { SuperAdminProfileEditModal } from '@/components/Dashboard/SuperAdminProfileEditModal';
@@ -169,6 +170,8 @@ export function SuperAdminDashboard() {
   const [services, setServices] = useState<ServiceListItem[]>([]);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [onboardingSP, setOnboardingSP] = useState<any | null>(null);
+  const [isLoadingSPProfile, setIsLoadingSPProfile] = useState(false);
   const [editingService, setEditingService] = useState<ServiceListItem | null>(null);
   const [newUserForm, setNewUserForm] = useState({
     name: '',
@@ -253,6 +256,28 @@ export function SuperAdminDashboard() {
       setServices(data);
     } catch (error: any) {
       toast.error('Failed to load services');
+    }
+  };
+
+  // Service Providers get the same 5-step onboarding/edit stepper AMs use,
+  // instead of the flat EditUserModal fields - editing an SP means editing
+  // business info, operations, documentation, commission and menu, not just
+  // name/email/phone.
+  const handleEditUser = async (u: User) => {
+    if (u.role !== 'SERVICE_PROVIDER') {
+      setEditingUser(u);
+      return;
+    }
+
+    setIsLoadingSPProfile(true);
+    try {
+      const profileResponse = await apiClient.getSPProfile(u.id);
+      const profileData = profileResponse.data?.data || profileResponse.data;
+      setOnboardingSP({ uid: u.id, ...profileData });
+    } catch (error: any) {
+      toast.error('Failed to load SP profile');
+    } finally {
+      setIsLoadingSPProfile(false);
     }
   };
 
@@ -470,12 +495,17 @@ export function SuperAdminDashboard() {
                       </div>
                     </div>
                     <button
-                      onClick={() => setEditingUser(u)}
-                      className="flex-shrink-0 p-2 rounded-lg transition hover:opacity-80"
+                      onClick={() => handleEditUser(u)}
+                      disabled={isLoadingSPProfile}
+                      className="flex-shrink-0 p-2 rounded-lg transition hover:opacity-80 disabled:opacity-50"
                       style={{ color: COLORS.semantic.info }}
                       title="Edit user"
                     >
-                      <Edit2 className="w-5 h-5" />
+                      {isLoadingSPProfile && u.role === 'SERVICE_PROVIDER' ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Edit2 className="w-5 h-5" />
+                      )}
                     </button>
                   </div>
                 ))}
@@ -619,6 +649,39 @@ export function SuperAdminDashboard() {
           loadDashboardData(true);
         }}
       />
+
+      {/* SP Onboarding/Edit Stepper - same 5-step flow the Account Manager uses */}
+      {onboardingSP && (() => {
+        const serviceId = onboardingSP.service?.serviceId || '';
+        const customMenusObj = onboardingSP.customMenus;
+        const currentServiceMenus = customMenusObj?.[serviceId] || [];
+
+        return (
+          <SPOnboardingStepper
+            spId={onboardingSP.uid}
+            spPhone={onboardingSP.phone}
+            spEmail={onboardingSP.email}
+            spBusinessName={onboardingSP.businessName}
+            spOwnerName={onboardingSP.ownerName}
+            spAddress={onboardingSP.address}
+            spArea={onboardingSP.area}
+            spCity={onboardingSP.city}
+            spPin={onboardingSP.pin}
+            serviceId={serviceId}
+            existingLogoUrl={onboardingSP.basicInfo?.logoUrl || onboardingSP.businessLogo || ''}
+            existingOperations={onboardingSP.operations}
+            existingDocumentation={onboardingSP.documentation}
+            existingCommission={onboardingSP.commission}
+            existingMenus={currentServiceMenus}
+            onComplete={() => {
+              setOnboardingSP(null);
+              loadUsers(true);
+              loadDashboardData(true);
+            }}
+            onCancel={() => setOnboardingSP(null)}
+          />
+        );
+      })()}
 
       {/* Edit Service Modal */}
       {editingService && (
