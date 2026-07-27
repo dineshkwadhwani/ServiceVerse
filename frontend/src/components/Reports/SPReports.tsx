@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Search } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
+import { formatDateTime } from '@/utils/formatters';
 
 interface Order {
   orderId: string;
@@ -317,7 +318,7 @@ export function SPReportPage({ reportType, orders, earnings, customers, stats, o
                     {order.customerName}
                   </p>
                   <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
-                    Order Date: {order.createdAt.toLocaleDateString()}
+                    Order Date: {formatDateTime(order.createdAt)}
                   </p>
                   <div className="mt-3 pt-3 border-t" style={{ borderColor: COLORS.border.light }}>
                     <p className="text-xs" style={{ color: COLORS.text.secondary }}>

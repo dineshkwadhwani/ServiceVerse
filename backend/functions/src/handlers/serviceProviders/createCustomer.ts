@@ -203,8 +203,10 @@ export async function createNewCustomerWithAssociation(req: AuthRequest, res: Re
 
     await assocRef.set({
       spId,
+      serviceId,
       status: 'ASSOCIATED',
       associationType: 'CREATED_BY_SP',
+      isActive: true,
       createdAt: new Date(),
       createdBySP: spId,
     });
@@ -311,8 +313,10 @@ export async function associateExistingCustomer(req: AuthRequest, res: Response)
 
     await assocRef.set({
       spId,
+      serviceId,
       status: 'ASSOCIATED',
       associationType: 'ASSOCIATED_BY_SP',
+      isActive: true,
       createdAt: new Date(),
       associatedBySP: spId,
     });

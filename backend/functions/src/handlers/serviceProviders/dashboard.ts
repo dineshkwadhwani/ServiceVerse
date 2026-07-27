@@ -263,7 +263,7 @@ export async function getSPCustomers(req: AuthRequest, res: Response) {
         email: doc.data()?.email,
         phone: doc.data()?.phone,
         verified: doc.data()?.verified,
-        addedAt: doc.data()?.createdAt,
+        addedAt: toDate(doc.data()?.createdAt),
       }));
 
     logger.info('SP customers fetched', { spId, count: customers.length });

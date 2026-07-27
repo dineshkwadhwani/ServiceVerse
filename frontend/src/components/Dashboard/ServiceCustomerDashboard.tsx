@@ -14,6 +14,7 @@ import { OrderLifecycleModal } from '@/components/Orders/OrderLifecycleModal';
 import { InvoiceModal } from '@/components/Orders/InvoiceModal';
 import { CustomerProfileEditModal } from '@/components/Dashboard/CustomerProfileEditModal';
 import { COLORS } from '@/utils/theme';
+import { formatDateTime } from '@/utils/formatters';
 import { getDoc, doc } from 'firebase/firestore';
 import { db } from '@/utils/firebase-config';
 import type { Service } from '@/types';
@@ -89,23 +90,26 @@ export function ServiceCustomerDashboard() {
             setCustomerData(customerDocData);
             const pinCode = customerDocData?.pin || '';
 
-            // Fetch all SPs with same PIN code who provide this service
-            if (pinCode && serviceId) {
+            // Fetch SPs providing this service: always include the customer's
+            // directly-associated provider (e.g. one who created this customer),
+            // plus any others in the same PIN code
+            if (serviceId) {
               const spDetails: SPInfo[] = [];
 
               try {
                 const spProvidersResponse = await apiClient.getCustomerServiceProviders(serviceId);
                 const spIds = spProvidersResponse.data?.providers || [];
+                const associatedSpId = spProvidersResponse.data?.associatedSpId || null;
 
-                // Fetch full details for each SP and filter by pin code
                 for (const provider of spIds) {
                   try {
                     const spDocRef = doc(db, 'users', provider.spId);
                     const spDoc = await getDoc(spDocRef);
                     if (spDoc.exists()) {
                       const spData = spDoc.data();
-                      // Only include SPs from the same PIN code
-                      if (spData?.pin === pinCode) {
+                      const isAssociated = provider.spId === associatedSpId;
+                      const matchesPinCode = Boolean(pinCode) && spData?.pin === pinCode;
+                      if (isAssociated || matchesPinCode) {
                         spDetails.push({
                           spId: spDoc.id,
                           businessName: spData.businessName || spData.name || 'Service Provider',
@@ -471,7 +475,7 @@ export function ServiceCustomerDashboard() {
                             className="text-xs mt-1"
                             style={{ color: COLORS.text.secondary }}
                           >
-                            Order Date: {new Date(order.createdAt).toLocaleDateString()}
+                            Order Date: {formatDateTime(order.createdAt)}
                           </p>
                           {order.selectedCoworker && (
                             <p

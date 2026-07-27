@@ -1,7 +1,9 @@
 // trigger stage deploy
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { auth, initFCM } from '@/utils/firebase-config';
+import { registerNativePush } from '@/utils/nativePush';
 import { useAuthStore } from '@/store/authStore';
 import { useNotificationStore } from '@/store/notificationStore';
 import { USER_ROLES } from '@/utils/constants';
@@ -88,7 +90,7 @@ export function App() {
 
     const registerDeviceToken = async () => {
       try {
-        const token = await initFCM();
+        const token = Capacitor.isNativePlatform() ? await registerNativePush() : await initFCM();
         if (!token || cancelled) return;
         await apiClient.registerPushToken(token);
       } catch {

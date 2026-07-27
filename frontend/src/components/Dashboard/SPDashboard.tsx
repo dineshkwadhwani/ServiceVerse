@@ -16,6 +16,7 @@ import { SPReportPage } from '@/components/Reports/SPReports';
 import { useDashboardContext } from '@/context/DashboardContext';
 import { apiClient } from '@/services/apiClient';
 import { COLORS } from '@/utils/theme';
+import { formatDateTime } from '@/utils/formatters';
 import { useAuthStore } from '@/store/authStore';
 import { getDoc, doc } from 'firebase/firestore';
 import { db } from '@/utils/firebase-config';
@@ -513,7 +514,7 @@ export function SPDashboard() {
                           Order #{order.orderId} • ₹{order.totalAmount.toFixed(2)}
                         </p>
                         <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
-                          Order Date: {order.createdAt.toLocaleDateString()}
+                          Order Date: {formatDateTime(order.createdAt)}
                         </p>
                       </div>
                         <div
@@ -596,7 +597,7 @@ export function SPDashboard() {
                               Order #{order.orderId}
                             </p>
                             <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
-                              Order Date: {order.createdAt.toLocaleDateString()}
+                              Order Date: {formatDateTime(order.createdAt)}
                             </p>
                           </div>
                           <div
@@ -697,7 +698,7 @@ export function SPDashboard() {
                           Order #{order.orderId}
                         </p>
                         <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
-                          Order Date: {order.createdAt.toLocaleDateString()}
+                          Order Date: {formatDateTime(order.createdAt)}
                         </p>
                         <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
                           <ClickableIdentity
