@@ -297,6 +297,7 @@ export async function getAllUsers(req: AuthRequest, res: Response) {
         name: data.name,
         email: data.email,
         phone: data.phone || null,
+        address: data.address || null,
         role: data.role,
         status: data.status || 'ACTIVE',
         verified: data.verified || false,

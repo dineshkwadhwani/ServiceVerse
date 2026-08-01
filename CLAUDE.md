@@ -1,7 +1,7 @@
 # ServiceVerse Project Documentation
 
-**Last Updated**: July 20, 2026  
-**Status**: 🚀 Active Development - Milestone 1 Complete: All Logins Working ✅
+**Last Updated**: July 29, 2026  
+**Status**: 🚀 Active Development - Android Mobile App Running on Real Device ✅
 
 ---
 
@@ -320,6 +320,35 @@ GET    /service-providers/:spId/menu                (public)
 4. **Uploads could hang on "Uploading…" indefinitely** — added a 20-second client-side timeout (`withTimeout()`) so a failure always surfaces a clear, retryable error instead of an infinite spinner.
 5. **The one specific file that kept failing everywhere** turned out to be a copy-protected/IRM-restricted file in a OneDrive folder that the browser couldn't fully read — not a code or config bug at all. Confirmed by moving the same file to a different folder, which then uploaded fine.
 
+#### Phase 15: Mobile App — Android via Capacitor ✅ (iOS pending)
+
+- Wrapped the existing React/Vite frontend natively for Android using Capacitor 8 — no rewrite, the same web codebase now also builds into a real installable Android app
+- User's first mobile app; walked through the entire toolchain from zero (no Android Studio, no SDK, no emulator existed on the machine beforehand) to a working debug APK installed and running on a physical Android phone
+- iOS deliberately deferred — requires the full Xcode.app (not just Command Line Tools, which is all that was present), a multi-GB App Store download
+
+**Setup performed**:
+- `@capacitor/core`/`@capacitor/camera`/`@capacitor/filesystem` had been sitting in `frontend/package.json` at a stale `^6.0.0` from an earlier, never-finished attempt (no `@capacitor/cli` installed, no `capacitor.config.ts`, no native folders existed). Bumped everything to the current stable `^8.x` line together (`core`, `cli`, `android`, `camera`, `filesystem`, plus new `push-notifications`) rather than mixing majors
+- `npx cap init` → App ID `in.theserviceverse.app`, name "ServiceVerse" → `frontend/capacitor.config.ts`
+- `npx cap add android` → native Android Studio project at `frontend/android/` (gitignored — regenerated from `capacitor.config.ts` + `cap add`, not meant to be tracked)
+- Registered a real Firebase Android app via `firebase apps:create android` + `firebase apps:sdkconfig ANDROID` (CLI, skips the console) → `frontend/android/app/google-services.json`. Capacitor 8's Android template already conditionally applies the Google Services Gradle plugin once that file exists — no manual Gradle edits needed for this part
+- Native push notification registration: new `frontend/src/utils/nativePush.ts`; `App.tsx`'s existing device-token-registration effect now branches on `Capacitor.isNativePlatform()` — native devices register via the native Firebase Messaging SDK, browsers keep using the existing web VAPID flow (`initFCM()`). Both paths still call the same `apiClient.registerPushToken(token)`, so no backend change was needed for this part
+- Android Studio + the Android SDK did not exist on the machine at all. Installed via Homebrew (`brew install --cask android-studio`), then the SDK platform/build-tools/emulator/system-image were installed **directly via the `sdkmanager` CLI** (`brew install --cask android-commandlinetools`) into `~/Library/Android/sdk` — this proved far more reliable than Android Studio's interactive "Select SDKs" first-run dialog, which repeatedly rejected the same path ("does not contain any platforms") until the CLI had already populated it. Once Android Studio's own Setup Wizard ran afterward, it detected everything and reported "Nothing to do! Android SDK is up to date."
+- Emulator testing used Android Studio's own auto-created default AVD ("Medium Phone") rather than a hand-built one — the `avdmanager` CLI failed to create a custom AVD ("Package path is not valid... null") even with `ANDROID_HOME`/`ANDROID_SDK_ROOT` set correctly; never root-caused, worked around instead
+
+**Critical bug found & fixed — CORS silently blocked every API call from the app**:
+- Capacitor's default WebView origin is `https://localhost` (Android) / `capacitor://localhost` (iOS) — not `http://localhost:5173`. The backend's CORS allowlist (`backend/functions/src/index.ts`, `defaultAllowedOrigins`) only had the Vite dev server and Vercel domains, so every request from the wrapped app was rejected by CORS before the app ever saw a response
+- Symptom looked like a data/environment problem, not a networking one: the Android app's landing page showed "No services available" even though the real two services existed untouched in Firestore, because `apiClient` calls threw and were silently swallowed by existing `try/catch` blocks
+- Fix: added `'https://localhost'` and `'capacitor://localhost'` to `defaultAllowedOrigins`, then `firebase deploy --only functions` (this class of change never takes effect until deployed, same as any other backend edit)
+- Confirmed there is only **one** Firebase project (`serviceverse-dev-fa38e`) serving dev/stage/prod today — so this fix, and the mobile build's config, is already effectively "prod-configured"; there was no separate prod backend to redirect to
+
+**Build tooling added**:
+- `frontend/.env.production` — mirrors `.env.local` (same Firebase project, same API URL; only `VITE_APP_URL` differs), added deliberately because `vite build` defaults to `--mode production`, which would otherwise silently start overriding `.env.local` values the moment such a file existed
+- `npm run build:mobile` (`tsc && vite build --mode production && npx cap sync`) — rebuilds the web app and copies it into the native Android project. Required before every native rebuild; the native project has no visibility into `frontend/src/` on its own, only whatever was last copied in
+- `npm run build:apk` — `build:mobile` plus `cd android && ./gradlew assembleDebug`, producing a real installable file at `frontend/android/app/build/outputs/apk/debug/app-debug.apk`. Both scripts also exist at the repo root (`npm run build:mobile` / `build:apk`, matching the existing `build:frontend`/`build:backend` workspace convention)
+- `frontend/android/gradle.properties` — added `org.gradle.java.home` pointing at the JDK bundled inside Android Studio itself (`Android Studio.app/Contents/jbr`, JDK 21). The system's own JDK was version 25, which Gradle/AGP rejected outright ("Cannot find a Java installation... matching languageVersion=21"); pointing Gradle at Android Studio's bundled JDK fixed this permanently without installing yet another JDK or requiring `JAVA_HOME` to be exported by hand each time
+
+**Verified working**: debug APK built from the command line, transferred to and installed directly on a physical Android phone, launched successfully, and loaded the real service list from Firestore after the CORS fix.
+
 ---
 
 ## 🏗️ Architecture & Structure
@@ -419,7 +448,8 @@ backend/functions/src/
 | Order Anti-Fraud Identity | ✅ Complete | Clickable coworker/customer name → photo modal on pickup/delivery |
 | Email Notifications | 🔄 In Progress | Resend integration pending |
 | Analytics Dashboard | 📋 Planned | KPIs, charts, reporting |
-| Mobile App | 📋 Planned | Capacitor iOS/Android build |
+| Mobile App (Android) | ✅ Complete | Capacitor 8 wrapper, debug APK built and verified on a real device |
+| Mobile App (iOS) | 📋 Planned | Same Capacitor project; needs full Xcode installed first (only Command Line Tools present today) |
 
 ---
 
@@ -456,9 +486,10 @@ backend/functions/src/
 
 ### Medium Term (1 Month)
 1. **Mobile App**
-   - Capacitor setup for iOS/Android
-   - Native app builds
-   - App store deployment
+   - ✅ Capacitor setup for Android — done (Phase 15)
+   - ✅ Native Android app builds — done, `npm run build:apk`
+   - 📋 iOS setup — needs full Xcode installed (Command Line Tools alone isn't enough)
+   - 📋 Signed release builds + app store deployment (Play Store + App Store) — separate from today's debug-only build, needs signing keystore/certificates and store listings
 
 2. **Advanced Features**
    - Customer reviews and ratings
@@ -543,6 +574,7 @@ npm run logs          # View logs
 | Build | Vite | 5.0+ |
 | Icons | Lucide React | Latest |
 | Validation | Zod | Latest |
+| Mobile Wrapper | Capacitor (Android live, iOS pending) | 8.x |
 
 ---
 
@@ -563,6 +595,14 @@ Latest work (as of July 20, 2026) — **uncommitted locally, not yet pushed via 
 - Clickable coworker/customer identity reveal on order tiles (name + photo modal) for pickup/delivery fraud prevention, with photos denormalized onto the order rather than a new user-lookup endpoint
 - Fixed two previously-silent Storage gaps: `firebase.json` had no `storage` target at all (rules were never deployed), and the business logo upload path had no Storage write rule
 - Fixed unreliable browser MIME-type detection and unbounded upload hangs in the image upload flow (affects both new profile pictures and the existing business logo upload)
+
+Latest work (as of July 29, 2026):
+
+- **Android mobile app working**: wrapped the existing frontend with Capacitor 8, added the native Android project, and got a debug APK built, installed, and verified running on a real physical device — see Phase 15 above for full detail
+- Found and fixed a critical CORS bug that silently blocked every API call from the wrapped app (Capacitor's WebView origin, `https://localhost`, wasn't in the backend's CORS allowlist) — deployed to `backend/functions`
+- Added mobile build tooling: `frontend/.env.production`, `npm run build:mobile`, `npm run build:apk` (root and `frontend/` workspace), and a Gradle JDK fix (`org.gradle.java.home` → Android Studio's bundled JDK 21) so command-line APK builds work without manual environment setup
+- Registered a native Android app in the existing Firebase project via the `firebase` CLI (`apps:create` / `apps:sdkconfig`) rather than the console, and wired native push-notification token registration alongside the existing web FCM flow
+- Confirmed `vercel.json`'s `git.deploymentEnabled: false` is intentional (user prefers manually triggering stage deploys) — not a bug, no action taken
 
 Prior milestone (as of July 13, 2026):
 
@@ -592,12 +632,12 @@ Prior milestone (as of July 13, 2026):
 
 ## 🔄 Current Development Focus
 
-**Phase Status**: Phase 14 Complete - Profile Pictures + Anti-Fraud Identity Reveal on Orders (Phase 13 Notification Center also complete)  
-**Milestone**: Milestone 1 ✅ - All Logins Working (5 roles fully authenticated and assigned)  
-**Current Work**: Manual verification of profile picture upload + order identity-reveal flows across roles; preparing for order management phase  
-**Blockers**: None  
+**Phase Status**: Phase 15 Complete - Android Mobile App via Capacitor (Phase 14 Profile Pictures/Anti-Fraud Identity and Phase 13 Notification Center also complete)  
+**Milestone**: Milestone 1 ✅ - All Logins Working; Android app now running end-to-end on a real device  
+**Current Work**: Deciding next mobile step (iOS setup, push-notification on-device testing, or a signed release build) vs. resuming order management  
+**Blockers**: iOS work needs full Xcode installed (only Command Line Tools present today)  
 **Dependencies**: Razorpay integration for payments, Firebase data validation rules  
-**Next Phase**: Order Management (Phase 15) - order creation, tracking, and status updates  
+**Next Phase**: Either iOS (Phase 16a) or Order Management (Phase 16b) - order creation, tracking, and status updates  
 
 **Known Issues to Address**:
 
@@ -606,8 +646,11 @@ Prior milestone (as of July 13, 2026):
 - Implement SP profile completion with GST details and business address
 - Add Firestore security rules for multi-tenant data isolation
 - `sp-logos`/`profile-pictures` Storage rules only allow the account's own uid to write — an Account Manager uploading a business logo on behalf of an SP during onboarding (via `SPOnboardingStepper.tsx`) would still be blocked, since that flow runs under the AM's own signed-in uid, not the SP's. Not yet fixed — would need a Firestore-backed rule check (AM assigned to that SP) if that flow is actually used.
+- Native push notifications (Android) are wired up but not yet verified with an actual push send/receive test on a device
+- iOS Capacitor setup not started — needs full Xcode (not just Command Line Tools) installed first
+- Mobile builds are debug-only so far; a signed release build (keystore, Play Store listing) is separate, deferred work
 
 ---
 
-**Last Updated**: July 20, 2026  
-**Next Review**: After order management implementation
+**Last Updated**: July 29, 2026  
+**Next Review**: After iOS setup or order management implementation, whichever is picked up next

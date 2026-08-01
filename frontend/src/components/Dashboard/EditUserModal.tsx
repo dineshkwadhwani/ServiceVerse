@@ -10,6 +10,7 @@ interface EditUserModalProps {
     name: string;
     email: string;
     phone?: string;
+    address?: string;
     role: 'SUPERADMIN' | 'ACCOUNT_MANAGER' | 'SERVICE_PROVIDER' | 'CUSTOMER' | 'COWORKER';
     status?: 'ACTIVE' | 'PENDING' | 'INACTIVE';
     verified?: boolean;
@@ -147,6 +148,16 @@ export function EditUserModal({ isOpen, user, onClose, onSave }: EditUserModalPr
                 className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 text-sm"
               />
             </div>
+
+            {/* Address (Read-only) */}
+            {user.address && (
+              <div>
+                <label className="block text-white font-semibold text-sm mb-2">Address</label>
+                <div className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-gray-300 text-sm">
+                  {user.address}
+                </div>
+              </div>
+            )}
 
             {/* Status */}
             {canChangeStatus && (

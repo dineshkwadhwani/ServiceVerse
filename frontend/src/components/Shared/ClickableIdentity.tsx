@@ -7,9 +7,11 @@ interface Props {
   photoUrl?: string;
   label?: string;
   prefix?: string;
+  phone?: string;
+  address?: string;
 }
 
-export function ClickableIdentity({ name, photoUrl, label, prefix }: Props) {
+export function ClickableIdentity({ name, photoUrl, label, prefix, phone, address }: Props) {
   const [isOpen, setIsOpen] = useState(false);
 
   if (!name) return null;
@@ -34,6 +36,8 @@ export function ClickableIdentity({ name, photoUrl, label, prefix }: Props) {
         name={name}
         photoUrl={photoUrl}
         label={label}
+        phone={phone}
+        address={address}
       />
     </>
   );

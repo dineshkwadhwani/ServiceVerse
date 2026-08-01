@@ -15,6 +15,11 @@ interface OrderLike {
   customerId?: string;
   customerName?: string;
   customerPhotoUrl?: string;
+  customerPhone?: string;
+  deliveryAddress?: string;
+  customerAddress?: string;
+  selectedCoworkerPhone?: string;
+  selectedCoworkerAddress?: string;
   createdBy?: string;
   createdByRole?: string;
   createdByUserId?: string;
@@ -161,8 +166,15 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
     (role === 'CUSTOMER' ? (user as any)?.name : '') ||
     'N/A';
   const displayCustomerPhotoUrl = orderDetails?.customerPhotoUrl || order?.customerPhotoUrl || '';
+  const displayCustomerPhone = orderDetails?.customerPhone || (order as any)?.customerPhone || '';
+  const displayCustomerAddress =
+    orderDetails?.deliveryAddress || orderDetails?.customerAddress ||
+    (order as any)?.deliveryAddress || (order as any)?.customerAddress || '';
   const assignedCoworkerName = orderDetails?.selectedCoworker || order?.selectedCoworker || '';
   const assignedCoworkerPhotoUrl = orderDetails?.selectedCoworkerPhotoUrl || order?.selectedCoworkerPhotoUrl || '';
+  const assignedCoworkerPhone = orderDetails?.selectedCoworkerPhone || (order as any)?.selectedCoworkerPhone || '';
+  const assignedCoworkerAddress =
+    orderDetails?.selectedCoworkerAddress || (order as any)?.selectedCoworkerAddress || '';
   const canCustomerConfirm = role === 'CUSTOMER' && isPreConfirmStatus && !createdByCustomer;
   const canCustomerPay = role === 'CUSTOMER' && currentStatus === 'DELIVERED';
   const currentPaymentMethod = paymentMethod || orderDetails?.paymentMethod || order?.paymentMethod || 'DIRECT';
@@ -488,7 +500,13 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
           <div>
             <p className="text-sm" style={{ color: COLORS.text.secondary }}>Customer</p>
             <p className="font-semibold" style={{ color: COLORS.text.primary }}>
-              <ClickableIdentity name={displayCustomerName} photoUrl={displayCustomerPhotoUrl} label="Customer" />
+              <ClickableIdentity
+                name={displayCustomerName}
+                photoUrl={displayCustomerPhotoUrl}
+                phone={displayCustomerPhone}
+                address={displayCustomerAddress}
+                label="Customer"
+              />
             </p>
           </div>
 
@@ -501,7 +519,13 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
             <div>
               <p className="text-sm" style={{ color: COLORS.text.secondary }}>Assigned for Pickup</p>
               <p className="font-semibold" style={{ color: COLORS.text.primary }}>
-                <ClickableIdentity name={assignedCoworkerName} photoUrl={assignedCoworkerPhotoUrl} label="Coworker" />
+                <ClickableIdentity
+                  name={assignedCoworkerName}
+                  photoUrl={assignedCoworkerPhotoUrl}
+                  phone={assignedCoworkerPhone}
+                  address={assignedCoworkerAddress}
+                  label="Coworker"
+                />
               </p>
             </div>
           )}

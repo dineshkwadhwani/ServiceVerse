@@ -302,7 +302,7 @@ export function RegisterCustomerForm({ serviceId, serviceName }: Props) {
             style={{ color: COLORS.text.primary }}
           >
             <Phone className="w-4 h-4" />
-            Phone Number *
+            Phone Number <span style={{ color: COLORS.semantic.error }}>*</span>
           </label>
           <div className="flex gap-2">
             <span

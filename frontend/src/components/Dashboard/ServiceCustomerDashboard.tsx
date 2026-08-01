@@ -25,6 +25,8 @@ interface Order {
   customerName?: string;
   selectedCoworker?: string;
   selectedCoworkerPhotoUrl?: string;
+  selectedCoworkerPhone?: string;
+  selectedCoworkerAddress?: string;
   status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED' | 'NEW' | 'COMPLETED' | 'PAID';
   totalAmount: number;
   createdAt: Date;
@@ -151,6 +153,8 @@ export function ServiceCustomerDashboard() {
             customerName: order.customerName || '',
             selectedCoworker: order.selectedCoworker || '',
             selectedCoworkerPhotoUrl: order.selectedCoworkerPhotoUrl || '',
+            selectedCoworkerPhone: order.selectedCoworkerPhone || '',
+            selectedCoworkerAddress: order.selectedCoworkerAddress || '',
             status: order.status || 'NEW',
             totalAmount: order.total || 0,
             createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
@@ -494,6 +498,8 @@ export function ServiceCustomerDashboard() {
                               <ClickableIdentity
                                 name={order.selectedCoworker}
                                 photoUrl={order.selectedCoworkerPhotoUrl}
+                                phone={order.selectedCoworkerPhone}
+                                address={order.selectedCoworkerAddress}
                                 label="Coworker"
                                 prefix="Assigned for Pickup: "
                               />

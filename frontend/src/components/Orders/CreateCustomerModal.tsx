@@ -233,7 +233,7 @@ export function CreateCustomerModal({ initialPhone, onClose, onCustomerCreated }
                       className="block text-sm font-medium mb-2"
                       style={{ color: COLORS.text.secondary }}
                     >
-                      Name *
+                      Name <span style={{ color: COLORS.semantic.error }}>*</span>
                     </label>
                     <input
                       type="text"
@@ -258,7 +258,7 @@ export function CreateCustomerModal({ initialPhone, onClose, onCustomerCreated }
                       className="block text-sm font-medium mb-2"
                       style={{ color: COLORS.text.secondary }}
                     >
-                      Address *
+                      Address <span style={{ color: COLORS.semantic.error }}>*</span>
                     </label>
                     <textarea
                       value={formData.address}
@@ -284,7 +284,7 @@ export function CreateCustomerModal({ initialPhone, onClose, onCustomerCreated }
                         className="block text-sm font-medium mb-2"
                         style={{ color: COLORS.text.secondary }}
                       >
-                        City *
+                        City <span style={{ color: COLORS.semantic.error }}>*</span>
                       </label>
                       <input
                         type="text"
@@ -309,7 +309,7 @@ export function CreateCustomerModal({ initialPhone, onClose, onCustomerCreated }
                         className="block text-sm font-medium mb-2"
                         style={{ color: COLORS.text.secondary }}
                       >
-                        PIN Code *
+                        PIN Code <span style={{ color: COLORS.semantic.error }}>*</span>
                       </label>
                       <input
                         type="text"

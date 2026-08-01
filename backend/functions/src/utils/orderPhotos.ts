@@ -27,21 +27,31 @@ export async function enrichOrdersWithLivePhotos(orders: any[]): Promise<any[]> 
 
   // Queries only by role (like getSPCoworkers) and filters spId/name in memory
   // to avoid needing a composite index.
-  const coworkerPhotoMap = new Map<string, string>(); // key: `${spId}::${name}`
+  const coworkerInfoMap = new Map<string, { photoUrl: string; phone: string; address: string }>(); // key: `${spId}::${name}`
   if (needsCoworkerLookup) {
     const coworkersSnapshot = await db.collection('users').where('role', '==', 'COWORKER').get();
     coworkersSnapshot.docs.forEach((doc) => {
       const data = doc.data();
-      coworkerPhotoMap.set(`${data.spId}::${data.name}`, data.photoUrl || '');
+      coworkerInfoMap.set(`${data.spId}::${data.name}`, {
+        photoUrl: data.photoUrl || '',
+        phone: data.phone || '',
+        address: data.address || '',
+      });
     });
   }
 
-  return orders.map((order) => ({
-    ...order,
-    customerPhotoUrl:
-      (order.customerId && customerPhotoMap.get(order.customerId)) || order.customerPhotoUrl || null,
-    selectedCoworkerPhotoUrl: order.selectedCoworker
-      ? coworkerPhotoMap.get(`${order.spId}::${order.selectedCoworker}`) || order.selectedCoworkerPhotoUrl || null
-      : order.selectedCoworkerPhotoUrl || null,
-  }));
+  return orders.map((order) => {
+    const coworkerInfo = order.selectedCoworker
+      ? coworkerInfoMap.get(`${order.spId}::${order.selectedCoworker}`)
+      : undefined;
+
+    return {
+      ...order,
+      customerPhotoUrl:
+        (order.customerId && customerPhotoMap.get(order.customerId)) || order.customerPhotoUrl || null,
+      selectedCoworkerPhotoUrl: coworkerInfo?.photoUrl || order.selectedCoworkerPhotoUrl || null,
+      selectedCoworkerPhone: coworkerInfo?.phone || order.selectedCoworkerPhone || null,
+      selectedCoworkerAddress: coworkerInfo?.address || order.selectedCoworkerAddress || null,
+    };
+  });
 }

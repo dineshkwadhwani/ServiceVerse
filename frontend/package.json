@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "build:frontend": "tsc && vite build",
+    "build:mobile": "tsc && vite build --mode production && npx cap sync",
+    "build:apk": "npm run build:mobile && cd android && ./gradlew assembleDebug",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit"

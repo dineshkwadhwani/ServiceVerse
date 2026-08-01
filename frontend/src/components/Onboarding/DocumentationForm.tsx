@@ -70,7 +70,7 @@ export function DocumentationForm({
               className="block font-semibold mb-2 text-sm"
               style={{ color: COLORS.text.primary }}
             >
-              GST Number {isGSTRequired ? '*' : '(Optional)'}
+              GST Number {isGSTRequired ? <span style={{ color: COLORS.semantic.error }}>*</span> : '(Optional)'}
             </label>
             <input
               type="text"
@@ -174,7 +174,7 @@ export function DocumentationForm({
                 className="block font-semibold mb-2 text-sm"
                 style={{ color: COLORS.text.primary }}
               >
-                UPI QR Code {isQRRequired && '*'}
+                UPI QR Code {isQRRequired && <span style={{ color: COLORS.semantic.error }}>*</span>}
               </label>
               <div
                 className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition"
@@ -284,7 +284,7 @@ export function DocumentationForm({
                 borderColor: `${COLORS.semantic.info}30`,
               }}>
                 <label className="block font-semibold mb-2 text-sm" style={{ color: COLORS.text.primary }}>
-                  Commission Rate (%) *
+                  Commission Rate (%) <span style={{ color: COLORS.semantic.error }}>*</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <input

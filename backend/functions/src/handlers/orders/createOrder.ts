@@ -29,19 +29,26 @@ function getRazorpayClient(): Razorpay {
 }
 
 /**
- * Resolve a coworker's photoUrl by name, scoped to their SP.
+ * Resolve a coworker's photoUrl/phone/address by name, scoped to their SP.
  * Queries only by role (like getSPCoworkers) and filters spId/name in memory
  * to avoid needing a composite index.
  */
-async function resolveCoworkerPhotoUrl(spId: string, coworkerName: string): Promise<string | null> {
-  if (!spId || !coworkerName) return null;
+async function resolveCoworkerInfo(
+  spId: string,
+  coworkerName: string
+): Promise<{ photoUrl: string | null; phone: string | null; address: string | null }> {
+  if (!spId || !coworkerName) return { photoUrl: null, phone: null, address: null };
 
   const coworkersSnapshot = await db.collection('users').where('role', '==', 'COWORKER').get();
   const match = coworkersSnapshot.docs.find(
     (doc) => doc.data().spId === spId && doc.data().name === coworkerName
   );
 
-  return match?.data()?.photoUrl || null;
+  return {
+    photoUrl: match?.data()?.photoUrl || null,
+    phone: match?.data()?.phone || null,
+    address: match?.data()?.address || null,
+  };
 }
 
 interface OrderItem {
@@ -411,8 +418,11 @@ export const updateOrderLifecycle = async (req: Request, res: Response) => {
     }
 
     if (status === 'ASSIGNED_FOR_PICKUP') {
+      const coworkerInfo = await resolveCoworkerInfo(orderData.spId, selectedCoworker);
       updateData.selectedCoworker = selectedCoworker;
-      updateData.selectedCoworkerPhotoUrl = await resolveCoworkerPhotoUrl(orderData.spId, selectedCoworker);
+      updateData.selectedCoworkerPhotoUrl = coworkerInfo.photoUrl;
+      updateData.selectedCoworkerPhone = coworkerInfo.phone;
+      updateData.selectedCoworkerAddress = coworkerInfo.address;
       updateData.assignedForPickupAt = new Date();
     }
 
@@ -547,8 +557,11 @@ export const updateOrderDetails = async (req: Request, res: Response) => {
     }
 
     if (typeof selectedCoworker === 'string') {
+      const coworkerInfo = await resolveCoworkerInfo(orderData.spId, selectedCoworker);
       updateData.selectedCoworker = selectedCoworker;
-      updateData.selectedCoworkerPhotoUrl = await resolveCoworkerPhotoUrl(orderData.spId, selectedCoworker);
+      updateData.selectedCoworkerPhotoUrl = coworkerInfo.photoUrl;
+      updateData.selectedCoworkerPhone = coworkerInfo.phone;
+      updateData.selectedCoworkerAddress = coworkerInfo.address;
     }
 
     if (paymentMethod === 'ONLINE' || paymentMethod === 'DIRECT') {

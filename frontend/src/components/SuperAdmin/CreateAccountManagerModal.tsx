@@ -99,7 +99,7 @@ export function CreateAccountManagerModal({
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Full Name *
+              Full Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -113,7 +113,7 @@ export function CreateAccountManagerModal({
           {/* Email */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address *
+              Email Address <span className="text-red-500">*</span>
             </label>
             <input
               type="email"
@@ -128,7 +128,7 @@ export function CreateAccountManagerModal({
           {/* Phone */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Phone Number * (Required for Login)
+              Phone Number <span className="text-red-500">*</span> (Required for Login)
             </label>
             <input
               type="tel"

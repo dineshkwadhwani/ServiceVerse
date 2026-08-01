@@ -26,11 +26,15 @@ interface Order {
   customerId: string;
   customerName: string;
   customerPhotoUrl?: string;
+  customerPhone?: string;
+  deliveryAddress?: string;
   status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED' | 'COMPLETED' | 'PAID' | 'ASSIGNED_FOR_PICKUP' | 'READY_FOR_DELIVERY';
   deliveryType?: 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY';
   spId?: string;
   selectedCoworker?: string;
   selectedCoworkerPhotoUrl?: string;
+  selectedCoworkerPhone?: string;
+  selectedCoworkerAddress?: string;
   totalAmount: number;
   createdAt: Date;
   items: Array<{ name: string; quantity: number; price: number }>;
@@ -106,11 +110,15 @@ async function fetchSPDashboardData(uid: string, forceRefresh = false): Promise<
       customerId: order.customerId || '',
       customerName: order.customerName || 'Unknown',
       customerPhotoUrl: order.customerPhotoUrl || '',
+      customerPhone: order.customerPhone || '',
+      deliveryAddress: order.deliveryAddress || order.customerAddress || '',
       status: order.status || 'NEW',
       deliveryType: normalizeDeliveryType(order.deliveryType),
       spId: order.spId || uid,
       selectedCoworker: order.selectedCoworker || '',
       selectedCoworkerPhotoUrl: order.selectedCoworkerPhotoUrl || '',
+      selectedCoworkerPhone: order.selectedCoworkerPhone || '',
+      selectedCoworkerAddress: order.selectedCoworkerAddress || '',
       totalAmount: order.total || order.totalAmount || 0,
       createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
       items: order.items || [],
@@ -292,11 +300,15 @@ export function SPDashboard() {
         customerId: order.customerId || '',
         customerName: order.customerName || 'Unknown',
         customerPhotoUrl: order.customerPhotoUrl || '',
+        customerPhone: order.customerPhone || '',
+        deliveryAddress: order.deliveryAddress || order.customerAddress || '',
         status: order.status || 'NEW',
         deliveryType: normalizeDeliveryType(order.deliveryType),
         spId: order.spId || effectiveSpId,
         selectedCoworker: order.selectedCoworker || '',
         selectedCoworkerPhotoUrl: order.selectedCoworkerPhotoUrl || '',
+        selectedCoworkerPhone: order.selectedCoworkerPhone || '',
+        selectedCoworkerAddress: order.selectedCoworkerAddress || '',
         totalAmount: order.total || order.totalAmount || 0,
         createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
         items: order.items || [],
@@ -516,6 +528,8 @@ export function SPDashboard() {
                           <ClickableIdentity
                             name={order.customerName}
                             photoUrl={order.customerPhotoUrl}
+                            phone={order.customerPhone}
+                            address={order.deliveryAddress}
                             label="Customer"
                           />
                         </p>
@@ -599,6 +613,8 @@ export function SPDashboard() {
                               <ClickableIdentity
                                 name={order.customerName}
                                 photoUrl={order.customerPhotoUrl}
+                                phone={order.customerPhone}
+                                address={order.deliveryAddress}
                                 label="Customer"
                               />
                             </p>
@@ -700,6 +716,8 @@ export function SPDashboard() {
                           <ClickableIdentity
                             name={order.customerName}
                             photoUrl={order.customerPhotoUrl}
+                            phone={order.customerPhone}
+                            address={order.deliveryAddress}
                             label="Customer"
                           />
                         </p>
@@ -713,6 +731,8 @@ export function SPDashboard() {
                           <ClickableIdentity
                             name={order.selectedCoworker || ''}
                             photoUrl={order.selectedCoworkerPhotoUrl}
+                            phone={order.selectedCoworkerPhone}
+                            address={order.selectedCoworkerAddress}
                             label="Coworker"
                             prefix="Assigned pickup: "
                           />

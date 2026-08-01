@@ -42,6 +42,7 @@ interface User {
   name: string;
   email: string;
   phone?: string;
+  address?: string;
   role: 'SUPERADMIN' | 'ACCOUNT_MANAGER' | 'SERVICE_PROVIDER' | 'CUSTOMER' | 'COWORKER';
   status?: 'ACTIVE' | 'PENDING' | 'INACTIVE';
   verified: boolean;

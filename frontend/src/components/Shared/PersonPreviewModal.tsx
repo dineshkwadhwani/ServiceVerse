@@ -1,4 +1,4 @@
-import { User } from 'lucide-react';
+import { User, Phone, MapPin } from 'lucide-react';
 import { Modal } from '@/components/Shared/Modal';
 import { COLORS } from '@/utils/theme';
 
@@ -8,9 +8,11 @@ interface Props {
   name: string;
   photoUrl?: string;
   label?: string;
+  phone?: string;
+  address?: string;
 }
 
-export function PersonPreviewModal({ isOpen, onClose, name, photoUrl, label }: Props) {
+export function PersonPreviewModal({ isOpen, onClose, name, photoUrl, label, phone, address }: Props) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={label || 'Details'} size="sm">
       <div className="flex flex-col items-center text-center gap-3">
@@ -42,6 +44,33 @@ export function PersonPreviewModal({ isOpen, onClose, name, photoUrl, label }: P
           <p className="text-xs" style={{ color: COLORS.text.tertiary }}>
             No photo on file yet
           </p>
+        )}
+
+        {(phone || address) && (
+          <div className="w-full pt-3 border-t space-y-2 text-left" style={{ borderColor: COLORS.border.light }}>
+            {phone && (
+              <a
+                href={`tel:${phone}`}
+                className="flex items-center gap-2 text-sm hover:opacity-80 transition"
+                style={{ color: COLORS.text.primary }}
+              >
+                <Phone className="w-4 h-4 flex-shrink-0" style={{ color: COLORS.text.secondary }} />
+                {phone}
+              </a>
+            )}
+            {address && (
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2 text-sm hover:opacity-80 transition"
+                style={{ color: COLORS.text.primary }}
+              >
+                <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: COLORS.semantic.info }} />
+                <span className="underline underline-offset-2">{address}</span>
+              </a>
+            )}
+          </div>
         )}
       </div>
     </Modal>

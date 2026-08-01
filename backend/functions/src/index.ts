@@ -47,6 +47,9 @@ const defaultAllowedOrigins = [
   'http://localhost:3000',
   'https://serviceverse.vercel.app',
   'https://serviceverse-stage.vercel.app',
+  // Capacitor's default WebView origin for the wrapped mobile app (Android: https, iOS: capacitor:)
+  'https://localhost',
+  'capacitor://localhost',
 ];
 
 const configuredAllowedOrigins = (process.env.CORS_ORIGIN || '')
