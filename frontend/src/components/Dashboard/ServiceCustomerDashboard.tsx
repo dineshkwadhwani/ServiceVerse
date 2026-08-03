@@ -477,9 +477,9 @@ export function ServiceCustomerDashboard() {
                       }}
                     >
                       <div className="flex items-start justify-between mb-3">
-                        <div>
+                        <div className="flex-1 min-w-0 pr-3">
                           <p
-                            className="text-sm font-medium"
+                            className="text-sm font-medium truncate"
                             style={{ color: COLORS.text.secondary }}
                           >
                             Order #{order.orderId}
@@ -507,7 +507,7 @@ export function ServiceCustomerDashboard() {
                           )}
                         </div>
                         <div
-                          className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold text-white"
+                          className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold text-white flex-shrink-0 whitespace-nowrap"
                           style={{ backgroundColor: getStatusColor(order.status) }}
                         >
                           {getStatusIcon(order.status)}

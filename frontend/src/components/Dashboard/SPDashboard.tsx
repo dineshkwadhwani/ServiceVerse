@@ -523,7 +523,7 @@ export function SPDashboard() {
                         borderColor: COLORS.border.light,
                       }}
                     >
-                      <div>
+                      <div className="flex-1 min-w-0 pr-3">
                         <p className="font-semibold" style={{ color: COLORS.text.primary }}>
                           <ClickableIdentity
                             name={order.customerName}
@@ -533,7 +533,7 @@ export function SPDashboard() {
                             label="Customer"
                           />
                         </p>
-                        <p style={{ color: COLORS.text.secondary }}>
+                        <p className="truncate" style={{ color: COLORS.text.secondary }}>
                           Order #{order.orderId} • ₹{order.totalAmount.toFixed(2)}
                         </p>
                         <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
@@ -541,7 +541,7 @@ export function SPDashboard() {
                         </p>
                       </div>
                         <div
-                        className="px-3 py-1 rounded-full text-xs font-semibold text-white"
+                        className="px-3 py-1 rounded-full text-xs font-semibold text-white flex-shrink-0 whitespace-nowrap"
                         style={{ backgroundColor: getStatusColor(order.status) }}
                       >
                         {order.status}
@@ -608,7 +608,7 @@ export function SPDashboard() {
                         }}
                       >
                         <div className="flex items-start justify-between mb-3">
-                          <div>
+                          <div className="flex-1 min-w-0 pr-3">
                             <p className="font-semibold" style={{ color: COLORS.text.primary }}>
                               <ClickableIdentity
                                 name={order.customerName}
@@ -618,7 +618,7 @@ export function SPDashboard() {
                                 label="Customer"
                               />
                             </p>
-                            <p className="text-sm" style={{ color: COLORS.text.secondary }}>
+                            <p className="text-sm truncate" style={{ color: COLORS.text.secondary }}>
                               Order #{order.orderId}
                             </p>
                             <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
@@ -626,7 +626,7 @@ export function SPDashboard() {
                             </p>
                           </div>
                           <div
-                            className="px-3 py-1 rounded-full text-xs font-semibold text-white"
+                            className="px-3 py-1 rounded-full text-xs font-semibold text-white flex-shrink-0 whitespace-nowrap"
                             style={{ backgroundColor: getStatusColor(order.status) }}
                           >
                             {order.status}
@@ -711,7 +711,7 @@ export function SPDashboard() {
                     }}
                   >
                     <div className="flex items-start justify-between mb-3">
-                      <div>
+                      <div className="flex-1 min-w-0 pr-3">
                         <p className="font-semibold" style={{ color: COLORS.text.primary }}>
                           <ClickableIdentity
                             name={order.customerName}
@@ -721,7 +721,7 @@ export function SPDashboard() {
                             label="Customer"
                           />
                         </p>
-                        <p className="text-sm" style={{ color: COLORS.text.secondary }}>
+                        <p className="text-sm truncate" style={{ color: COLORS.text.secondary }}>
                           Order #{order.orderId}
                         </p>
                         <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
@@ -739,7 +739,7 @@ export function SPDashboard() {
                         </p>
                       </div>
                       <div
-                        className="px-3 py-1 rounded-full text-xs font-semibold text-white"
+                        className="px-3 py-1 rounded-full text-xs font-semibold text-white flex-shrink-0 whitespace-nowrap"
                         style={{ backgroundColor: getStatusColor(order.status) }}
                       >
                         {order.status}
