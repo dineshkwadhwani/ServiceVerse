@@ -12,6 +12,7 @@ export interface BaseUser {
   businessName?: string;
   isOrphaned?: boolean;
   verified?: boolean;
+  photoUrl?: string;
 }
 
 export interface SuperAdmin extends BaseUser {
@@ -60,8 +61,10 @@ export interface Coworker extends BaseUser {
 export interface Customer extends BaseUser {
   role: 'CUSTOMER';
   address?: string;
+  area?: string;
   city?: string;
   pin?: string;
+  mapsLink?: string;
   status: 'ACTIVE' | 'INACTIVE';
   verified: boolean;
   verifiedMethod?: 'email' | 'phone';
@@ -178,6 +181,7 @@ export interface BasicInfoData {
   city: string;
   pinCode: string;
   logoUrl?: string;
+  photoUrl?: string;
 }
 
 export interface OperationsData {

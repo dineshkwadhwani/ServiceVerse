@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/store/notificationStore';
 import { apiClient } from '@/services/apiClient';
@@ -12,13 +12,21 @@ import {
   Edit2,
 } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
+import { IndianRupeeIcon } from '@/components/Shared/IndianRupeeIcon';
 import { EditUserModal } from './EditUserModal';
+import { SPOnboardingStepper } from '@/components/Onboarding/SPOnboardingStepper';
 import { CreateServiceModal } from '@/components/SuperAdmin/CreateServiceModal';
 import { ApprovalsTab } from '@/components/SuperAdmin/ApprovalsTab';
+import { SuperAdminProfileEditModal } from '@/components/Dashboard/SuperAdminProfileEditModal';
+import { SuperAdminReportPage } from '@/components/Reports/SuperAdminReports';
+import { useDashboardContext } from '@/context/DashboardContext';
+import { useAuthStore } from '@/store/authStore';
 import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
-import { StatsGrid } from '@/components/Shared/StatsGrid';
+import { StatsGrid, StatCard } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
 import { CheckCircle2 } from 'lucide-react';
+import { getDoc, doc } from 'firebase/firestore';
+import { db } from '@/utils/firebase-config';
 
 interface SystemStats {
   totalUsers: number;
@@ -26,6 +34,7 @@ interface SystemStats {
   totalAccountManagers: number;
   totalServiceProviders: number;
   totalCustomers: number;
+  totalEarnings?: number;
 }
 
 interface User {
@@ -33,9 +42,11 @@ interface User {
   name: string;
   email: string;
   phone?: string;
+  address?: string;
   role: 'SUPERADMIN' | 'ACCOUNT_MANAGER' | 'SERVICE_PROVIDER' | 'CUSTOMER' | 'COWORKER';
   status?: 'ACTIVE' | 'PENDING' | 'INACTIVE';
   verified: boolean;
+  businessName?: string;
   createdAt: Date;
 }
 
@@ -145,10 +156,13 @@ async function fetchSAServices(forceRefresh = false): Promise<ServiceListItem[]>
 }
 
 type ActiveTab = 'overview' | 'users' | 'services' | 'managers' | 'approvals';
+type ReportType = 'users' | 'services' | 'providers' | 'customers' | 'managers' | 'earnings' | null;
 
 export function SuperAdminDashboard() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { firebaseUser } = useAuthStore();
+  const { showProfileModal, setShowProfileModal } = useDashboardContext();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [isLoading, setIsLoading] = useState(true);
@@ -157,6 +171,8 @@ export function SuperAdminDashboard() {
   const [services, setServices] = useState<ServiceListItem[]>([]);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [onboardingSP, setOnboardingSP] = useState<any | null>(null);
+  const [isLoadingSPProfile, setIsLoadingSPProfile] = useState(false);
   const [editingService, setEditingService] = useState<ServiceListItem | null>(null);
   const [newUserForm, setNewUserForm] = useState({
     name: '',
@@ -166,16 +182,46 @@ export function SuperAdminDashboard() {
     serviceId: '', // For Account Managers
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saData, setSAData] = useState<any>(null);
+  const [openReport, setOpenReport] = useState<ReportType>(null);
+  const [userTypeFilter, setUserTypeFilter] = useState<'ALL' | User['role']>('ALL');
+  const [userStatusFilter, setUserStatusFilter] = useState<'ALL' | 'Active' | 'Pending' | 'Inactive'>('ALL');
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+    if (firebaseUser?.uid) {
+      loadSAProfile();
+    }
+    // Load users and services for reports on overview tab
+    loadUsers();
+    loadServices();
+  }, [firebaseUser?.uid]);
 
+  const loadSAProfile = async () => {
+    if (!firebaseUser?.uid) return;
+    try {
+      const docRef = doc(db, 'users', firebaseUser.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setSAData(docSnap.data());
+      }
+    } catch (error) {
+      console.error('Error loading SuperAdmin profile:', error);
+    }
+  };
+
+  const hasMountedTabEffect = useRef(false);
   useEffect(() => {
-    if (activeTab === 'users' || activeTab === 'managers') {
-      loadUsers();
+    if (!hasMountedTabEffect.current) {
+      hasMountedTabEffect.current = true;
+      return;
+    }
+    if (activeTab === 'overview') {
+      loadDashboardData(true);
+    } else if (activeTab === 'users' || activeTab === 'managers') {
+      loadUsers(true);
     } else if (activeTab === 'services') {
-      loadServices();
+      loadServices(true);
     }
   }, [activeTab]);
 
@@ -184,6 +230,11 @@ export function SuperAdminDashboard() {
     try {
       const data = await fetchSAStats(forceRefresh);
       setStats(data);
+
+      // Load SA profile data
+      if (firebaseUser?.uid) {
+        loadSAProfile();
+      }
     } catch (error: any) {
       toast.error('Failed to load dashboard stats');
     } finally {
@@ -206,6 +257,28 @@ export function SuperAdminDashboard() {
       setServices(data);
     } catch (error: any) {
       toast.error('Failed to load services');
+    }
+  };
+
+  // Service Providers get the same 5-step onboarding/edit stepper AMs use,
+  // instead of the flat EditUserModal fields - editing an SP means editing
+  // business info, operations, documentation, commission and menu, not just
+  // name/email/phone.
+  const handleEditUser = async (u: User) => {
+    if (u.role !== 'SERVICE_PROVIDER') {
+      setEditingUser(u);
+      return;
+    }
+
+    setIsLoadingSPProfile(true);
+    try {
+      const profileResponse = await apiClient.getSPProfile(u.id);
+      const profileData = profileResponse.data?.data || profileResponse.data;
+      setOnboardingSP({ uid: u.id, ...profileData });
+    } catch (error: any) {
+      toast.error('Failed to load SP profile');
+    } finally {
+      setIsLoadingSPProfile(false);
     }
   };
 
@@ -255,6 +328,19 @@ export function SuperAdminDashboard() {
     }
   };
 
+  // Show report page if one is selected
+  if (openReport) {
+    return (
+      <SuperAdminReportPage
+        reportType={openReport}
+        users={users}
+        services={services}
+        stats={stats || {}}
+        onBack={() => setOpenReport(null)}
+      />
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -274,6 +360,21 @@ export function SuperAdminDashboard() {
     return user.verified ? 'Active' : 'Pending';
   };
 
+  const filteredUsers = users.filter((u) => {
+    if (userTypeFilter !== 'ALL' && u.role !== userTypeFilter) return false;
+    if (userStatusFilter !== 'ALL' && getUserStatus(u) !== userStatusFilter) return false;
+    return true;
+  });
+
+  const handleStatClick = (stat: StatCard) => {
+    if (stat.id === 'users') setOpenReport('users');
+    else if (stat.id === 'services') setOpenReport('services');
+    else if (stat.id === 'providers') setOpenReport('providers');
+    else if (stat.id === 'customers') setOpenReport('customers');
+    else if (stat.id === 'managers') setOpenReport('managers');
+    else if (stat.id === 'earnings') setOpenReport('earnings');
+  };
+
   const tabs: DashboardTab<ActiveTab>[] = [
     { id: 'overview', icon: BarChart3, label: 'Overview' },
     { id: 'users', icon: Users, label: 'Users' },
@@ -291,13 +392,15 @@ export function SuperAdminDashboard() {
         {/* Overview Tab */}
         {activeTab === 'overview' && stats && (
           <StatsGrid
-            columns="grid-cols-2 lg:grid-cols-5"
+            columns="grid-cols-2 lg:grid-cols-6"
+            onStatClick={handleStatClick}
             stats={[
-              { label: 'Users', value: stats.totalUsers, icon: Users, color: COLORS.semantic.info },
-              { label: 'Services', value: stats.totalServices, icon: Briefcase, color: COLORS.semantic.success },
-              { label: 'Providers', value: stats.totalServiceProviders, icon: Users, color: COLORS.semantic.warning },
-              { label: 'Customers', value: stats.totalCustomers, icon: Users, color: COLORS.semantic.error },
-              { label: 'Managers', value: stats.totalAccountManagers, icon: Settings, color: COLORS.semantic.info },
+              { id: 'users', label: 'Users', value: stats.totalUsers, icon: Users, color: COLORS.semantic.info },
+              { id: 'services', label: 'Services', value: stats.totalServices, icon: Briefcase, color: COLORS.semantic.success },
+              { id: 'providers', label: 'Providers', value: stats.totalServiceProviders, icon: Users, color: COLORS.semantic.warning },
+              { id: 'customers', label: 'Customers', value: stats.totalCustomers, icon: Users, color: COLORS.semantic.error },
+              { id: 'managers', label: 'Managers', value: stats.totalAccountManagers, icon: Settings, color: COLORS.semantic.info },
+              { id: 'earnings', label: 'Earnings', value: `₹${Number(stats.totalEarnings || 0).toFixed(2)}`, icon: IndianRupeeIcon, color: COLORS.semantic.success },
             ]}
           />
         )}
@@ -319,11 +422,47 @@ export function SuperAdminDashboard() {
               </button>
             </div>
 
-            {users.length === 0 ? (
-              <EmptyState message="No users yet" />
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3">
+              <select
+                value={userTypeFilter}
+                onChange={(e) => setUserTypeFilter(e.target.value as typeof userTypeFilter)}
+                className="px-3 py-2 rounded-lg border text-sm focus:outline-none"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  borderColor: COLORS.border.light,
+                  color: COLORS.text.primary,
+                }}
+              >
+                <option value="ALL">All Types</option>
+                <option value="SUPERADMIN">Super Admin</option>
+                <option value="ACCOUNT_MANAGER">Account Manager</option>
+                <option value="SERVICE_PROVIDER">Service Provider</option>
+                <option value="COWORKER">Coworker</option>
+                <option value="CUSTOMER">Customer</option>
+              </select>
+              <select
+                value={userStatusFilter}
+                onChange={(e) => setUserStatusFilter(e.target.value as typeof userStatusFilter)}
+                className="px-3 py-2 rounded-lg border text-sm focus:outline-none"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  borderColor: COLORS.border.light,
+                  color: COLORS.text.primary,
+                }}
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="Pending">Pending</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </div>
+
+            {filteredUsers.length === 0 ? (
+              <EmptyState message={users.length === 0 ? 'No users yet' : 'No users match the selected filters'} />
             ) : (
               <div className="space-y-2">
-                {users.map((u) => (
+                {filteredUsers.map((u) => (
                   <div
                     key={u.id}
                     className="rounded-lg p-4 flex items-center justify-between gap-3 border transition"
@@ -336,25 +475,38 @@ export function SuperAdminDashboard() {
                       <p className="font-semibold text-sm truncate" style={{ color: COLORS.text.primary }}>
                         {u.name}
                       </p>
-                      <p
-                        className="text-xs mt-1"
-                        style={{
-                          color:
-                            u.role === 'SUPERADMIN' || getUserStatus(u) === 'Active'
-                              ? COLORS.semantic.success
-                              : COLORS.semantic.warning,
-                        }}
-                      >
-                        {getUserStatus(u)}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full font-semibold text-white"
+                          style={{ backgroundColor: COLORS.semantic.info }}
+                        >
+                          {u.role.replace('_', ' ')}
+                        </span>
+                        <p
+                          className="text-xs"
+                          style={{
+                            color:
+                              u.role === 'SUPERADMIN' || getUserStatus(u) === 'Active'
+                                ? COLORS.semantic.success
+                                : COLORS.semantic.warning,
+                          }}
+                        >
+                          {getUserStatus(u)}
+                        </p>
+                      </div>
                     </div>
                     <button
-                      onClick={() => setEditingUser(u)}
-                      className="flex-shrink-0 p-2 rounded-lg transition hover:opacity-80"
+                      onClick={() => handleEditUser(u)}
+                      disabled={isLoadingSPProfile}
+                      className="flex-shrink-0 p-2 rounded-lg transition hover:opacity-80 disabled:opacity-50"
                       style={{ color: COLORS.semantic.info }}
                       title="Edit user"
                     >
-                      <Edit2 className="w-5 h-5" />
+                      {isLoadingSPProfile && u.role === 'SERVICE_PROVIDER' ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Edit2 className="w-5 h-5" />
+                      )}
                     </button>
                   </div>
                 ))}
@@ -499,6 +651,39 @@ export function SuperAdminDashboard() {
         }}
       />
 
+      {/* SP Onboarding/Edit Stepper - same 5-step flow the Account Manager uses */}
+      {onboardingSP && (() => {
+        const serviceId = onboardingSP.service?.serviceId || '';
+        const customMenusObj = onboardingSP.customMenus;
+        const currentServiceMenus = customMenusObj?.[serviceId] || [];
+
+        return (
+          <SPOnboardingStepper
+            spId={onboardingSP.uid}
+            spPhone={onboardingSP.phone}
+            spEmail={onboardingSP.email}
+            spBusinessName={onboardingSP.businessName}
+            spOwnerName={onboardingSP.ownerName}
+            spAddress={onboardingSP.address}
+            spArea={onboardingSP.area}
+            spCity={onboardingSP.city}
+            spPin={onboardingSP.pin}
+            serviceId={serviceId}
+            existingLogoUrl={onboardingSP.basicInfo?.logoUrl || onboardingSP.businessLogo || ''}
+            existingOperations={onboardingSP.operations}
+            existingDocumentation={onboardingSP.documentation}
+            existingCommission={onboardingSP.commission}
+            existingMenus={currentServiceMenus}
+            onComplete={() => {
+              setOnboardingSP(null);
+              loadUsers(true);
+              loadDashboardData(true);
+            }}
+            onCancel={() => setOnboardingSP(null)}
+          />
+        );
+      })()}
+
       {/* Edit Service Modal */}
       {editingService && (
         <CreateServiceModal
@@ -587,6 +772,18 @@ export function SuperAdminDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Profile Edit Modal */}
+      {showProfileModal && firebaseUser?.uid && (
+        <SuperAdminProfileEditModal
+          userId={firebaseUser.uid}
+          name={saData?.name || ''}
+          email={saData?.email || ''}
+          photoUrl={saData?.photoUrl || ''}
+          onClose={() => setShowProfileModal(false)}
+          onComplete={() => loadSAProfile()}
+        />
       )}
     </div>
   );

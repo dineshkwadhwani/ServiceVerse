@@ -231,6 +231,9 @@ export async function registerServiceProvider(req: any, res: Response) {
       return sendError(res, new ValidationError('Phone number already registered as Service Provider'));
     }
 
+    const serviceDoc = await db.collection('services').doc(serviceId).get();
+    const serviceName = serviceDoc.exists ? (serviceDoc.data() as any)?.name || '' : '';
+
     // Create user in Firebase Auth
     let authUser;
     let isNewAuthUser = false;
@@ -337,6 +340,7 @@ export async function registerServiceProvider(req: any, res: Response) {
       spId: authUser.uid,
       businessName,
       email,
+      serviceName,
     });
 
     return sendSuccess(res, {
@@ -540,10 +544,13 @@ export async function completeRegistration(req: any, res: Response) {
     });
 
     if (role === 'SERVICE_PROVIDER') {
+      const serviceDoc = await db.collection('services').doc(serviceId).get();
+      const serviceName = serviceDoc.exists ? (serviceDoc.data() as any)?.name || '' : '';
       await sendNotificationByEvent('SP_REGISTERED', {
         spId: userId,
         businessName: (req.body as any).businessName || name,
         email,
+        serviceName,
       });
     }
 

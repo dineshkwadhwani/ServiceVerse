@@ -1,5 +1,6 @@
-import { FileText, QrCode, Percent, DollarSign, AlertCircle } from 'lucide-react';
+import { FileText, QrCode, Percent, AlertCircle } from 'lucide-react';
 import { COLORS } from '@/utils/theme';
+import { IndianRupeeIcon } from '@/components/Shared/IndianRupeeIcon';
 import type { DocumentationData, OnboardingCommissionConfig } from '@/types';
 
 interface Props {
@@ -30,9 +31,10 @@ export function DocumentationForm({
     }
   };
 
+  const isGSTRequired = documentationData.gstCollectionMandatory;
   const isQRRequired = documentationData.directPaymentAllowed && !documentationData.qrCodeUrl;
   const isValid =
-    documentationData.gstNumber &&
+    (!isGSTRequired || documentationData.gstNumber) &&
     (!documentationData.directPaymentAllowed || documentationData.qrCodeUrl) &&
     commissionData.type &&
     (commissionData.type === 'FIXED' || (commissionData.type === 'PERCENTAGE' && commissionData.value));
@@ -68,7 +70,7 @@ export function DocumentationForm({
               className="block font-semibold mb-2 text-sm"
               style={{ color: COLORS.text.primary }}
             >
-              GST Number *
+              GST Number {isGSTRequired ? <span style={{ color: COLORS.semantic.error }}>*</span> : '(Optional)'}
             </label>
             <input
               type="text"
@@ -172,7 +174,7 @@ export function DocumentationForm({
                 className="block font-semibold mb-2 text-sm"
                 style={{ color: COLORS.text.primary }}
               >
-                UPI QR Code {isQRRequired && '*'}
+                UPI QR Code {isQRRequired && <span style={{ color: COLORS.semantic.error }}>*</span>}
               </label>
               <div
                 className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition"
@@ -246,7 +248,7 @@ export function DocumentationForm({
           }}
         >
           <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: COLORS.text.primary }}>
-            <DollarSign className="w-5 h-5" />
+            <IndianRupeeIcon className="w-5 h-5" />
             Commission Model
           </h3>
 
@@ -282,7 +284,7 @@ export function DocumentationForm({
                 borderColor: `${COLORS.semantic.info}30`,
               }}>
                 <label className="block font-semibold mb-2 text-sm" style={{ color: COLORS.text.primary }}>
-                  Commission Rate (%) *
+                  Commission Rate (%) <span style={{ color: COLORS.semantic.error }}>*</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -332,7 +334,7 @@ export function DocumentationForm({
               />
               <div className="flex-1">
                 <div className="flex items-center gap-2 font-semibold" style={{ color: COLORS.text.primary }}>
-                  <DollarSign className="w-4 h-4" />
+                  <IndianRupeeIcon className="w-4 h-4" />
                   Fixed Commission
                 </div>
                 <p className="text-xs mt-1" style={{ color: COLORS.text.secondary }}>
@@ -356,7 +358,7 @@ export function DocumentationForm({
           <div>
             <p className="font-semibold">Please complete all required fields:</p>
             <ul className="list-disc list-inside text-xs mt-2 ml-2">
-              {!documentationData.gstNumber && <li>GST Number</li>}
+              {isGSTRequired && !documentationData.gstNumber && <li>GST Number</li>}
               {isQRRequired && <li>QR Code (required for direct payments)</li>}
               {commissionData.type === 'PERCENTAGE' && !commissionData.value && <li>Commission percentage</li>}
             </ul>

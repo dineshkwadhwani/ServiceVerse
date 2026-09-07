@@ -36,10 +36,18 @@ export const createServiceSchema = z.object({
   }),
 });
 
+// Editing an existing service: logo/heroImage are only provided if the admin
+// picks a new file - the existing image should be preserved otherwise, so
+// unlike creation these are optional here.
+export const editServiceSchema = createServiceSchema.extend({
+  logo: z.instanceof(File).refine(file => file.size <= 5 * 1024 * 1024, 'Logo must be less than 5MB').optional(),
+  heroImage: z.instanceof(File).refine(file => file.size <= 5 * 1024 * 1024, 'Hero image must be less than 5MB').optional(),
+});
+
 // Menu item schema (for master menu creation)
 export const menuItemSchema = z.object({
   name: z.string().min(2, 'Item name is required').max(100),
-  description: z.string().min(5, 'Description required').max(200).optional(),
+  description: z.string().min(5, 'Description must be at least 5 characters').max(200),
   basePrice: z.number().min(0, 'Price must be positive'),
   image: z.instanceof(File).refine(file => file.size <= 100 * 1024, 'Image must be less than 100KB').optional().nullable(),
 });

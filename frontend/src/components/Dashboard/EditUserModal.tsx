@@ -10,9 +10,11 @@ interface EditUserModalProps {
     name: string;
     email: string;
     phone?: string;
+    address?: string;
     role: 'SUPERADMIN' | 'ACCOUNT_MANAGER' | 'SERVICE_PROVIDER' | 'CUSTOMER' | 'COWORKER';
     status?: 'ACTIVE' | 'PENDING' | 'INACTIVE';
     verified?: boolean;
+    businessName?: string;
   } | null;
   onClose: () => void;
   onSave: () => void;
@@ -25,6 +27,7 @@ export function EditUserModal({ isOpen, user, onClose, onSave }: EditUserModalPr
     name: '',
     email: '',
     phone: '',
+    businessName: '',
     status: 'ACTIVE' as 'ACTIVE' | 'PENDING' | 'INACTIVE',
   });
 
@@ -35,6 +38,7 @@ export function EditUserModal({ isOpen, user, onClose, onSave }: EditUserModalPr
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
+        businessName: user.businessName || '',
         status: user.status || 'ACTIVE',
       });
     }
@@ -42,9 +46,11 @@ export function EditUserModal({ isOpen, user, onClose, onSave }: EditUserModalPr
 
   if (!isOpen || !user) return null;
 
+  const isServiceProvider = user.role === 'SERVICE_PROVIDER';
+
   const handleSave = async () => {
-    if (!formData.name || !formData.email) {
-      toast.error('Name and email are required');
+    if (!formData.name) {
+      toast.error('Name is required');
       return;
     }
 
@@ -52,9 +58,10 @@ export function EditUserModal({ isOpen, user, onClose, onSave }: EditUserModalPr
     try {
       await apiClient.updateUserByAdmin(user.id, {
         name: formData.name,
-        email: formData.email,
+        email: formData.email || undefined,
         phone: formData.phone || undefined,
         status: formData.status,
+        ...(isServiceProvider ? { businessName: formData.businessName } : {}),
       });
 
       toast.success('User updated successfully');
@@ -93,9 +100,24 @@ export function EditUserModal({ isOpen, user, onClose, onSave }: EditUserModalPr
 
           {/* Form Fields */}
           <div className="space-y-4">
+            {/* Business Name (Service Providers only) */}
+            {isServiceProvider && (
+              <div>
+                <label className="block text-white font-semibold text-sm mb-2">Business Name</label>
+                <input
+                  type="text"
+                  value={formData.businessName}
+                  onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 text-sm"
+                />
+              </div>
+            )}
+
             {/* Name */}
             <div>
-              <label className="block text-white font-semibold text-sm mb-2">Name</label>
+              <label className="block text-white font-semibold text-sm mb-2">
+                {isServiceProvider ? 'Owner Name' : 'Name'}
+              </label>
               <input
                 type="text"
                 value={formData.name}
@@ -126,6 +148,16 @@ export function EditUserModal({ isOpen, user, onClose, onSave }: EditUserModalPr
                 className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 text-sm"
               />
             </div>
+
+            {/* Address (Read-only) */}
+            {user.address && (
+              <div>
+                <label className="block text-white font-semibold text-sm mb-2">Address</label>
+                <div className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-gray-300 text-sm">
+                  {user.address}
+                </div>
+              </div>
+            )}
 
             {/* Status */}
             {canChangeStatus && (

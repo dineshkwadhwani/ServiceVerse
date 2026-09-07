@@ -7,7 +7,8 @@ import { auth } from '@/utils/firebase-config';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 import { useAuthStore } from '@/store/authStore';
-import { clearRegistrationContext } from '@/utils/sessionStorage';
+import { clearRegistrationContext, getRegistrationPhone } from '@/utils/sessionStorage';
+import { getAuthErrorMessage } from '@/utils/authErrors';
 import { OTPVerificationStep } from './OTPVerificationStep';
 
 interface FormData {
@@ -35,7 +36,7 @@ export function RegisterSPForm({ serviceId, serviceName }: Props) {
     businessName: '',
     ownerName: '',
     email: '',
-    phone: '',
+    phone: getRegistrationPhone()?.replace('+91', '') || '',
     address: '',
     area: '',
     city: '',
@@ -97,6 +98,11 @@ export function RegisterSPForm({ serviceId, serviceName }: Props) {
 
     setIsLoading(true);
     try {
+      const recaptchaContainer = document.getElementById('recaptcha-container');
+      if (recaptchaContainer) {
+        recaptchaContainer.innerHTML = '';
+      }
+
       const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         size: 'invisible',
       });
@@ -112,10 +118,32 @@ export function RegisterSPForm({ serviceId, serviceName }: Props) {
       setStep('verification');
       toast.success('OTP sent to your phone');
     } catch (error: any) {
-      toast.error('Failed to send phone OTP: ' + error.message);
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleResendPhoneOTP = async () => {
+    if (!validateForm()) return;
+
+    const recaptchaContainer = document.getElementById('recaptcha-container');
+    if (recaptchaContainer) {
+      recaptchaContainer.innerHTML = '';
+    }
+
+    const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+      size: 'invisible',
+    });
+
+    const confirmationResult = await signInWithPhoneNumber(
+      auth,
+      `+91${formData.phone}`,
+      recaptchaVerifier
+    );
+
+    setPhoneConfirmationResult(confirmationResult);
+    setVerificationMethod('phone');
   };
 
   const handleVerificationComplete = async (_verifiedMethod: 'email' | 'phone') => {
@@ -184,6 +212,7 @@ export function RegisterSPForm({ serviceId, serviceName }: Props) {
         phone={formData.phone}
         onVerified={() => handleVerificationComplete(verificationMethod)}
         onBack={() => setStep('details')}
+        onResend={verificationMethod === 'phone' ? handleResendPhoneOTP : undefined}
         isLoading={isLoading}
         confirmationResult={phoneConfirmationResult}
       />
@@ -322,7 +351,7 @@ export function RegisterSPForm({ serviceId, serviceName }: Props) {
             style={{ color: COLORS.text.primary }}
           >
             <Phone className="w-4 h-4" />
-            Phone Number *
+            Phone Number <span style={{ color: COLORS.semantic.error }}>*</span>
           </label>
           <div className="flex gap-2">
             <span
@@ -365,7 +394,7 @@ export function RegisterSPForm({ serviceId, serviceName }: Props) {
             style={{ color: COLORS.text.primary }}
           >
             <MapPin className="w-4 h-4" />
-            Business Address *
+            Business Address <span style={{ color: COLORS.semantic.error }}>*</span>
           </label>
           <input
             type="text"
@@ -387,12 +416,18 @@ export function RegisterSPForm({ serviceId, serviceName }: Props) {
 
         {/* Area */}
         <div>
+          <label
+            className="flex items-center gap-2 font-semibold mb-3"
+            style={{ color: COLORS.text.primary }}
+          >
+            Area / Locality <span style={{ color: COLORS.semantic.error }}>*</span>
+          </label>
           <input
             type="text"
             name="area"
             value={formData.area}
             onChange={handleInputChange}
-            placeholder="Area / Locality *"
+            placeholder="Area / Locality"
             className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
             style={{
               backgroundColor: COLORS.bg.primary,
@@ -407,38 +442,54 @@ export function RegisterSPForm({ serviceId, serviceName }: Props) {
 
         {/* City & PIN */}
         <div className="grid grid-cols-2 gap-4">
-          <input
-            type="text"
-            name="city"
-            value={formData.city}
-            onChange={handleInputChange}
-            placeholder="City *"
-            className="px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
-            style={{
-              backgroundColor: COLORS.bg.primary,
-              borderColor: COLORS.border.light,
-              color: COLORS.text.primary,
-            }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.success)}
-            onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
-            required
-          />
-          <input
-            type="text"
-            name="pin"
-            value={formData.pin}
-            onChange={handleInputChange}
-            placeholder="PIN Code *"
-            className="px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
-            style={{
-              backgroundColor: COLORS.bg.primary,
-              borderColor: COLORS.border.light,
-              color: COLORS.text.primary,
-            }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.success)}
-            onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
-            required
-          />
+          <div>
+            <label
+              className="flex items-center gap-2 font-semibold mb-3"
+              style={{ color: COLORS.text.primary }}
+            >
+              City <span style={{ color: COLORS.semantic.error }}>*</span>
+            </label>
+            <input
+              type="text"
+              name="city"
+              value={formData.city}
+              onChange={handleInputChange}
+              placeholder="City"
+              className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
+              style={{
+                backgroundColor: COLORS.bg.primary,
+                borderColor: COLORS.border.light,
+                color: COLORS.text.primary,
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.success)}
+              onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
+              required
+            />
+          </div>
+          <div>
+            <label
+              className="flex items-center gap-2 font-semibold mb-3"
+              style={{ color: COLORS.text.primary }}
+            >
+              PIN Code <span style={{ color: COLORS.semantic.error }}>*</span>
+            </label>
+            <input
+              type="text"
+              name="pin"
+              value={formData.pin}
+              onChange={handleInputChange}
+              placeholder="PIN Code"
+              className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-2 transition"
+              style={{
+                backgroundColor: COLORS.bg.primary,
+                borderColor: COLORS.border.light,
+                color: COLORS.text.primary,
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = COLORS.semantic.success)}
+              onBlur={(e) => (e.currentTarget.style.borderColor = COLORS.border.light)}
+              required
+            />
+          </div>
         </div>
 
         {/* Verification */}

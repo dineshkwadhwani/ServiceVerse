@@ -1,3 +1,4 @@
+import * as admin from 'firebase-admin';
 import { db, messaging } from '@/utils/firebase';
 import { Logger } from '@/utils/logger';
 import * as functions from 'firebase-functions';
@@ -118,6 +119,32 @@ async function sendPush(tokens: string[], title: string, body: string, data?: Re
   });
 }
 
+async function persistNotifications(
+  userIds: string[],
+  title: string,
+  body: string,
+  event?: NotificationEvent,
+  data?: Record<string, string>
+) {
+  if (!userIds.length) return;
+
+  const batch = db.batch();
+  userIds.forEach((userId) => {
+    const ref = db.collection('notifications').doc();
+    batch.set(ref, {
+      userId,
+      title,
+      body,
+      type: event || 'GENERAL',
+      data: data || {},
+      read: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+  await batch.commit();
+}
+
 async function notifyUsers(params: {
   userIds?: string[];
   emails?: string[];
@@ -126,6 +153,7 @@ async function notifyUsers(params: {
   pushTitle?: string;
   pushBody?: string;
   pushData?: Record<string, string>;
+  event?: NotificationEvent;
 }) {
   const userIds = Array.from(new Set((params.userIds || []).filter(Boolean)));
   const explicitEmails = Array.from(new Set((params.emails || []).filter(Boolean)));
@@ -158,6 +186,18 @@ async function notifyUsers(params: {
       await sendPush(Array.from(new Set(tokens)), params.pushTitle, params.pushBody, params.pushData);
     } catch (error: any) {
       logger.warn('Push notification failed', { error: error?.message || String(error) });
+    }
+
+    try {
+      await persistNotifications(
+        validUsers.map((user) => user.uid),
+        params.pushTitle,
+        params.pushBody,
+        params.event,
+        params.pushData
+      );
+    } catch (error: any) {
+      logger.warn('Notification persistence failed', { error: error?.message || String(error) });
     }
   }
 }
@@ -198,6 +238,7 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
           userIds: superAdmins.map((u) => u.uid),
           pushTitle: template.push.title,
           pushBody,
+          event,
           emailSubject: template.email.subject,
           emailHtml: template.email.template(payload),
         });
@@ -218,6 +259,7 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
             spId: String(payload.spId || ''),
             amId: String(payload.amId || ''),
           },
+          event,
           emailSubject: template.email.subject,
           emailHtml: template.email.template(payload),
         });
@@ -233,6 +275,7 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
             type: 'SP_ONBOARDING_COMPLETE',
             spId: String(payload.spId || ''),
           },
+          event,
           emailSubject: template.email.subject,
           emailHtml: template.email.template(payload),
         });
@@ -251,6 +294,7 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
             type: 'SP_ACTIVATION_COMPLETE',
             spId: String(payload.spId || ''),
           },
+          event,
           emailSubject: template.email.subject,
           emailHtml: template.email.template(payload),
         });
@@ -274,6 +318,7 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
             type: 'ORDER_CREATED',
             orderId: String(payload.orderId || ''),
           },
+          event,
         });
         break;
       }
@@ -285,6 +330,7 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
           userIds: [payload.spId, payload.customerId],
           pushTitle: template.push.title,
           pushBody,
+          event,
           emailSubject: subject,
           emailHtml: template.email.template(payload),
         });
@@ -301,6 +347,7 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
             type: 'ORDER_COMPLETED',
             orderId: String(payload.orderId || ''),
           },
+          event,
           emailSubject: template.email.subject,
           emailHtml: template.email.template(payload),
         });
@@ -320,6 +367,7 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
             type: 'DEASSOCIATION_REQUESTED',
             requestId: String(payload.requestId || ''),
           },
+          event,
           emailSubject: template.email.subject,
           emailHtml: template.email.template(payload),
         });
@@ -344,6 +392,7 @@ export async function sendNotificationByEvent(event: NotificationEvent, payload:
             type: 'DEASSOCIATION_APPROVED',
             requestId: String(payload.requestId || ''),
           },
+          event,
           emailSubject: template.email.subject,
           emailHtml: template.email.template(payload),
         });

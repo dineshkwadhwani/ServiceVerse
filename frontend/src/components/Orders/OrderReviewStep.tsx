@@ -20,7 +20,7 @@ interface Props {
   deliveryDateTime?: string;
   specialInstructions: string;
   paymentMethod: 'ONLINE' | 'DIRECT';
-  deliveryType?: 'DROP' | 'PICKUP';
+  deliveryType?: 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY';
   selectedCoworker?: string;
   spGstPercent?: number;
   spGstMandatory?: boolean;
@@ -37,7 +37,7 @@ export function OrderReviewStep({
   deliveryDateTime,
   specialInstructions,
   paymentMethod,
-  deliveryType = 'DROP',
+  deliveryType = 'PICKUP_AND_DELIVERY',
   selectedCoworker = '',
   spGstPercent = 0,
   spGstMandatory = false,
@@ -48,17 +48,22 @@ export function OrderReviewStep({
   const toast = useToast();
   const [isCreating, setIsCreating] = useState(false);
 
+  // Online payment is only valid when the SP has GST collection mandatory. Guard here too
+  // in case spGstMandatory changed after this step was entered (e.g. SP switched mid-flow).
+  const effectivePaymentMethod: 'ONLINE' | 'DIRECT' = spGstMandatory ? paymentMethod : 'DIRECT';
+
   // Calculate totals
   const subtotal = items.reduce((sum, item) => sum + item.itemTotal, 0);
 
   // GST is applied if:
   // 1. SP has gstCollectionMandatory = true, OR
   // 2. Payment method is ONLINE
-  const applyGST = spGstMandatory || paymentMethod === 'ONLINE';
+  const applyGST = spGstMandatory || effectivePaymentMethod === 'ONLINE';
   const gstAmount = applyGST && spGstPercent > 0 ? (subtotal * spGstPercent) / 100 : 0;
   const total = subtotal + gstAmount;
 
   const handleConfirm = async () => {
+    console.log('[OrderReviewStep] handleConfirm called. spId:', spId, 'customerId:', customer?.customerId);
     setIsCreating(true);
     try {
       const orderData = {
@@ -70,7 +75,7 @@ export function OrderReviewStep({
         deliveryAddress,
         deliveryDateTime: deliveryDateTime ? new Date(deliveryDateTime).toISOString() : null,
         specialInstructions,
-        paymentMethod,
+        paymentMethod: effectivePaymentMethod,
         deliveryType,
         selectedCoworker,
         items: items.map(item => ({
@@ -86,10 +91,13 @@ export function OrderReviewStep({
         applyGST,
       };
 
+      console.log('[OrderReviewStep] About to send order to API:', { spId: orderData.spId, customerId: orderData.customerId, customerPhone: orderData.customerPhone, itemsCount: orderData.items.length, paymentMethod: orderData.paymentMethod });
+
       const response = await apiClient.createOrder(orderData);
       toast.success('Order created successfully!');
       onComplete(response?.data?.orderId);
     } catch (error: any) {
+      console.error('[OrderReviewStep] Order creation failed:', error);
       toast.error(error?.message || 'Failed to create order');
     } finally {
       setIsCreating(false);
@@ -139,12 +147,16 @@ export function OrderReviewStep({
             </div>
           )}
           <div className="flex justify-between">
-            <span style={{ color: COLORS.text.secondary }}>Delivery Type</span>
+            <span style={{ color: COLORS.text.secondary }}>Desired Service</span>
             <span className="font-semibold" style={{ color: COLORS.text.primary }}>
-              {deliveryType === 'DROP' ? 'Delivery (Drop)' : 'Pickup'}
+              {deliveryType === 'PICKUP_ONLY'
+                ? 'Pickup Only'
+                : deliveryType === 'DELIVERY_ONLY'
+                ? 'Delivery Only'
+                : 'Pickup and Delivery'}
             </span>
           </div>
-          {deliveryType === 'PICKUP' && (
+          {deliveryType !== 'DELIVERY_ONLY' && (
             <div className="flex justify-between">
               <span style={{ color: COLORS.text.secondary }}>Coworker</span>
               <span className="font-semibold" style={{ color: COLORS.text.primary }}>
@@ -155,7 +167,7 @@ export function OrderReviewStep({
           <div className="flex justify-between">
             <span style={{ color: COLORS.text.secondary }}>Payment Method</span>
             <span className="font-semibold" style={{ color: COLORS.text.primary }}>
-              {paymentMethod === 'DIRECT' ? 'Direct Payment' : 'Online Payment'}
+              {effectivePaymentMethod === 'DIRECT' ? 'Direct Payment' : 'Online Payment'}
             </span>
           </div>
         </div>

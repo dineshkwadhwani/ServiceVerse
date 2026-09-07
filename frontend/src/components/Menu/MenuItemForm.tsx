@@ -15,7 +15,7 @@ interface MenuItemFormProps {
 
 interface MenuItemFormData {
   name: string;
-  description?: string;
+  description: string;
   basePrice: number;
   image?: File | null;
 }
@@ -56,9 +56,9 @@ export function MenuItemForm({ onAdd, items, onRemove, isLoading = false }: Menu
     try {
       const newItem: Omit<MenuItem, 'menuItemId'> = {
         name: data.name,
-        description: data.description,
         basePrice: data.basePrice,
-        image: imagePreview || undefined,
+        description: data.description,
+        ...(imagePreview ? { image: imagePreview } : {}),
       };
 
       onAdd(newItem);
@@ -92,7 +92,7 @@ export function MenuItemForm({ onAdd, items, onRemove, isLoading = false }: Menu
           {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description (Optional)
+              Description <span className="text-red-500">*</span>
             </label>
             <textarea
               placeholder="e.g., Professional washing and ironing service"

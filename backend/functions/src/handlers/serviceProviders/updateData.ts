@@ -73,9 +73,11 @@ export async function updateSPData(req: AuthRequest, res: Response) {
       updateData.city = basicInfo.city;
       updateData.pin = basicInfo.pinCode;
       updateData.businessLogo = basicInfo.logoUrl || null;
+      updateData.photoUrl = basicInfo.photoUrl || null;
       updateData.basicInfo = {
         ...basicInfo,
         logoUrl: basicInfo.logoUrl || '',
+        photoUrl: basicInfo.photoUrl || '',
       };
     }
 

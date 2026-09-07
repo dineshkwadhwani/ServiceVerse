@@ -12,12 +12,15 @@ import * as phase3Handlers from '@/handlers/phase3/orders';
 import * as authHandlers from '@/handlers/auth/registration';
 import * as phoneSignInHandlers from '@/handlers/auth/phoneSignIn';
 import * as customerHandlers from '@/handlers/customers/dashboard';
+import * as customerProfileHandlers from '@/handlers/customers/profile';
 import * as spDashboardHandlers from '@/handlers/serviceProviders/dashboard';
 import * as createCustomerHandlers from '@/handlers/serviceProviders/createCustomer';
 import * as spProfileHandlers from '@/handlers/serviceProviders/getSPProfile';
 import * as spProfileUpdateHandlers from '@/handlers/serviceProviders/profileUpdate';
 import * as amDashboardHandlers from '@/handlers/accountManagers/dashboard';
+import * as amProfileHandlers from '@/handlers/accountManagers/profile';
 import * as superAdminHandlers from '@/handlers/superAdmin/dashboard';
+import * as superAdminProfileHandlers from '@/handlers/superAdmin/profile';
 import * as diagnosticsHandlers from '@/handlers/debug/diagnostics';
 import * as spMenuHandlers from '@/handlers/onboarding/spMenuSelection';
 import * as spActivationHandlers from '@/handlers/onboarding/spActivation';
@@ -28,6 +31,8 @@ import * as ordersHandlers from '@/handlers/orders/createOrder';
 import * as ordersListHandlers from '@/handlers/orders/getSPOrders';
 import * as orderMenuHandlers from '@/handlers/orders/getSPMenu';
 import * as coworkerHandlers from '@/handlers/coworkers/manage';
+import * as coworkerProfileHandlers from '@/handlers/coworkers/profile';
+import * as notificationHandlers from '@/handlers/notifications/notifications';
 
 import { getSeedAdminConfig, seedSuperAdminUser } from '@/handlers/admin/seedAdmin';
 
@@ -42,6 +47,9 @@ const defaultAllowedOrigins = [
   'http://localhost:3000',
   'https://serviceverse.vercel.app',
   'https://serviceverse-stage.vercel.app',
+  // Capacitor's default WebView origin for the wrapped mobile app (Android: https, iOS: capacitor:)
+  'https://localhost',
+  'capacitor://localhost',
 ];
 
 const configuredAllowedOrigins = (process.env.CORS_ORIGIN || '')
@@ -97,6 +105,10 @@ app.get('/services/:serviceId', async (req, res) => {
   serviceHandlers.getService(req as any, res);
 });
 
+app.get('/services/:serviceId/providers', async (req, res) => {
+  customerHandlers.getPublicServiceProviders(req as any, res);
+});
+
 // Auth endpoints
 app.post('/auth/send-email-otp', async (req, res) => {
   authHandlers.sendEmailOTP(req, res);
@@ -118,6 +130,10 @@ app.post('/auth/complete-phone-signin', async (req, res) => {
   phoneSignInHandlers.completePhoneSignIn(req, res);
 });
 
+app.post('/auth/check-phone', async (req, res) => {
+  phoneSignInHandlers.checkPhoneRegistered(req, res);
+});
+
 app.post('/auth/register-customer', async (req, res) => {
   authHandlers.registerCustomer(req, res);
 });
@@ -136,6 +152,18 @@ app.use(verifyToken);
 
 app.post('/auth/register-push-token', async (req, res) => {
   authHandlers.registerPushToken(req, res);
+});
+
+// ============================================================================
+// NOTIFICATIONS
+// ============================================================================
+
+app.get('/notifications', async (req, res) => {
+  notificationHandlers.getNotifications(req as any, res);
+});
+
+app.patch('/notifications/:notificationId/read', async (req, res) => {
+  notificationHandlers.markNotificationRead(req as any, res);
 });
 
 // ============================================================================
@@ -170,6 +198,10 @@ app.get('/customers/:customerId/orders', requireRole('CUSTOMER', 'ACCOUNT_MANAGE
   ordersListHandlers.getCustomerOrders(req as any, res);
 });
 
+app.patch('/customers/:userId/profile', requireRole('CUSTOMER'), async (req, res) => {
+  customerProfileHandlers.updateCustomerProfile(req as any, res);
+});
+
 // ============================================================================
 // ORDERS
 // ============================================================================
@@ -198,7 +230,7 @@ app.post('/orders/:orderId/verify-payment', requireRole('CUSTOMER'), async (req,
   ordersHandlers.verifyOnlinePayment(req as any, res);
 });
 
-app.get('/service-providers/:spId/orders', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), async (req, res) => {
+app.get('/service-providers/:spId/orders', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER', 'COWORKER'), async (req, res) => {
   ordersListHandlers.getSPOrders(req as any, res);
 });
 
@@ -206,46 +238,50 @@ app.get('/service-providers/:spId/orders', requireRole('SERVICE_PROVIDER', 'ACCO
 // SERVICE PROVIDER DASHBOARD
 // ============================================================================
 
-app.post('/service-providers/customers/search-phone', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+app.post('/service-providers/customers/search-phone', requireRole('SERVICE_PROVIDER', 'COWORKER'), async (req, res) => {
   createCustomerHandlers.searchCustomerByPhone(req as any, res);
 });
 
-app.post('/service-providers/customers/create-new', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+app.post('/service-providers/customers/create-new', requireRole('SERVICE_PROVIDER', 'COWORKER'), async (req, res) => {
   createCustomerHandlers.createNewCustomerWithAssociation(req as any, res);
 });
 
-app.post('/service-providers/customers/associate', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+app.post('/service-providers/customers/associate', requireRole('SERVICE_PROVIDER', 'COWORKER'), async (req, res) => {
   createCustomerHandlers.associateExistingCustomer(req as any, res);
 });
 
-app.get('/service-providers/customers', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+app.get('/service-providers/customers', requireRole('SERVICE_PROVIDER', 'COWORKER'), async (req, res) => {
   spDashboardHandlers.getSPCustomers(req as any, res);
 });
 
-// SP Profile Update (SP can update their own profile)
+// SP Profile Update (SP can update their own profile) - coworkers cannot edit the master SP profile
 app.patch('/service-providers/profile', requireRole('SERVICE_PROVIDER'), async (req, res) => {
   spProfileUpdateHandlers.updateSPProfile(req as any, res);
 });
 
-app.get('/service-providers/:spId/stats', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), async (req, res) => {
+app.get('/service-providers/:spId/stats', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER', 'COWORKER'), async (req, res) => {
   spDashboardHandlers.getSPStats(req as any, res);
 });
 
-app.get('/service-providers/:spId/earnings', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER'), async (req, res) => {
+app.get('/service-providers/:spId/earnings', requireRole('SERVICE_PROVIDER', 'ACCOUNT_MANAGER', 'COWORKER'), async (req, res) => {
   spDashboardHandlers.getSPEarnings(req as any, res);
 });
 
-// SP Coworker Management
+// SP Coworker Management - only the SP can create coworkers or change their status
 app.post('/service-providers/:spId/coworkers', requireRole('SERVICE_PROVIDER'), async (req, res) => {
   coworkerHandlers.createCoworker(req as any, res);
 });
 
-app.get('/service-providers/:spId/coworkers', requireRole('SERVICE_PROVIDER'), async (req, res) => {
+app.get('/service-providers/:spId/coworkers', requireRole('SERVICE_PROVIDER', 'COWORKER'), async (req, res) => {
   coworkerHandlers.getSPCoworkers(req as any, res);
 });
 
 app.patch('/service-providers/:spId/coworkers/:coworkerId', requireRole('SERVICE_PROVIDER'), async (req, res) => {
   coworkerHandlers.updateCoworkerStatus(req as any, res);
+});
+
+app.patch('/coworkers/:userId/profile', requireRole('COWORKER'), async (req, res) => {
+  coworkerProfileHandlers.updateCoworkerProfile(req as any, res);
 });
 
 // SP Menu Management
@@ -298,12 +334,20 @@ app.patch('/account-managers/unorphan-requests/:requestId', requireRole('ACCOUNT
   amDashboardHandlers.reviewUnorphanRequest(req as any, res);
 });
 
+app.patch('/account-managers/:userId/profile', requireRole('ACCOUNT_MANAGER'), async (req, res) => {
+  amProfileHandlers.updateAMProfile(req as any, res);
+});
+
 // ============================================================================
 // SUPERADMIN DASHBOARD
 // ============================================================================
 
 app.get('/superadmin/stats', requireRole('SUPERADMIN'), async (req, res) => {
   superAdminHandlers.getSystemStats(req as any, res);
+});
+
+app.get('/superadmin/earnings', requireRole('SUPERADMIN'), async (req, res) => {
+  superAdminHandlers.getEarningsReport(req as any, res);
 });
 
 app.get('/superadmin/users', requireRole('SUPERADMIN'), async (req, res) => {
@@ -316,6 +360,10 @@ app.post('/superadmin/users', requireRole('SUPERADMIN'), async (req, res) => {
 
 app.put('/superadmin/users/:userId', requireRole('SUPERADMIN'), async (req, res) => {
   superAdminHandlers.updateUser(req as any, res);
+});
+
+app.patch('/superadmin/:userId/profile', requireRole('SUPERADMIN'), async (req, res) => {
+  superAdminProfileHandlers.updateSuperAdminProfile(req as any, res);
 });
 
 // ============================================================================

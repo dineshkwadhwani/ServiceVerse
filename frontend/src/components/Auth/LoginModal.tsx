@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
+import { RecaptchaVerifier, signInWithPhoneNumber, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from '@/utils/firebase-config';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/store/notificationStore';
+import { apiClient } from '@/services/apiClient';
+import { getAuthErrorMessage } from '@/utils/authErrors';
+import { setRegistrationContext } from '@/utils/sessionStorage';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -15,10 +18,11 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
   const { firebaseUser, loadUserProfile } = useAuthStore();
   const toast = useToast();
 
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [step, setStep] = useState<'phone' | 'otp' | 'not-registered'>('phone');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
 
   // Close modal if logged in
@@ -38,6 +42,20 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
 
     setIsLoading(true);
     try {
+      // Check registration BEFORE triggering Firebase phone auth — signInWithPhoneNumber
+      // itself creates a Firebase Auth account as soon as OTP is confirmed, so an
+      // unregistered number must never reach that call in the first place.
+      const checkResponse: any = await apiClient.checkPhoneRegistered(`+91${phone}`);
+      if (checkResponse?.data?.registered !== true) {
+        setStep('not-registered');
+        return;
+      }
+
+      const recaptchaContainer = document.getElementById('login-recaptcha');
+      if (recaptchaContainer) {
+        recaptchaContainer.innerHTML = '';
+      }
+
       const recaptchaVerifier = new RecaptchaVerifier(auth, 'login-recaptcha', {
         size: 'invisible',
       });
@@ -47,9 +65,41 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
       setStep('otp');
       toast.success('OTP sent to your phone');
     } catch (error: any) {
-      toast.error('Failed to send OTP: ' + error.message);
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGoToRegister = () => {
+    setRegistrationContext({ phone: `+91${phone}` });
+    onSwitchToRegister();
+  };
+
+  const handleCancelRegisterPrompt = () => {
+    setStep('phone');
+  };
+
+  const handleResendOTP = async () => {
+    setIsResending(true);
+    try {
+      const recaptchaContainer = document.getElementById('login-recaptcha');
+      if (recaptchaContainer) {
+        recaptchaContainer.innerHTML = '';
+      }
+
+      const recaptchaVerifier = new RecaptchaVerifier(auth, 'login-recaptcha', {
+        size: 'invisible',
+      });
+
+      const result = await signInWithPhoneNumber(auth, `+91${phone}`, recaptchaVerifier);
+      setConfirmationResult(result);
+      setOtp('');
+      toast.success('OTP resent to your phone');
+    } catch (error: any) {
+      toast.error(getAuthErrorMessage(error));
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -71,17 +121,22 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
       await confirmationResult.confirm(otp);
 
       if (auth.currentUser) {
+        const fullPhone = `+91${phone}`;
+        let registered = false;
         try {
-          await fetch(`${import.meta.env.VITE_API_URL}/auth/complete-phone-signin`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              uid: auth.currentUser.uid,
-              phone: `+91${phone}`,
-            }),
-          });
+          const response: any = await apiClient.completePhoneSignIn(auth.currentUser.uid, fullPhone);
+          registered = response?.data?.registered === true;
         } catch (error) {
-          console.warn('Backend sync failed, continuing with login');
+          console.warn('Phone sign-in check failed, treating as unregistered', error);
+          registered = false;
+        }
+
+        if (!registered) {
+          await firebaseSignOut(auth);
+          setRegistrationContext({ phone: fullPhone });
+          toast.error("This number isn't registered yet. Let's get you set up.");
+          onSwitchToRegister();
+          return;
         }
 
         await loadUserProfile(auth.currentUser);
@@ -89,7 +144,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
         onClose();
       }
     } catch (error: any) {
-      toast.error('Failed to verify OTP: ' + error.message);
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -112,8 +167,36 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
         </div>
 
         {/* Content */}
-        <form onSubmit={step === 'phone' ? handleSendOTP : handleVerifyOTP} className="p-6 space-y-4">
-          {step === 'phone' ? (
+        <form
+          onSubmit={
+            step === 'phone' ? handleSendOTP : step === 'otp' ? handleVerifyOTP : (e) => e.preventDefault()
+          }
+          className="p-6 space-y-4"
+        >
+          {step === 'not-registered' ? (
+            <>
+              <div className="text-center py-2">
+                <p className="text-gray-900 font-medium mb-1">This number isn't registered yet</p>
+                <p className="text-sm text-gray-600">Would you like to create an account?</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoToRegister}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+              >
+                Register
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCancelRegisterPrompt}
+                className="w-full text-gray-600 hover:text-gray-800 font-medium py-2 transition"
+              >
+                Cancel
+              </button>
+            </>
+          ) : step === 'phone' ? (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -168,6 +251,15 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
 
               <button
                 type="button"
+                onClick={handleResendOTP}
+                disabled={isResending || isLoading}
+                className="w-full text-blue-600 hover:text-blue-700 font-medium py-1 transition disabled:opacity-50 text-sm"
+              >
+                {isResending ? 'Resending OTP...' : 'Resend OTP'}
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   setStep('phone');
                   setOtp('');
@@ -180,16 +272,18 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
             </>
           )}
 
-          <div className="text-center text-sm text-gray-600">
-            Don't have an account?{' '}
-            <button
-              type="button"
-              onClick={onSwitchToRegister}
-              className="text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Register
-            </button>
-          </div>
+          {step !== 'not-registered' && (
+            <div className="text-center text-sm text-gray-600">
+              Don't have an account?{' '}
+              <button
+                type="button"
+                onClick={onSwitchToRegister}
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Register
+              </button>
+            </div>
+          )}
         </form>
 
         {/* Recaptcha container */}

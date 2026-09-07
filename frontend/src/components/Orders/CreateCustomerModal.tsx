@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { apiClient } from '@/services/apiClient';
 import { COLORS } from '@/utils/theme';
 
 interface CreateCustomerModalProps {
+  initialPhone?: string;
   onClose: () => void;
   onCustomerCreated: () => void;
 }
@@ -26,25 +27,30 @@ interface FormData {
   phone: string;
   name: string;
   address: string;
+  city: string;
+  pin: string;
   email: string;
 }
 
-export function CreateCustomerModal({ onClose, onCustomerCreated }: CreateCustomerModalProps) {
+export function CreateCustomerModal({ initialPhone, onClose, onCustomerCreated }: CreateCustomerModalProps) {
+  const isValidInitialPhone = !!initialPhone && initialPhone.length === 10 && /^\d+$/.test(initialPhone);
   const [step, setStep] = useState<Step>('search');
-  const [phone, setPhone] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const [phone, setPhone] = useState(isValidInitialPhone ? initialPhone! : '');
+  const [isSearching, setIsSearching] = useState(isValidInitialPhone);
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [formData, setFormData] = useState<FormData>({
     phone: '',
     name: '',
     address: '',
+    city: '',
+    pin: '',
     email: '',
   });
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSearchCustomer = async () => {
-    if (!phone || phone.length !== 10 || !/^\d+$/.test(phone)) {
+  const handleSearchCustomer = async (phoneToSearch: string = phone) => {
+    if (!phoneToSearch || phoneToSearch.length !== 10 || !/^\d+$/.test(phoneToSearch)) {
       setError('Please enter a valid 10-digit phone number');
       return;
     }
@@ -52,11 +58,11 @@ export function CreateCustomerModal({ onClose, onCustomerCreated }: CreateCustom
     setIsSearching(true);
     setError('');
     try {
-      const result = await apiClient.searchCustomerByPhone(phone);
+      const result = await apiClient.searchCustomerByPhone(phoneToSearch);
       setSearchResult(result?.data);
 
       if (result?.data?.status === 'NOT_EXISTS') {
-        setFormData({ phone, name: '', address: '', email: '' });
+        setFormData({ phone: phoneToSearch, name: '', address: '', city: '', pin: '', email: '' });
         setStep('details');
       } else if (result?.data?.status === 'EXISTS_ORPHANED') {
         setStep('details');
@@ -72,9 +78,28 @@ export function CreateCustomerModal({ onClose, onCustomerCreated }: CreateCustom
     }
   };
 
+  // Skip the redundant "enter phone number again" step when we already know it
+  // (e.g. coming from CustomerNotFoundModal after a search already failed).
+  useEffect(() => {
+    if (isValidInitialPhone) {
+      handleSearchCustomer(initialPhone!);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleCreateNewCustomer = async () => {
     if (!formData.name?.trim() || !formData.address?.trim()) {
       setError('Name and address are required');
+      return;
+    }
+
+    if (!formData.city?.trim()) {
+      setError('City is required');
+      return;
+    }
+
+    if (!/^\d{6}$/.test(formData.pin?.trim())) {
+      setError('A valid 6-digit PIN code is required');
       return;
     }
 
@@ -133,7 +158,14 @@ export function CreateCustomerModal({ onClose, onCustomerCreated }: CreateCustom
         {/* Content */}
         <div className="p-6 space-y-4">
           {/* Step 1: Search by Phone */}
-          {step === 'search' && (
+          {step === 'search' && isValidInitialPhone && isSearching && !error ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-6">
+              <Loader2 className="w-6 h-6 animate-spin" style={{ color: COLORS.semantic.info }} />
+              <p style={{ color: COLORS.text.secondary }} className="text-sm">
+                Checking {phone}...
+              </p>
+            </div>
+          ) : step === 'search' && (
             <div className="space-y-4">
               <div>
                 <label
@@ -176,7 +208,7 @@ export function CreateCustomerModal({ onClose, onCustomerCreated }: CreateCustom
               )}
 
               <button
-                onClick={handleSearchCustomer}
+                onClick={() => handleSearchCustomer()}
                 disabled={!phone || isSearching}
                 className="w-full px-4 py-2 rounded-lg font-semibold text-white transition disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{ backgroundColor: COLORS.semantic.info }}
@@ -201,7 +233,7 @@ export function CreateCustomerModal({ onClose, onCustomerCreated }: CreateCustom
                       className="block text-sm font-medium mb-2"
                       style={{ color: COLORS.text.secondary }}
                     >
-                      Name *
+                      Name <span style={{ color: COLORS.semantic.error }}>*</span>
                     </label>
                     <input
                       type="text"
@@ -226,7 +258,7 @@ export function CreateCustomerModal({ onClose, onCustomerCreated }: CreateCustom
                       className="block text-sm font-medium mb-2"
                       style={{ color: COLORS.text.secondary }}
                     >
-                      Address *
+                      Address <span style={{ color: COLORS.semantic.error }}>*</span>
                     </label>
                     <textarea
                       value={formData.address}
@@ -244,6 +276,59 @@ export function CreateCustomerModal({ onClose, onCustomerCreated }: CreateCustom
                       }}
                       disabled={isCreating}
                     />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label
+                        className="block text-sm font-medium mb-2"
+                        style={{ color: COLORS.text.secondary }}
+                      >
+                        City <span style={{ color: COLORS.semantic.error }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.city}
+                        onChange={(e) => {
+                          setFormData({ ...formData, city: e.target.value });
+                          setError('');
+                        }}
+                        placeholder="City"
+                        className="w-full px-4 py-2 rounded-lg border focus:outline-none"
+                        style={{
+                          borderColor: COLORS.border.light,
+                          backgroundColor: COLORS.bg.primary,
+                          color: COLORS.text.primary,
+                        }}
+                        disabled={isCreating}
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        className="block text-sm font-medium mb-2"
+                        style={{ color: COLORS.text.secondary }}
+                      >
+                        PIN Code <span style={{ color: COLORS.semantic.error }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.pin}
+                        onChange={(e) => {
+                          setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '').slice(0, 6) });
+                          setError('');
+                        }}
+                        placeholder="PIN code"
+                        maxLength={6}
+                        className="w-full px-4 py-2 rounded-lg border focus:outline-none"
+                        style={{
+                          borderColor: COLORS.border.light,
+                          backgroundColor: COLORS.bg.primary,
+                          color: COLORS.text.primary,
+                        }}
+                        disabled={isCreating}
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -322,7 +407,7 @@ export function CreateCustomerModal({ onClose, onCustomerCreated }: CreateCustom
                     setStep('search');
                     setPhone('');
                     setSearchResult(null);
-                    setFormData({ phone: '', name: '', address: '', email: '' });
+                    setFormData({ phone: '', name: '', address: '', city: '', pin: '', email: '' });
                     setError('');
                   }}
                   className="flex-1 px-4 py-2 rounded-lg font-semibold transition"

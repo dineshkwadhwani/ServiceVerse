@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { X, Upload, Loader2, AlertCircle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { createServiceSchema } from '@/utils/validators';
-import { createService as createServiceInFirestore } from '@/services/serviceService';
+import { createServiceSchema, editServiceSchema } from '@/utils/validators';
+import { createService as createServiceInFirestore, uploadServiceImage } from '@/services/serviceService';
 import { apiClient } from '@/services/apiClient';
 import { useToast } from '@/store/notificationStore';
 import { DEFAULT_COLORS } from '@/utils/constants';
@@ -12,6 +12,15 @@ import { FormTextarea } from '@/components/Form/FormTextarea';
 import { MenuItemForm } from '@/components/Menu/MenuItemForm';
 import { useFormErrors } from '@/hooks/useFormErrors';
 import type { Service, CreateServiceFormData, MenuItem } from '@/types';
+
+// logo/heroImage are only present in form state if the admin picked a new
+// file - required when creating, optional when editing (existing image is
+// preserved otherwise). createServiceSchema/editServiceSchema enforce the
+// "required on create" rule at runtime via the resolver.
+interface ServiceFormValues extends Omit<CreateServiceFormData, 'logo' | 'heroImage'> {
+  logo?: File;
+  heroImage?: File;
+}
 
 interface CreateServiceModalProps {
   isOpen: boolean;
@@ -50,8 +59,9 @@ export function CreateServiceModal({
     setValue,
     watch,
     setFocus,
-  } = useForm<CreateServiceFormData>({
-    resolver: zodResolver(createServiceSchema),
+    reset,
+  } = useForm<ServiceFormValues>({
+    resolver: zodResolver(service ? editServiceSchema : createServiceSchema),
     defaultValues: {
       name: service?.name || '',
       description: service?.description || '',
@@ -68,12 +78,41 @@ export function CreateServiceModal({
     mode: 'onBlur',
   });
 
-  // Load existing service data when service prop changes
+  // This modal is rendered once and never unmounted (ServiceDashboard.tsx
+  // renders it unconditionally, toggling only `isOpen`), so useForm's
+  // defaultValues are only ever captured from the very first render - they
+  // don't refresh just because the `service` prop changes later. Re-sync the
+  // form and local preview state explicitly whenever the modal opens.
   useEffect(() => {
-    if (service) {
-      setMenuItems(service.menuItems || []);
-    }
-  }, [service?.serviceId]);
+    if (!isOpen) return;
+
+    const defaultColors = {
+      primary: DEFAULT_COLORS.primary,
+      secondary: DEFAULT_COLORS.secondary,
+      accent: DEFAULT_COLORS.accent,
+      primaryFontColor: DEFAULT_COLORS.primaryFont,
+      secondaryFontColor: DEFAULT_COLORS.secondaryFont,
+    };
+    const nextColors = service?.colorTheme || defaultColors;
+
+    reset({
+      name: service?.name || '',
+      description: service?.description || '',
+      fromEmail: service?.fromEmail || '',
+      fromName: service?.fromName || '',
+      gstPercentage: service?.gstPercentage || 5,
+      defaultCommission: service?.defaultCommission || {
+        type: 'PERCENTAGE',
+        value: 10,
+        active: true,
+      },
+      colorTheme: nextColors,
+    });
+    setColors(nextColors);
+    setLogoPreview(service?.logo || null);
+    setHeroImagePreview(service?.heroImage || null);
+    setMenuItems(service?.menuItems || []);
+  }, [isOpen, service?.serviceId]);
 
   const { hasErrors, errorCount } = useFormErrors({ errors, setFocus });
   const commissionType = watch('defaultCommission.type');
@@ -111,7 +150,7 @@ export function CreateServiceModal({
     setValue('colorTheme', newColors);
   };
 
-  const onSubmit = async (data: CreateServiceFormData) => {
+  const onSubmit = async (data: ServiceFormValues) => {
     // Validate at least 1 menu item
     if (menuItems.length === 0) {
       toast.error('At least 1 menu item is required');
@@ -121,15 +160,28 @@ export function CreateServiceModal({
     setIsSubmitting(true);
     try {
       if (service) {
-        // Update existing service
+        // Update existing service. Only upload + include logo/heroImage if the
+        // admin actually picked a new file - otherwise the existing image URL
+        // is preserved by omitting the field entirely (never send the raw
+        // File object, and never overwrite a real URL with a blank value).
+        const { logo, heroImage, ...rest } = data;
+        const imageUpdates: { logo?: string; heroImage?: string } = {};
+        if (logo instanceof File) {
+          imageUpdates.logo = await uploadServiceImage(service.serviceId, logo, 'logo');
+        }
+        if (heroImage instanceof File) {
+          imageUpdates.heroImage = await uploadServiceImage(service.serviceId, heroImage, 'hero');
+        }
+
         await apiClient.updateService(service.serviceId, {
-          ...data,
+          ...rest,
+          ...imageUpdates,
           menuItems,
         });
         toast.success('Service updated successfully');
       } else {
         // Create new service with embedded menu items
-        await createServiceInFirestore(data, menuItems);
+        await createServiceInFirestore(data as CreateServiceFormData, menuItems);
         toast.success('Service created successfully');
       }
       onSave();

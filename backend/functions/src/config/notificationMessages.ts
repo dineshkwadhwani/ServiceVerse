@@ -86,6 +86,10 @@ export const notificationMessages: Record<string, NotificationTemplate> = {
                   <td style="padding: 10px 0; color: #718096;"><strong>Email</strong></td>
                   <td style="padding: 10px 0; text-align: right;">${data.email || 'N/A'}</td>
                 </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 10px 0; color: #718096;"><strong>Service</strong></td>
+                  <td style="padding: 10px 0; text-align: right;">${data.serviceName || 'N/A'}</td>
+                </tr>
                 <tr>
                   <td style="padding: 10px 0; color: #718096;"><strong>Registration Date</strong></td>
                   <td style="padding: 10px 0; text-align: right;">${new Date().toLocaleDateString()}</td>

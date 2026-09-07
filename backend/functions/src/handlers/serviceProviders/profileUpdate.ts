@@ -48,9 +48,11 @@ export async function updateSPProfile(req: AuthRequest, res: Response) {
       city: basicInfo.city,
       pin: basicInfo.pinCode,
       businessLogo: basicInfo.logoUrl || null,
+      photoUrl: basicInfo.photoUrl || null,
       basicInfo: {
         ...basicInfo,
         logoUrl: basicInfo.logoUrl || '',
+        photoUrl: basicInfo.photoUrl || '',
       },
       operations,
       updatedAt: new Date(),

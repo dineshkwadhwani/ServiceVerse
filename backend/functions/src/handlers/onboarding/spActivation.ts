@@ -63,6 +63,24 @@ export async function updateSPActivationStatus(req: AuthRequest, res: Response) 
       updatedAt: new Date(),
     });
 
+    // Keep the service association's isActive flag in sync - customer-facing SP
+    // lookups filter on this, not on the user doc's status field.
+    const associationsSnapshot = await db
+      .collection('users')
+      .doc(spId)
+      .collection('serviceAssociations')
+      .get();
+
+    await Promise.all(
+      associationsSnapshot.docs.map((assocDoc) =>
+        assocDoc.ref.update({
+          status: activate ? 'ACTIVE' : 'INACTIVE',
+          isActive: activate,
+          ...(activate ? { activatedAt: new Date() } : {}),
+        })
+      )
+    );
+
     if (activate) {
       await sendNotificationByEvent('SP_ACTIVATION_COMPLETE', {
         spId,

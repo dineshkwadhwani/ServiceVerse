@@ -18,6 +18,8 @@
     "seed:superadmin": "npm run seed:superadmin --workspace=backend/functions",
     "deploy:seedAdmin": "npm run build --workspace=backend/functions && npx --yes --package=firebase-tools@15.22.4 firebase deploy --only functions:seedAdmin --project serviceverse-dev-fa38e",
     "build:frontend": "npm run build --workspace=frontend",
+    "build:mobile": "npm run build:mobile --workspace=frontend",
+    "build:apk": "npm run build:apk --workspace=frontend",
     "build:backend": "npm run build --workspace=backend/functions",
     "build": "npm run build:frontend",
     "install:all": "npm install"

@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useToast } from '@/store/notificationStore';
-import { LogOut, Bell, User, Settings } from 'lucide-react';
-import { useState } from 'react';
+import { useNotificationCenterStore } from '@/store/notificationCenterStore';
+import { LogOut, Bell, User } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { COLORS } from '@/utils/theme';
 
 interface NavbarProps {
@@ -12,9 +13,26 @@ interface NavbarProps {
 
 export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
   const navigate = useNavigate();
-  const { user, firebaseUser, signOut } = useAuthStore();
+  const { user, signOut } = useAuthStore();
   const toast = useToast();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const { notifications, fetchNotifications } = useNotificationCenterStore();
+
+  useEffect(() => {
+    if (!user) return;
+    fetchNotifications();
+  }, [user, fetchNotifications]);
+
+  const handleBellClick = () => {
+    fetchNotifications();
+    navigate('/dashboard/notifications');
+  };
+
+  const handleDashboardClick = () => {
+    setShowProfileMenu(false);
+    // Force reload to dashboard to close any open reports
+    window.location.href = '/dashboard';
+  };
 
   const handleLogout = async () => {
     try {
@@ -48,7 +66,7 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
         {/* Right */}
         <div className="flex items-center gap-2 md:gap-4">
           {/* Sign In (when not authenticated) */}
-          {!firebaseUser && (
+          {!user && (
             <button
               onClick={onSignInClick}
               className="px-4 py-2 rounded-lg font-medium text-sm transition hover:opacity-80"
@@ -62,20 +80,23 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
           )}
 
           {/* Authenticated User Menu */}
-          {firebaseUser && (
+          {user && (
             <>
               {/* Notifications */}
               <button
-                className="p-2 rounded-lg transition"
+                onClick={handleBellClick}
+                className="relative p-2 rounded-lg transition"
                 style={{
                   color: COLORS.text.secondary,
                 }}
               >
                 <Bell className="w-5 h-5" />
-                <span
-                  className="absolute top-2 right-2 w-2 h-2 rounded-full"
-                  style={{ backgroundColor: COLORS.semantic.error }}
-                />
+                {notifications.length > 0 && (
+                  <span
+                    className="absolute top-2 right-2 w-2 h-2 rounded-full"
+                    style={{ backgroundColor: COLORS.semantic.error }}
+                  />
+                )}
               </button>
 
               {/* Profile Menu */}
@@ -94,10 +115,14 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
                     </p>
                   </div>
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold overflow-hidden"
                     style={{ backgroundColor: COLORS.semantic.info }}
                   >
-                    {user?.name?.charAt(0) || 'U'}
+                    {user?.photoUrl ? (
+                      <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
+                    ) : (
+                      user?.name?.charAt(0) || 'U'
+                    )}
                   </div>
                 </button>
 
@@ -114,6 +139,16 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
                   >
                     <div className="p-2 space-y-1">
                       <button
+                        onClick={handleDashboardClick}
+                        className="w-full text-left px-4 py-2 text-sm rounded flex items-center gap-2 transition hover:bg-opacity-50"
+                        style={{
+                          color: COLORS.text.primary,
+                        }}
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Dashboard
+                      </button>
+                      <button
                         onClick={() => {
                           setShowProfileMenu(false);
                           onProfileClick?.();
@@ -125,15 +160,6 @@ export function Navbar({ onSignInClick, onProfileClick }: NavbarProps) {
                       >
                         <User className="w-4 h-4" />
                         Profile
-                      </button>
-                      <button
-                        className="w-full text-left px-4 py-2 text-sm rounded flex items-center gap-2 transition"
-                        style={{
-                          color: COLORS.text.primary,
-                        }}
-                      >
-                        <Settings className="w-4 h-4" />
-                        Settings
                       </button>
                       <hr style={{ borderColor: COLORS.border.light }} />
                       <button

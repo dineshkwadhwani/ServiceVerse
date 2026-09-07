@@ -72,6 +72,14 @@ class ApiClient {
     return this.axiosInstance.post('/auth/complete-registration', data);
   }
 
+  async completePhoneSignIn(uid: string, phone: string) {
+    return this.axiosInstance.post('/auth/complete-phone-signin', { uid, phone });
+  }
+
+  async checkPhoneRegistered(phone: string) {
+    return this.axiosInstance.post('/auth/check-phone', { phone });
+  }
+
   async registerPushToken(token: string) {
     return this.axiosInstance.post('/auth/register-push-token', { token });
   }
@@ -122,7 +130,7 @@ class ApiClient {
     return this.axiosInstance.post('/service-providers/customers/search-phone', { phone });
   }
 
-  async createNewCustomerWithAssociation(data: { phone: string; name: string; address: string; email?: string }) {
+  async createNewCustomerWithAssociation(data: { phone: string; name: string; address: string; city: string; pin: string; email?: string }) {
     return this.axiosInstance.post('/service-providers/customers/create-new', data);
   }
 
@@ -158,6 +166,10 @@ class ApiClient {
     return this.axiosInstance.get('/superadmin/stats');
   }
 
+  async getSuperAdminEarnings(params?: { city?: string; serviceProviderId?: string; month?: string }) {
+    return this.axiosInstance.get('/superadmin/earnings', { params });
+  }
+
   async getAllUsers() {
     return this.axiosInstance.get('/superadmin/users');
   }
@@ -186,6 +198,10 @@ class ApiClient {
 
   async getService(serviceId: string) {
     return this.axiosInstance.get(`/services/${serviceId}`);
+  }
+
+  async getPublicServiceProviders(serviceId: string) {
+    return this.axiosInstance.get(`/services/${serviceId}/providers`);
   }
 
   async updateService(serviceId: string, data: any) {
@@ -494,6 +510,26 @@ class ApiClient {
   }
 
   // ============================================================================
+  // PROFILE MANAGEMENT
+  // ============================================================================
+
+  async updateCustomerProfile(userId: string, data: any) {
+    return this.axiosInstance.patch(`/customers/${userId}/profile`, data);
+  }
+
+  async updateAMProfile(userId: string, data: any) {
+    return this.axiosInstance.patch(`/account-managers/${userId}/profile`, data);
+  }
+
+  async updateCoworkerProfile(userId: string, data: any) {
+    return this.axiosInstance.patch(`/coworkers/${userId}/profile`, data);
+  }
+
+  async updateSuperAdminProfile(userId: string, data: any) {
+    return this.axiosInstance.patch(`/superadmin/${userId}/profile`, data);
+  }
+
+  // ============================================================================
   // ANALYTICS
   // ============================================================================
 
@@ -505,6 +541,18 @@ class ApiClient {
     return this.axiosInstance.get('/analytics/platform', {
       params: { startDate, endDate },
     });
+  }
+
+  // ============================================================================
+  // NOTIFICATIONS
+  // ============================================================================
+
+  async getNotifications() {
+    return this.axiosInstance.get('/notifications');
+  }
+
+  async markNotificationRead(notificationId: string) {
+    return this.axiosInstance.patch(`/notifications/${notificationId}/read`);
   }
 }
 

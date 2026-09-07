@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '@/utils/firebase';
 import { Logger } from '@/utils/logger';
 import { sendNotificationByEvent } from '@/utils/notificationCenter';
+import { enrichOrdersWithLivePhotos } from '@/utils/orderPhotos';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
@@ -27,6 +28,29 @@ function getRazorpayClient(): Razorpay {
   return razorpayClient;
 }
 
+/**
+ * Resolve a coworker's photoUrl/phone/address by name, scoped to their SP.
+ * Queries only by role (like getSPCoworkers) and filters spId/name in memory
+ * to avoid needing a composite index.
+ */
+async function resolveCoworkerInfo(
+  spId: string,
+  coworkerName: string
+): Promise<{ photoUrl: string | null; phone: string | null; address: string | null }> {
+  if (!spId || !coworkerName) return { photoUrl: null, phone: null, address: null };
+
+  const coworkersSnapshot = await db.collection('users').where('role', '==', 'COWORKER').get();
+  const match = coworkersSnapshot.docs.find(
+    (doc) => doc.data().spId === spId && doc.data().name === coworkerName
+  );
+
+  return {
+    photoUrl: match?.data()?.photoUrl || null,
+    phone: match?.data()?.phone || null,
+    address: match?.data()?.address || null,
+  };
+}
+
 interface OrderItem {
   menuItemId: string;
   name: string;
@@ -45,7 +69,7 @@ interface CreateOrderRequest {
   deliveryDateTime?: string;
   specialInstructions?: string;
   paymentMethod: 'ONLINE' | 'DIRECT';
-  deliveryType: 'DROP' | 'PICKUP';
+  deliveryType: 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY';
   selectedCoworker?: string;
   items: OrderItem[];
   subtotal: number;
@@ -66,7 +90,10 @@ export const createOrder = async (req: Request, res: Response) => {
     const createdByUserId = authUser?.uid || '';
 
     // Validation
-    if (!data.spId || !data.customerId || !data.customerPhone || !data.items || data.items.length === 0) {
+    // Items aren't required when the customer creates the order, or when it's a pickup -
+    // the coworker/SP adds items once the goods are actually picked up.
+    const itemsRequired = createdByRole !== 'CUSTOMER' && data.deliveryType === 'DELIVERY_ONLY';
+    if (!data.spId || !data.customerId || !data.customerPhone || !data.items || (itemsRequired && data.items.length === 0)) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields: spId, customerId, customerPhone, items',
@@ -77,6 +104,14 @@ export const createOrder = async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         error: 'Invalid payment method. Must be ONLINE or DIRECT.',
+      });
+    }
+
+    // Coworker can create orders only for their own associated SP
+    if (authUser?.role === 'COWORKER' && authUser?.spId !== data.spId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Coworker can create orders only for their assigned service provider',
       });
     }
 
@@ -94,6 +129,15 @@ export const createOrder = async (req: Request, res: Response) => {
       return res.status(404).json({
         success: false,
         error: 'Service Provider not found',
+      });
+    }
+
+    const spDocumentation = spDoc.data()?.documentation || {};
+    const isSpGstMandatory = !!spDocumentation.gstCollectionMandatory;
+    if (data.paymentMethod === 'ONLINE' && !isSpGstMandatory) {
+      return res.status(400).json({
+        success: false,
+        error: 'Online payment is available only when GST collection is mandatory for this Service Provider.',
       });
     }
 
@@ -151,6 +195,7 @@ export const createOrder = async (req: Request, res: Response) => {
       customerId: data.customerId,
       customerPhone: data.customerPhone,
       customerName: data.customerName,
+      customerPhotoUrl: customerDoc.data()?.photoUrl || null,
       customerAddress: data.customerAddress,
       deliveryAddress: data.deliveryAddress || data.customerAddress,
       deliveryDateTime: data.deliveryDateTime ? new Date(data.deliveryDateTime) : null,
@@ -229,14 +274,18 @@ export const getOrderById = async (req: Request, res: Response) => {
     }
 
     const orderData: any = orderDoc.data() || {};
-    return res.status(200).json({
-      success: true,
-      data: {
+    const [enrichedOrder] = await enrichOrdersWithLivePhotos([
+      {
         ...orderData,
         createdAt: orderData.createdAt?.toDate?.() || orderData.createdAt,
         updatedAt: orderData.updatedAt?.toDate?.() || orderData.updatedAt,
         deliveryDateTime: orderData.deliveryDateTime?.toDate?.() || orderData.deliveryDateTime,
       },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: enrichedOrder,
     });
   } catch (error: any) {
     logger.error('Get order by ID failed', error);
@@ -304,6 +353,22 @@ export const updateOrderLifecycle = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, error: `${role} cannot set status ${status}` });
     }
 
+    // No-op re-save: same status (and, where relevant, the same coworker/payment
+    // proof) as what's already stored. Skip the write and notifications entirely
+    // so re-saving an unchanged status doesn't re-send emails to the customer.
+    const statusUnchanged = orderData.status === status;
+    const coworkerUnchanged =
+      status !== 'ASSIGNED_FOR_PICKUP' || selectedCoworker === orderData.selectedCoworker;
+    const paymentProofUnchanged =
+      status !== 'PAID' || !paymentProofUrl || paymentProofUrl === orderData.paymentProofUrl;
+
+    if (statusUnchanged && coworkerUnchanged && paymentProofUnchanged) {
+      return res.status(200).json({
+        success: true,
+        data: { orderId, status, unchanged: true },
+      });
+    }
+
     // Lifecycle constraints
     if (status === 'CONFIRMED' && role === 'CUSTOMER') {
       const creatorRole = orderData.createdByRole || orderData.createdBy || '';
@@ -316,6 +381,13 @@ export const updateOrderLifecycle = async (req: Request, res: Response) => {
           success: false,
           error: 'Customer cannot confirm orders created by customer. SP/Coworker must confirm.',
         });
+      }
+    }
+
+    if (status === 'CONFIRMED') {
+      const itemCount = Array.isArray(orderData.items) ? orderData.items.length : 0;
+      if (itemCount === 0) {
+        return res.status(400).json({ success: false, error: 'Order must contain at least one item before it can be confirmed' });
       }
     }
 
@@ -346,7 +418,11 @@ export const updateOrderLifecycle = async (req: Request, res: Response) => {
     }
 
     if (status === 'ASSIGNED_FOR_PICKUP') {
+      const coworkerInfo = await resolveCoworkerInfo(orderData.spId, selectedCoworker);
       updateData.selectedCoworker = selectedCoworker;
+      updateData.selectedCoworkerPhotoUrl = coworkerInfo.photoUrl;
+      updateData.selectedCoworkerPhone = coworkerInfo.phone;
+      updateData.selectedCoworkerAddress = coworkerInfo.address;
       updateData.assignedForPickupAt = new Date();
     }
 
@@ -443,6 +519,8 @@ export const updateOrderDetails = async (req: Request, res: Response) => {
     };
 
     if (Array.isArray(items)) {
+      // Intermediate saves (edit-in-progress) may leave the order at 0 items - the SP/Coworker
+      // is still assembling it. The at-least-one-item rule is enforced at confirm time instead.
       const normalizedItems = items
         .map((item: any) => ({
           menuItemId: item.menuItemId,
@@ -451,10 +529,6 @@ export const updateOrderDetails = async (req: Request, res: Response) => {
           qty: Math.max(0, Number(item.qty || item.quantity || 0)),
         }))
         .filter((item: any) => item.qty > 0);
-
-      if (normalizedItems.length === 0) {
-        return res.status(400).json({ success: false, error: 'Order must contain at least one item' });
-      }
 
       const normalizedWithTotal = normalizedItems.map((item: any) => ({
         ...item,
@@ -474,12 +548,20 @@ export const updateOrderDetails = async (req: Request, res: Response) => {
       updateData.specialInstructions = specialInstructions;
     }
 
-    if (deliveryType === 'DROP' || deliveryType === 'PICKUP') {
+    if (
+      deliveryType === 'PICKUP_AND_DELIVERY' ||
+      deliveryType === 'PICKUP_ONLY' ||
+      deliveryType === 'DELIVERY_ONLY'
+    ) {
       updateData.deliveryType = deliveryType;
     }
 
     if (typeof selectedCoworker === 'string') {
+      const coworkerInfo = await resolveCoworkerInfo(orderData.spId, selectedCoworker);
       updateData.selectedCoworker = selectedCoworker;
+      updateData.selectedCoworkerPhotoUrl = coworkerInfo.photoUrl;
+      updateData.selectedCoworkerPhone = coworkerInfo.phone;
+      updateData.selectedCoworkerAddress = coworkerInfo.address;
     }
 
     if (paymentMethod === 'ONLINE' || paymentMethod === 'DIRECT') {

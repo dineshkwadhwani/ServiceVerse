@@ -3,6 +3,8 @@ import { Logger } from '@/utils/logger';
 import { ValidationError, sendError, sendSuccess } from '@/middleware/errorHandler';
 import type { AuthRequest } from '@/middleware/auth';
 import type { Response } from 'express';
+import { resolveSpId } from '@/utils/spContext';
+import { sendNotificationByEvent } from '@/utils/notificationCenter';
 
 const logger = new Logger('CreateCustomerHandler');
 
@@ -29,7 +31,7 @@ export async function searchCustomerByPhone(req: AuthRequest, res: Response) {
       return sendError(res, new ValidationError('Valid 10-digit phone number is required'));
     }
 
-    const spId = req.user?.uid;
+    const spId = resolveSpId(req.user);
     if (!spId) {
       return sendError(res, new ValidationError('Service Provider not authenticated'));
     }
@@ -114,11 +116,11 @@ export async function searchCustomerByPhone(req: AuthRequest, res: Response) {
 
 /**
  * Step 2a: Create new customer and associate with SP
- * SP sends: phone, name, address, email (optional)
+ * SP sends: phone, name, address, city, pin, email (optional)
  */
 export async function createNewCustomerWithAssociation(req: AuthRequest, res: Response) {
   try {
-    const { phone, name, address, email } = req.body;
+    const { phone, name, address, city, pin, email } = req.body;
 
     // Validation
     if (!phone || !validatePhoneNumber(phone)) {
@@ -133,7 +135,15 @@ export async function createNewCustomerWithAssociation(req: AuthRequest, res: Re
       return sendError(res, new ValidationError('Customer address is required'));
     }
 
-    const spId = req.user?.uid;
+    if (!city || city.trim().length === 0) {
+      return sendError(res, new ValidationError('Customer city is required'));
+    }
+
+    if (!pin || !/^\d{6}$/.test(pin.trim())) {
+      return sendError(res, new ValidationError('A valid 6-digit customer PIN code is required'));
+    }
+
+    const spId = resolveSpId(req.user);
     if (!spId) {
       return sendError(res, new ValidationError('Service Provider not authenticated'));
     }
@@ -180,6 +190,8 @@ export async function createNewCustomerWithAssociation(req: AuthRequest, res: Re
       phone,
       name,
       address,
+      city,
+      pin,
       email: email || '',
       role: 'CUSTOMER',
       status: 'ACTIVE',
@@ -202,8 +214,10 @@ export async function createNewCustomerWithAssociation(req: AuthRequest, res: Re
 
     await assocRef.set({
       spId,
+      serviceId,
       status: 'ASSOCIATED',
       associationType: 'CREATED_BY_SP',
+      isActive: true,
       createdAt: new Date(),
       createdBySP: spId,
     });
@@ -215,11 +229,15 @@ export async function createNewCustomerWithAssociation(req: AuthRequest, res: Re
       status: 'ASSOCIATED',
     });
 
-    // TODO: Send welcome email via Resend
-    logger.info('Welcome email should be sent', {
-      customerId: authUser.uid,
-      email: email || phone,
-    });
+    if (email) {
+      await sendNotificationByEvent('ACCOUNT_CREATED', {
+        userId: authUser.uid,
+        name,
+        email,
+        role: 'CUSTOMER',
+      });
+      logger.info('Welcome email sent', { customerId: authUser.uid, email });
+    }
 
     return sendSuccess(
       res,
@@ -228,6 +246,8 @@ export async function createNewCustomerWithAssociation(req: AuthRequest, res: Re
         phone,
         name,
         address,
+        city,
+        pin,
         email,
         status: 'ASSOCIATED',
         message: 'Customer created and associated successfully',
@@ -252,7 +272,7 @@ export async function associateExistingCustomer(req: AuthRequest, res: Response)
       return sendError(res, new ValidationError('Customer ID is required'));
     }
 
-    const spId = req.user?.uid;
+    const spId = resolveSpId(req.user);
     if (!spId) {
       return sendError(res, new ValidationError('Service Provider not authenticated'));
     }
@@ -310,8 +330,10 @@ export async function associateExistingCustomer(req: AuthRequest, res: Response)
 
     await assocRef.set({
       spId,
+      serviceId,
       status: 'ASSOCIATED',
       associationType: 'ASSOCIATED_BY_SP',
+      isActive: true,
       createdAt: new Date(),
       associatedBySP: spId,
     });

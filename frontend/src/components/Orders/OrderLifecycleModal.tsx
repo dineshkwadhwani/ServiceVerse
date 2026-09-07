@@ -7,12 +7,19 @@ import { useAuthStore } from '@/store/authStore';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, storage } from '@/utils/firebase-config';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { ClickableIdentity } from '@/components/Shared/ClickableIdentity';
 
 interface OrderLike {
   orderId: string;
   spId?: string;
   customerId?: string;
   customerName?: string;
+  customerPhotoUrl?: string;
+  customerPhone?: string;
+  deliveryAddress?: string;
+  customerAddress?: string;
+  selectedCoworkerPhone?: string;
+  selectedCoworkerAddress?: string;
   createdBy?: string;
   createdByRole?: string;
   createdByUserId?: string;
@@ -20,6 +27,7 @@ interface OrderLike {
   totalAmount?: number;
   deliveryType?: string;
   selectedCoworker?: string;
+  selectedCoworkerPhotoUrl?: string;
   paymentMethod?: 'ONLINE' | 'DIRECT';
   specialInstructions?: string;
   isFrozen?: boolean;
@@ -37,6 +45,17 @@ interface Props {
 const SP_STATUSES = ['CONFIRMED', 'ASSIGNED_FOR_PICKUP', 'READY_FOR_DELIVERY', 'DELIVERED', 'COMPLETED'];
 const COWORKER_STATUSES = ['CONFIRMED', 'READY_FOR_DELIVERY', 'DELIVERED'];
 
+type DeliveryType = 'PICKUP_AND_DELIVERY' | 'PICKUP_ONLY' | 'DELIVERY_ONLY';
+
+// Older orders stored the legacy 2-value field ('DROP'/'PICKUP') - map them onto
+// the closest new 3-value equivalent instead of losing/misreading that data.
+function normalizeDeliveryType(value?: string): DeliveryType {
+  if (value === 'DROP') return 'DELIVERY_ONLY';
+  if (value === 'PICKUP') return 'PICKUP_AND_DELIVERY';
+  if (value === 'PICKUP_ONLY' || value === 'DELIVERY_ONLY' || value === 'PICKUP_AND_DELIVERY') return value;
+  return 'PICKUP_AND_DELIVERY';
+}
+
 export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSaved }: Props) {
   const toast = useToast();
   const { user, firebaseUser } = useAuthStore();
@@ -46,9 +65,10 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   const [status, setStatus] = useState(order.status);
   const [selectedCoworker, setSelectedCoworker] = useState(order.selectedCoworker || '');
   const [paymentMethod, setPaymentMethod] = useState<'ONLINE' | 'DIRECT'>(order.paymentMethod || 'DIRECT');
-  const [deliveryType, setDeliveryType] = useState<'DROP' | 'PICKUP'>((order.deliveryType as 'DROP' | 'PICKUP') || 'DROP');
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>(normalizeDeliveryType(order.deliveryType));
   const [specialInstructions, setSpecialInstructions] = useState(order.specialInstructions || '');
   const [editableItems, setEditableItems] = useState<Array<any>>(order.items || []);
+  const [isLoadingMenu, setIsLoadingMenu] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
   const [showPaidPopup, setShowPaidPopup] = useState(false);
@@ -57,6 +77,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   const [showDirectPayPopup, setShowDirectPayPopup] = useState(false);
   const [spQrCodeUrl, setSpQrCodeUrl] = useState('');
   const [spUpiId, setSpUpiId] = useState('');
+  const [showCustomerConfirmModal, setShowCustomerConfirmModal] = useState(false);
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -68,7 +89,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
         setStatus(fullOrder?.status || order.status);
         setSelectedCoworker(fullOrder?.selectedCoworker || '');
         setPaymentMethod((fullOrder?.paymentMethod || 'DIRECT') as 'ONLINE' | 'DIRECT');
-        setDeliveryType((fullOrder?.deliveryType || 'DROP') as 'DROP' | 'PICKUP');
+        setDeliveryType(normalizeDeliveryType(fullOrder?.deliveryType));
         setSpecialInstructions(fullOrder?.specialInstructions || '');
         setEditableItems(fullOrder?.items || []);
 
@@ -91,6 +112,34 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
           } catch {
             setSpQrCodeUrl('');
             setSpUpiId('');
+          }
+
+          // Load SP's full configured menu so items can be added, not just adjusted.
+          // Needed when a customer creates an order with 0 items for SP/Coworker to fill in.
+          if (role === 'SERVICE_PROVIDER' || role === 'COWORKER') {
+            setIsLoadingMenu(true);
+            try {
+              const menuResponse: any = await apiClient.getSPConfiguredMenu(spId);
+              const menuItems = (menuResponse?.menuItems || menuResponse?.data?.menuItems || []) as Array<any>;
+              const existingItems = fullOrder?.items || [];
+
+              const merged = menuItems.map((menuItem: any) => {
+                const existing = existingItems.find((i: any) => i.menuItemId === menuItem.menuItemId);
+                return {
+                  menuItemId: menuItem.menuItemId,
+                  name: menuItem.name,
+                  customPrice: menuItem.customPrice,
+                  qty: existing?.qty || existing?.quantity || 0,
+                  itemTotal: existing?.itemTotal || 0,
+                };
+              });
+
+              setEditableItems(merged);
+            } catch {
+              // Menu load failed - fall back to items already on the order
+            } finally {
+              setIsLoadingMenu(false);
+            }
           }
         }
       } catch (error: any) {
@@ -116,9 +165,27 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
     order?.customerName ||
     (role === 'CUSTOMER' ? (user as any)?.name : '') ||
     'N/A';
+  const displayCustomerPhotoUrl = orderDetails?.customerPhotoUrl || order?.customerPhotoUrl || '';
+  const displayCustomerPhone = orderDetails?.customerPhone || (order as any)?.customerPhone || '';
+  const displayCustomerAddress =
+    orderDetails?.deliveryAddress || orderDetails?.customerAddress ||
+    (order as any)?.deliveryAddress || (order as any)?.customerAddress || '';
+  const assignedCoworkerName = orderDetails?.selectedCoworker || order?.selectedCoworker || '';
+  const assignedCoworkerPhotoUrl = orderDetails?.selectedCoworkerPhotoUrl || order?.selectedCoworkerPhotoUrl || '';
+  const assignedCoworkerPhone = orderDetails?.selectedCoworkerPhone || (order as any)?.selectedCoworkerPhone || '';
+  const assignedCoworkerAddress =
+    orderDetails?.selectedCoworkerAddress || (order as any)?.selectedCoworkerAddress || '';
   const canCustomerConfirm = role === 'CUSTOMER' && isPreConfirmStatus && !createdByCustomer;
   const canCustomerPay = role === 'CUSTOMER' && currentStatus === 'DELIVERED';
   const currentPaymentMethod = paymentMethod || orderDetails?.paymentMethod || order?.paymentMethod || 'DIRECT';
+  console.log('[OrderLifecycleModal] payment method resolution:', {
+    paymentMethodState: paymentMethod,
+    orderDetailsPaymentMethod: orderDetails?.paymentMethod,
+    orderPropPaymentMethod: order?.paymentMethod,
+    currentPaymentMethod,
+    currentStatus,
+    canCustomerPay,
+  });
   const isFullEditMode =
     (role === 'SERVICE_PROVIDER' || role === 'COWORKER') &&
     !orderDetails?.isFrozen &&
@@ -172,6 +239,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   };
 
   const saveDetails = async () => {
+    console.log('[OrderLifecycleModal] saveDetails sending paymentMethod:', paymentMethod);
     setIsSaving(true);
     try {
       await apiClient.updateOrderDetails(order.orderId, {
@@ -192,8 +260,23 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   };
 
   const confirmFromEditMode = async () => {
+    if (editableItems.filter((item) => Number(item.qty || item.quantity || 0) > 0).length === 0) {
+      toast.error('Please select at least one item before confirming');
+      return;
+    }
+
+    console.log('[OrderLifecycleModal] confirmFromEditMode sending paymentMethod:', paymentMethod);
     setIsSaving(true);
     try {
+      // Persist current items/details first - the order may have been created with 0 items
+      // (customer flow) and items only exist in local edit state until saved.
+      await apiClient.updateOrderDetails(order.orderId, {
+        items: editableItems,
+        specialInstructions,
+        deliveryType,
+        selectedCoworker,
+        paymentMethod,
+      });
       await apiClient.updateOrderLifecycle(order.orderId, { status: 'CONFIRMED' });
       toast.success('Order confirmed');
       onSaved();
@@ -240,6 +323,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   };
 
   const handleOnlinePayNow = async () => {
+    console.log('[OrderLifecycleModal] handleOnlinePayNow invoked. currentPaymentMethod:', currentPaymentMethod);
     try {
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
@@ -340,6 +424,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
   };
 
   const handleDirectPayNow = () => {
+    console.log('[OrderLifecycleModal] handleDirectPayNow invoked. currentPaymentMethod:', currentPaymentMethod, 'spQrCodeUrl:', spQrCodeUrl, 'spUpiId:', spUpiId);
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
     const upiIntent = buildUpiIntent();
 
@@ -348,16 +433,13 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
       return;
     }
 
-    if (isMobile && spQrCodeUrl) {
-      window.open(spQrCodeUrl, '_blank');
-      return;
-    }
-
     if (!spQrCodeUrl) {
       toast.error('SP QR code is not configured yet');
       return;
     }
 
+    // Show the QR inline instead of window.open - an invalid/relative spQrCodeUrl
+    // can cause the browser to open a blank tab.
     setShowDirectPayPopup(true);
   };
 
@@ -417,7 +499,15 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
         <div className="p-4 space-y-4">
           <div>
             <p className="text-sm" style={{ color: COLORS.text.secondary }}>Customer</p>
-            <p className="font-semibold" style={{ color: COLORS.text.primary }}>{displayCustomerName}</p>
+            <p className="font-semibold" style={{ color: COLORS.text.primary }}>
+              <ClickableIdentity
+                name={displayCustomerName}
+                photoUrl={displayCustomerPhotoUrl}
+                phone={displayCustomerPhone}
+                address={displayCustomerAddress}
+                label="Customer"
+              />
+            </p>
           </div>
 
           <div>
@@ -425,10 +515,32 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
             <p className="font-semibold" style={{ color: COLORS.text.primary }}>{currentStatus}</p>
           </div>
 
+          {role === 'CUSTOMER' && assignedCoworkerName && (
+            <div>
+              <p className="text-sm" style={{ color: COLORS.text.secondary }}>Assigned for Pickup</p>
+              <p className="font-semibold" style={{ color: COLORS.text.primary }}>
+                <ClickableIdentity
+                  name={assignedCoworkerName}
+                  photoUrl={assignedCoworkerPhotoUrl}
+                  phone={assignedCoworkerPhone}
+                  address={assignedCoworkerAddress}
+                  label="Coworker"
+                />
+              </p>
+            </div>
+          )}
+
           {isFullEditMode && (
             <>
               <div>
                 <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>Order Items (Editable until confirmed)</label>
+                {isLoadingMenu ? (
+                  <div className="flex items-center justify-center p-6">
+                    <Loader2 className="w-5 h-5 animate-spin" style={{ color: COLORS.semantic.info }} />
+                  </div>
+                ) : editableItems.length === 0 ? (
+                  <p className="text-sm p-3" style={{ color: COLORS.text.secondary }}>No menu items configured for this service provider yet.</p>
+                ) : (
                 <div className="space-y-2 max-h-56 overflow-y-auto">
                   {editableItems.map((item: any, idx: number) => (
                     <div key={idx} className="p-3 rounded-lg border flex items-center justify-between" style={{ borderColor: COLORS.border.light, backgroundColor: COLORS.bg.surface }}>
@@ -456,6 +568,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
                     </div>
                   ))}
                 </div>
+                )}
                 <p className="text-sm mt-2" style={{ color: COLORS.text.secondary }}>Subtotal: ₹{subtotal.toFixed(2)}</p>
               </div>
 
@@ -484,19 +597,20 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
               </div>
 
               <div>
-                <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>Delivery Type</label>
+                <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>Desired Service</label>
                 <select
                   value={deliveryType}
-                  onChange={(e) => setDeliveryType(e.target.value as 'DROP' | 'PICKUP')}
+                  onChange={(e) => setDeliveryType(e.target.value as DeliveryType)}
                   className="w-full px-3 py-2 rounded-lg border"
                   style={{ borderColor: COLORS.border.light, backgroundColor: COLORS.bg.surface, color: COLORS.text.primary }}
                 >
-                  <option value="DROP">DROP</option>
-                  <option value="PICKUP">PICKUP</option>
+                  <option value="PICKUP_AND_DELIVERY">Pickup and Delivery</option>
+                  <option value="PICKUP_ONLY">Pickup Only</option>
+                  <option value="DELIVERY_ONLY">Delivery Only</option>
                 </select>
               </div>
 
-              {deliveryType === 'PICKUP' && role === 'SERVICE_PROVIDER' && (
+              {deliveryType !== 'DELIVERY_ONLY' && role === 'SERVICE_PROVIDER' && (
                 <div>
                   <label className="text-sm font-semibold block mb-1" style={{ color: COLORS.text.secondary }}>Assign Pickup</label>
                   <select
@@ -517,7 +631,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
 
               <button
                 onClick={saveDetails}
-                disabled={isSaving}
+                disabled={isSaving || isLoadingMenu}
                 className="w-full px-4 py-2 rounded-lg font-semibold text-white disabled:opacity-60"
                 style={{ backgroundColor: COLORS.semantic.success }}
               >
@@ -527,7 +641,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
               {(role === 'SERVICE_PROVIDER' || role === 'COWORKER') && (
                 <button
                   onClick={confirmFromEditMode}
-                  disabled={isSaving}
+                  disabled={isSaving || isLoadingMenu}
                   className="w-full px-4 py-2 rounded-lg font-semibold text-white disabled:opacity-60"
                   style={{ backgroundColor: COLORS.semantic.info }}
                 >
@@ -609,7 +723,7 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
 
           {canCustomerConfirm && (
             <button
-              onClick={() => saveStatus('CONFIRMED')}
+              onClick={() => setShowCustomerConfirmModal(true)}
               disabled={isSaving}
               className="w-full px-4 py-2 rounded-lg font-semibold text-white disabled:opacity-60"
               style={{ backgroundColor: COLORS.semantic.info }}
@@ -687,6 +801,45 @@ export function OrderLifecycleModal({ order, role, coworkers = [], onClose, onSa
                 style={{ backgroundColor: COLORS.bg.surface, color: COLORS.text.primary, border: `1px solid ${COLORS.border.light}` }}
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCustomerConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[70]">
+          <div
+            className="w-full max-w-md rounded-xl border p-4"
+            style={{ backgroundColor: COLORS.bg.primary, borderColor: COLORS.border.light }}
+          >
+            <h4 className="font-semibold mb-2" style={{ color: COLORS.text.primary }}>
+              Confirm this order?
+            </h4>
+            <p className="text-sm mb-4" style={{ color: COLORS.text.secondary }}>
+              Once confirmed, your service provider will start processing this order.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowCustomerConfirmModal(false)}
+                className="flex-1 px-4 py-2 rounded-lg font-semibold"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  color: COLORS.text.primary,
+                  border: `1px solid ${COLORS.border.light}`,
+                }}
+              >
+                Not Now
+              </button>
+              <button
+                onClick={async () => {
+                  setShowCustomerConfirmModal(false);
+                  await saveStatus('CONFIRMED');
+                }}
+                className="flex-1 px-4 py-2 rounded-lg font-semibold text-white"
+                style={{ backgroundColor: COLORS.semantic.success }}
+              >
+                Confirm
               </button>
             </div>
           </div>

@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Clock, CheckCircle2, XCircle, BarChart3, ShoppingBag, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, Clock, CheckCircle2, XCircle, BarChart3, ShoppingBag, Plus, Search, X } from 'lucide-react';
 import { useToast } from '@/store/notificationStore';
 import { apiClient } from '@/services/apiClient';
 import { useAuthStore } from '@/store/authStore';
+import { useDashboardContext } from '@/context/DashboardContext';
 import { DashboardTabs, DashboardTab } from '@/components/Shared/DashboardTabs';
 import { StatsGrid } from '@/components/Shared/StatsGrid';
 import { EmptyState } from '@/components/Shared/EmptyState';
+import { ClickableIdentity } from '@/components/Shared/ClickableIdentity';
 import { CreateOrderModal } from '@/components/Orders/CreateOrderModal';
 import { OrderLifecycleModal } from '@/components/Orders/OrderLifecycleModal';
 import { InvoiceModal } from '@/components/Orders/InvoiceModal';
+import { CustomerProfileEditModal } from '@/components/Dashboard/CustomerProfileEditModal';
 import { COLORS } from '@/utils/theme';
+import { formatDateTime } from '@/utils/formatters';
 import { getDoc, doc } from 'firebase/firestore';
 import { db } from '@/utils/firebase-config';
 import type { Service } from '@/types';
@@ -19,6 +23,10 @@ interface Order {
   orderId: string;
   spId?: string;
   customerName?: string;
+  selectedCoworker?: string;
+  selectedCoworkerPhotoUrl?: string;
+  selectedCoworkerPhone?: string;
+  selectedCoworkerAddress?: string;
   status: 'PENDING' | 'CONFIRMED' | 'READY' | 'DELIVERED' | 'CANCELLED' | 'NEW' | 'COMPLETED' | 'PAID';
   totalAmount: number;
   createdAt: Date;
@@ -42,18 +50,24 @@ type ActiveTab = 'overview' | 'orders';
 export function ServiceCustomerDashboard() {
   const { serviceId } = useParams<{ serviceId: string }>();
   const { firebaseUser } = useAuthStore();
+  const { showProfileModal, setShowProfileModal } = useDashboardContext();
   const navigate = useNavigate();
   const toast = useToast();
 
   const [service, setService] = useState<Service | null>(null);
   const [spsInPinCode, setSPsInPinCode] = useState<SPInfo[]>([]);
+  const [associatedSpId, setAssociatedSpId] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [customerData, setCustomerData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [selectedSPForOrder, setSelectedSPForOrder] = useState<SPInfo | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SPInfo[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     if (serviceId && firebaseUser?.uid) {
@@ -75,26 +89,34 @@ export function ServiceCustomerDashboard() {
           const customerDocRef = doc(db, 'users', firebaseUser.uid);
           const customerDoc = await getDoc(customerDocRef);
           if (customerDoc.exists()) {
-            const customerData = customerDoc.data();
-            const pinCode = customerData?.pin || '';
+            const customerDocData = customerDoc.data();
+            setCustomerData(customerDocData);
+            const pinCode = customerDocData?.pin || '';
 
-            // Fetch all SPs with same PIN code who provide this service
-            if (pinCode && serviceId) {
+            // Fetch SPs providing this service: always include the customer's
+            // directly-associated provider (e.g. one who created this customer),
+            // plus any others in the same PIN code
+            if (serviceId) {
               const spDetails: SPInfo[] = [];
 
               try {
                 const spProvidersResponse = await apiClient.getCustomerServiceProviders(serviceId);
                 const spIds = spProvidersResponse.data?.providers || [];
+                const currentAssociatedSpId = spProvidersResponse.data?.associatedSpId || null;
+                setAssociatedSpId(currentAssociatedSpId);
 
-                // Fetch full details for each SP and filter by pin code
                 for (const provider of spIds) {
                   try {
                     const spDocRef = doc(db, 'users', provider.spId);
                     const spDoc = await getDoc(spDocRef);
                     if (spDoc.exists()) {
                       const spData = spDoc.data();
-                      // Only include SPs from the same PIN code
-                      if (spData?.pin === pinCode) {
+                      // Once associated with an SP, only that SP should ever show -
+                      // customers must not be able to switch providers themselves
+                      const shouldInclude = currentAssociatedSpId
+                        ? provider.spId === currentAssociatedSpId
+                        : Boolean(pinCode) && spData?.pin === pinCode;
+                      if (shouldInclude) {
                         spDetails.push({
                           spId: spDoc.id,
                           businessName: spData.businessName || spData.name || 'Service Provider',
@@ -129,6 +151,10 @@ export function ServiceCustomerDashboard() {
             orderId: order.orderId || '',
             spId: order.spId || '',
             customerName: order.customerName || '',
+            selectedCoworker: order.selectedCoworker || '',
+            selectedCoworkerPhotoUrl: order.selectedCoworkerPhotoUrl || '',
+            selectedCoworkerPhone: order.selectedCoworkerPhone || '',
+            selectedCoworkerAddress: order.selectedCoworkerAddress || '',
             status: order.status || 'NEW',
             totalAmount: order.total || 0,
             createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
@@ -184,9 +210,50 @@ export function ServiceCustomerDashboard() {
     return normalized === 'COMPLETED' || normalized === 'DELIVERED' || normalized === 'PAID';
   };
 
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = searchQuery.trim();
+    if (!query || !serviceId) {
+      setSearchResults(null);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const response = await apiClient.searchServiceProviders(serviceId, query);
+      const providers = (response.data?.providers || []) as any[];
+      setSearchResults(
+        providers.map((p) => ({
+          spId: p.spId,
+          businessName: p.businessName || p.ownerName || 'Service Provider',
+          email: p.email || '',
+          phone: p.phone || '',
+        }))
+      );
+    } catch (error) {
+      toast.error('Search failed');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setSearchResults(null);
+  };
+
+  const displayedSPs = searchResults ?? spsInPinCode;
+
   const handleStartOrder = (sp: SPInfo) => {
     setSelectedSPForOrder(sp);
     setShowCreateOrder(true);
+  };
+
+  const handleTabChange = (tab: ActiveTab) => {
+    if (tab === activeTab || isLoading) {
+      return;
+    }
+    setActiveTab(tab);
+    loadData();
   };
 
   const tabs: DashboardTab<ActiveTab>[] = [
@@ -215,10 +282,60 @@ export function ServiceCustomerDashboard() {
           </h1>
         </div>
 
+        {/* Search - finds providers by name across all PIN codes.
+            Hidden once the customer is already associated with a provider -
+            they should not be able to switch providers themselves. */}
+        {!associatedSpId && (
+          <form onSubmit={handleSearch} className="mb-4 flex gap-2">
+            <div className="relative flex-1">
+              <Search
+                className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2"
+                style={{ color: COLORS.text.secondary }}
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search any service provider by name (any PIN code)"
+                className="w-full pl-9 pr-9 py-2 rounded-lg border text-sm focus:outline-none"
+                style={{
+                  backgroundColor: COLORS.bg.surface,
+                  borderColor: COLORS.border.light,
+                  color: COLORS.text.primary,
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  style={{ color: COLORS.text.secondary }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={isSearching}
+              className="px-4 py-2 rounded-lg font-semibold text-white transition hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+              style={{ backgroundColor: COLORS.semantic.info }}
+            >
+              {isSearching && <Loader2 className="w-4 h-4 animate-spin" />}
+              Search
+            </button>
+          </form>
+        )}
+
         {/* Service Providers List */}
         <div className="mb-8 space-y-3">
-          {spsInPinCode.length > 0 ? (
-            spsInPinCode.map((sp) => (
+          {searchResults !== null && (
+            <p className="text-xs" style={{ color: COLORS.text.secondary }}>
+              Showing search results for "{searchQuery}" across all PIN codes
+            </p>
+          )}
+          {displayedSPs.length > 0 ? (
+            displayedSPs.map((sp) => (
               <div
                 key={sp.spId}
                 className="p-4 rounded-lg border flex items-center gap-4 justify-between"
@@ -275,12 +392,18 @@ export function ServiceCustomerDashboard() {
               </div>
             ))
           ) : (
-            <EmptyState message="No service providers available in your area for this service" />
+            <EmptyState
+              message={
+                searchResults !== null
+                  ? `No service providers found matching "${searchQuery}"`
+                  : 'No service providers available in your area for this service'
+              }
+            />
           )}
         </div>
 
         {/* Tabs */}
-        <DashboardTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+        <DashboardTabs tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
 
           {/* Overview Tab */}
           {activeTab === 'overview' && (
@@ -292,7 +415,7 @@ export function ServiceCustomerDashboard() {
                     { label: 'Total Orders', value: orders.length, icon: ShoppingBag, color: COLORS.semantic.info },
                     {
                       label: 'Total Spent',
-                      value: `$${orders.reduce((sum, o) => sum + o.totalAmount, 0).toFixed(2)}`,
+                      value: `₹${orders.reduce((sum, o) => sum + o.totalAmount, 0).toFixed(2)}`,
                       icon: ShoppingBag,
                       color: COLORS.semantic.info,
                     },
@@ -354,22 +477,37 @@ export function ServiceCustomerDashboard() {
                       }}
                     >
                       <div className="flex items-start justify-between mb-3">
-                        <div>
+                        <div className="flex-1 min-w-0 pr-3">
                           <p
-                            className="text-sm font-medium"
+                            className="text-sm font-medium truncate"
                             style={{ color: COLORS.text.secondary }}
                           >
                             Order #{order.orderId}
                           </p>
                           <p
-                            className="text-sm mt-1"
+                            className="text-xs mt-1"
                             style={{ color: COLORS.text.secondary }}
                           >
-                            {new Date(order.createdAt).toLocaleDateString()}
+                            Order Date: {formatDateTime(order.createdAt)}
                           </p>
+                          {order.selectedCoworker && (
+                            <p
+                              className="text-xs mt-1"
+                              style={{ color: COLORS.text.secondary }}
+                            >
+                              <ClickableIdentity
+                                name={order.selectedCoworker}
+                                photoUrl={order.selectedCoworkerPhotoUrl}
+                                phone={order.selectedCoworkerPhone}
+                                address={order.selectedCoworkerAddress}
+                                label="Coworker"
+                                prefix="Assigned for Pickup: "
+                              />
+                            </p>
+                          )}
                         </div>
                         <div
-                          className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold text-white"
+                          className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold text-white flex-shrink-0 whitespace-nowrap"
                           style={{ backgroundColor: getStatusColor(order.status) }}
                         >
                           {getStatusIcon(order.status)}
@@ -390,7 +528,7 @@ export function ServiceCustomerDashboard() {
                               <span>
                                 {qty}x {item.name}
                               </span>
-                              <span>${price.toFixed(2)}</span>
+                              <span>₹{price.toFixed(2)}</span>
                             </div>
                           );
                         })}
@@ -399,7 +537,7 @@ export function ServiceCustomerDashboard() {
                       <div className="flex justify-between font-bold">
                         <span style={{ color: COLORS.text.primary }}>Total</span>
                         <span style={{ color: COLORS.semantic.info }}>
-                          ${order.totalAmount.toFixed(2)}
+                          ₹{order.totalAmount.toFixed(2)}
                         </span>
                       </div>
 
@@ -456,6 +594,27 @@ export function ServiceCustomerDashboard() {
           order={invoiceOrder}
           businessNameHint={selectedSPForOrder?.businessName || service.name}
           onClose={() => setInvoiceOrder(null)}
+        />
+      )}
+
+      {/* Profile Edit Modal */}
+      {showProfileModal && firebaseUser?.uid && (
+        <CustomerProfileEditModal
+          userId={firebaseUser.uid}
+          phone={customerData?.phone || ''}
+          name={customerData?.name || ''}
+          email={customerData?.email || ''}
+          address={customerData?.address || ''}
+          area={customerData?.area || ''}
+          city={customerData?.city || ''}
+          pin={customerData?.pin || ''}
+          mapsLink={customerData?.mapsLink || ''}
+          photoUrl={customerData?.photoUrl || ''}
+          onClose={() => setShowProfileModal(false)}
+          onComplete={() => {
+            // Reload data to refresh profile
+            loadData();
+          }}
         />
       )}
     </div>

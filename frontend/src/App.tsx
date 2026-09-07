@@ -1,6 +1,9 @@
+// trigger stage deploy
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { auth, initFCM } from '@/utils/firebase-config';
+import { registerNativePush } from '@/utils/nativePush';
 import { useAuthStore } from '@/store/authStore';
 import { useNotificationStore } from '@/store/notificationStore';
 import { USER_ROLES } from '@/utils/constants';
@@ -20,6 +23,7 @@ import { ServiceCustomerDashboard } from '@/components/Dashboard/ServiceCustomer
 import { SPDashboard } from '@/components/Dashboard/SPDashboard';
 import { AMDashboard } from '@/components/Dashboard/AMDashboard';
 import { SuperAdminDashboard } from '@/components/Dashboard/SuperAdminDashboard';
+import { NotificationsPage } from '@/pages/NotificationsPage';
 
 function AuthLoadingScreen() {
   return (
@@ -30,8 +34,8 @@ function AuthLoadingScreen() {
 }
 
 function ProtectedRoute() {
-  const { firebaseUser } = useAuthStore();
-  if (!firebaseUser) {
+  const { user } = useAuthStore();
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
   return <Outlet />;
@@ -86,7 +90,7 @@ export function App() {
 
     const registerDeviceToken = async () => {
       try {
-        const token = await initFCM();
+        const token = Capacitor.isNativePlatform() ? await registerNativePush() : await initFCM();
         if (!token || cancelled) return;
         await apiClient.registerPushToken(token);
       } catch {
@@ -143,6 +147,9 @@ export function App() {
 
               {/* Customer service dashboard */}
               <Route path="service/:serviceId" element={<ServiceCustomerDashboard />} />
+
+              {/* Notifications */}
+              <Route path="notifications" element={<NotificationsPage />} />
             </Route>
           </Route>
 
